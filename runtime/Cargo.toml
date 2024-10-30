@@ -35,6 +35,7 @@ pallet-utility.workspace = true
 pallet-proxy.workspace = true
 pallet-preimage.workspace = true
 pallet-scheduler.workspace = true
+pallet-contracts.workspace = true
 
 sp-api.workspace = true
 sp-block-builder.workspace = true
@@ -105,6 +106,7 @@ std = [
 	"pallet-preimage/std",
 	"pallet-scheduler/std",
 	"pallet-collective/std",
+	"pallet-contracts/std",
 
 	"sp-api/std",
 	"sp-block-builder/std",
@@ -137,6 +139,7 @@ runtime-benchmarks = [
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-subnet-democracy/runtime-benchmarks",
 	"pallet-proxy/runtime-benchmarks",
+	"pallet-contracts/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
 
@@ -151,9 +154,10 @@ try-runtime = [
 	"pallet-sudo/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
-	"sp-runtime/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-network/try-runtime",
 	"pallet-multisig/try-runtime",
 	"pallet-proxy/try-runtime",
+	"pallet-contracts/try-runtime",
+	"sp-runtime/try-runtime",
 ]
