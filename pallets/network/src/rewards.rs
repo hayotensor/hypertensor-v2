@@ -308,7 +308,8 @@ impl<T: Config> Pallet<T> {
       let subnet_penalty_count = SubnetPenaltyCount::<T>::get(subnet_id);
       if subnet_penalty_count > max_subnet_penalty_count {
         Self::deactivate_subnet(
-          data.path,
+          None,
+          Some(data.path),
           SubnetRemovalReason::MaxPenalties,
         );
       }

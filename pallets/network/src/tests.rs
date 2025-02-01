@@ -3314,7 +3314,8 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
 
     assert_ok!(
       Network::deactivate_subnet(
-        subnet_path.clone().into(),
+        None,
+        Some(subnet_path.clone().into()),
         SubnetRemovalReason::SubnetDemocracy,
       )
     );
@@ -4027,7 +4028,8 @@ fn test_remove_delegate_stake_after_subnet_remove() {
 
     assert_ok!(
       Network::deactivate_subnet( 
-        subnet_path.clone().into(),
+        None,
+        Some(subnet_path.clone().into()),
         SubnetRemovalReason::SubnetDemocracy,
       )
     );
@@ -7476,3 +7478,29 @@ fn test_epoch_steps() {
   });
 }
 
+#[test]
+fn test_select_validator() {
+  new_test_ext().execute_with(|| {
+    setup_blocks(38);
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+
+    let epoch_length = EpochLength::get();
+    let block = System::block_number();
+    let epoch = block / epoch_length;
+
+
+    let submittable = Network::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+
+    Network::select_validator(subnet_id, &submittable, epoch as u32, block);
+
+    let validator = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    assert!(validator != None, "Validator is None");
+  });
+}

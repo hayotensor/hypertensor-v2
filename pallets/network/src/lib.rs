@@ -467,6 +467,7 @@ pub mod pallet {
 		ProposalComplete,
 		/// Subnet node as defendant has proposal activated already
 		NodeHasActiveProposal,
+		MustPassSubnetIdOrPath,
 	}
 	
 	/// Subnet node classification
@@ -494,6 +495,7 @@ pub mod pallet {
 		pub peer_id: PeerId,
 		pub initialized: u64,
 		pub classification: SubnetNodeClassification,
+		pub reputation: u32,
 		pub a: Vec<u8>,
 		pub b: Vec<u8>,
 		pub c: Vec<u8>,
@@ -547,77 +549,6 @@ pub mod pallet {
     }
 	}
 
-	// #[derive(EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
-	// pub enum SubnetNodeActionType {
-	// 	Deregister,
-	// 	Deactivate,
-	// }
-
-	// #[derive(Default, Encode, Decode, Clone, PartialEq, Eq, scale_info::TypeInfo)]
-	// pub struct SubnetNodePendingActions<AccountId> {
-  //   actions: BTreeMap<AccountId, (SubnetNodeActionType, u64)>,
-	// }
-
-	// impl<T: Config> SubnetNodePendingActions<T> {
-	// 	// fn default() -> Self {
-	// 	// 	SubnetNodePendingActions {
-	// 	// 		actions: BTreeMap::new(),
-	// 	// 	}
-	// 	// }
-
-  //   /// Adds a pending action for a node.
-  //   pub fn add_action(&mut self, account_id: T::AccountId, action: SubnetNodeActionType, target_epoch: u64) {
-	// 		self.actions.insert(account_id, (action, target_epoch));
-  //   }
-
-  //   /// Removes a pending action for a node.
-  //   pub fn remove_action(&mut self, account_id: T::AccountId) {
-	// 		self.actions.remove(&account_id);
-  //   }
-
-  //   /// Checks for actions to be executed at the current epoch.
-  //   pub fn process_actions(&mut self, current_epoch: u64) -> Vec<(T::AccountId, SubnetNodeActionType)> {
-	// 		let mut to_process = vec![];
-
-	// 		for (account_id, (action, target_epoch)) in self.actions.iter() {
-	// 			if *target_epoch <= current_epoch {
-	// 				to_process.push((account_id.clone(), action.clone()));
-	// 			}
-	// 		}
-
-	// 		// Remove processed actions.
-	// 		for (account_id, _) in &to_process {
-	// 			self.actions.remove(account_id);
-	// 		}
-
-	// 		to_process
-  //   }
-
-	// 	pub fn execute_actions(
-	// 		&mut self,
-	// 		current_epoch: u64,
-	// 		nodes: &mut BTreeMap<T::AccountId, SubnetNode<T::AccountId>>,
-	// ) {
-	// 		let actions = self.process_actions(current_epoch);
-
-	// 		for (node_id, action) in actions {
-	// 			if let Some(node) = nodes.get_mut(&node_id) {
-	// 				match action {
-	// 					SubnetNodeActionType::Deregister => {
-	// 						// Remove node if not activated.
-	// 						nodes.remove(&node_id);
-	// 					}
-	// 					SubnetNodeActionType::Deactivate => {
-	// 						// Set node classification to Registered.
-	// 						node.classification.class = SubnetNodeClass::Registered;
-	// 						node.classification.start_epoch = current_epoch;
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-
 	/// Registered: Subnet node registered, not included in consensus
 	/// Idle: Subnet node is activated as idle, unless subnet is registering, and automatically updates on the first successful consensus epoch
 	/// Included: Subnet node automatically updates to Included from Idle on the first successful consensus epoch after being Idle
@@ -661,6 +592,7 @@ pub mod pallet {
 		MinSubnetDelegateStake,
 		Council,
 		EnactmentPeriod,
+		ValidatorReputation,
   }
 
 	/// Attests format for consensus
@@ -846,6 +778,7 @@ pub mod pallet {
 				class: SubnetNodeClass::Registered,
 				start_epoch: 0,
 			},
+			reputation: 0,
 			a: Vec::new(),
 			b: Vec::new(),
       c: Vec::new(),
@@ -1802,13 +1735,15 @@ pub mod pallet {
 			if penalties > MaxSubnetPenaltyCount::<T>::get() {
 				// --- If the subnet has reached max penalty, remove it
         Self::deactivate_subnet(
-          subnet.path,
+					None,
+          Some(subnet.path),
           SubnetRemovalReason::MaxPenalties,
         ).map_err(|e| e)?;
 			} else if subnet_delegate_stake_balance < min_subnet_delegate_stake_balance {
 				// --- If the delegate stake balance is below minimum threshold, remove it
         Self::deactivate_subnet(
-          subnet.path,
+					None,
+          Some(subnet.path),
           SubnetRemovalReason::MinSubnetDelegateStake,
         ).map_err(|e| e)?;
 			}
@@ -2446,7 +2381,8 @@ pub mod pallet {
 			// --- If subnet not activated yet and is outside the enactment period, remove subnet
 			if block > subnet.initialized + subnet.registration_blocks + SubnetActivationEnactmentPeriod::<T>::get() {
 				return Self::deactivate_subnet(
-					subnet.path,
+					None,
+					Some(subnet.path),
 					SubnetRemovalReason::EnactmentPeriod,
 				)
 			}
@@ -2459,7 +2395,8 @@ pub mod pallet {
 
 			if subnet_nodes_count < subnet.min_nodes {
 				return Self::deactivate_subnet(
-					subnet.path,
+					None,
+					Some(subnet.path),
 					SubnetRemovalReason::MinSubnetNodes,
 				)
 			}
@@ -2471,7 +2408,8 @@ pub mod pallet {
 			// --- Ensure delegate stake balance is below minimum threshold required
 			if subnet_delegate_stake_balance < min_subnet_delegate_stake_balance {
 				return Self::deactivate_subnet(
-					subnet.path,
+					None,
+					Some(subnet.path),
 					SubnetRemovalReason::MinSubnetDelegateStake,
 				)
 			}
@@ -2494,25 +2432,41 @@ pub mod pallet {
 		}
 
 		pub fn deactivate_subnet(
-			path: Vec<u8>,
+			subnet_id: Option<u32>,
+			path: Option<Vec<u8>>,
 			reason: SubnetRemovalReason,
 		) -> DispatchResult {
-			ensure!(
-				SubnetPaths::<T>::contains_key(path.clone()),
-				Error::<T>::SubnetNotExist
-			);
+			let (subnet_id, path) = match (subnet_id, path) {
+        (Some(subnet_id), _) => {
+					let subnet = match SubnetsData::<T>::try_get(subnet_id) {
+						Ok(subnet) => subnet,
+						Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
+					};
+					(subnet_id, subnet.path)
+				}
+				(_, Some(path)) => {
+					let subnet_id = match SubnetPaths::<T>::try_get(path.clone()) {
+						Ok(subnet_id) => subnet_id,
+						Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
+					};
+					(subnet_id, path)
+        }
+				(None, None) => {
+					return Err(Error::<T>::SubnetNotExist.into())
+				}
+			};
 
-			let subnet_id = SubnetPaths::<T>::get(path.clone()).unwrap();
-
+			// Get subnets data before removing
 			let subnet = match SubnetsData::<T>::try_get(subnet_id) {
         Ok(subnet) => subnet,
         Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
 			};
 
 			// Remove unique path
-			SubnetPaths::<T>::remove(path.clone());
+			SubnetPaths::<T>::remove(path);
 			// Remove subnet data
 			SubnetsData::<T>::remove(subnet_id);
+
 			// Decrease total subnet memory
 			TotalSubnetMemoryMB::<T>::mutate(|n: &mut u128| n.saturating_reduce(subnet.memory_mb));
 
@@ -2663,6 +2617,7 @@ pub mod pallet {
 				peer_id: peer_id.clone(),
 				initialized: 0,
 				classification: classification,
+				reputation: 1000,
 				a: Vec::new(),
 				b: Vec::new(),
 				c: Vec::new(),
@@ -3105,7 +3060,8 @@ impl<T: Config> SubnetVote<OriginFor<T>, T::AccountId> for Pallet<T> {
 	}
 	fn vote_deactivated(deactivator: T::AccountId, path: Vec<u8>, proposer: T::AccountId, vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult {
 		Self::deactivate_subnet(
-			vote_subnet_data.clone().data.path,
+			None,
+			Some(vote_subnet_data.clone().data.path),
 			SubnetRemovalReason::SubnetDemocracy
 		)
 	}
@@ -3314,7 +3270,8 @@ impl<T: Config> AdminInterface<T::AccountId> for Pallet<T> {
 	}
 	fn council_remove_subnet(path: Vec<u8>) -> DispatchResult {
 		Self::deactivate_subnet(
-			path,
+			None,
+			Some(path),
 			SubnetRemovalReason::Council
 		)
 	}

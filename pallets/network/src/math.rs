@@ -133,4 +133,20 @@ impl<T: Config> Pallet<T> {
   pub fn wmul(x: u128, y: u128) -> u128 {
     ((x * y) + (1e+18 as u128 / 2)) / 1e+18 as u128
   }
+
+  pub fn min(a: u128, b: u128) -> u128 {
+    if a < b {
+      a
+    } else {
+      b
+    }
+  }
+
+  pub fn max(a: u128, b: u128) -> u128 {
+    if a > b {
+      a
+    } else {
+      b
+    }
+  }
 }

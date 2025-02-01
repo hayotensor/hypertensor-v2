@@ -18,6 +18,8 @@ use frame_support::pallet_prelude::DispatchResultWithPostInfo;
 use frame_support::pallet_prelude::Pays;
 
 impl<T: Config> Pallet<T> {
+  pub const REPUTATION_FACTOR: u32 = 1000;
+
   /// Submit subnet scores per subnet node
   /// Validator of the epoch receives rewards when attestation passes consensus
   pub fn do_validate(
@@ -259,24 +261,161 @@ impl<T: Config> Pallet<T> {
 
   }
 
-  /// Increase a subnet nodes classification
-  // Nodes that enter before the activation of a subnet are automatically Submittable, otherwise
-  // on entry they are classified as `Idle`
-  // After `x` epochs, they can increase their classification to `Inclusion`
-  //    - This is used as a way for subnets nodes to do preliminary events before they are ready to be included in
-  pub fn increase_classification(subnet_id: u32, account_id: T::AccountId) -> DispatchResult {
-    let subnet_node = match SubnetNodesData::<T>::try_get(subnet_id, account_id) {
-      Ok(subnet_node) => subnet_node,
-      Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
-    };
+  /// Increase reputation based on attestation percentage (scaled by 1e9)
+  fn increase_reputation_attestation(
+    subnet_id: u32,
+    mut validator: &SubnetNode<T::AccountId>,
+    attestation_percentage: u128, 
+    min_attestation_percentage: u128, 
+    weight: u32
+  ) {
+    if attestation_percentage >= min_attestation_percentage {
+      if validator.reputation >= Self::REPUTATION_FACTOR {
+        return
+      }
+      
+      // Scale the PERCENTAGE_FACTOR down to REPUTATION_FACTOR
+      // Example:
+      //  500 = 500000000 / 1000000
+      let attestation_percentage_scaled: u32 = (attestation_percentage / 1_000_000) as u32;
+      // Example:
+      //  660 = 660000000 / 1000000
+      let min_attestation_percentage_scaled: u32 = (min_attestation_percentage / 1_000_000) as u32;
 
-    // --- Get classification
+      // Calculate the reward factor (non-linear formula)
+      // Example 1:
+      //  1109 = 1000 * 1000 / (900 + 1)
+      // Example 2:
+      //  2493 = 1000 * 1000 / (400 + 1)
+      let reward_factor: u32 = Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR / (validator.reputation + 1); 
 
-    // --- Get `x` required epochs to increase classification
+      // Calculate the nominal reward
+      // Example 1:
+      //  188 = (1000 - 660) * 500 * 1109 / 1000000
+      // Example 2:
+      //  49 = (700 - 660) * 500 * 2493 / 1000000
+      // Example 2:
+      //  0 = (660 - 660) * 500 * 2493 / 1000000
+      let nominal_reward: u32  = (attestation_percentage_scaled - min_attestation_percentage_scaled) * weight * reward_factor / (Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR);
 
-    // --- Check the most recent `x` count of epochs
+      if nominal_reward == 0 {
+        return
+      }
+      // Apply the reputation increase and clamp to `REPUTATION_FACTOR`
+      validator.reputation.saturating_add(nominal_reward).min(Self::REPUTATION_FACTOR);
 
-    // -- Must be in included `x` epochs
-    Ok(())
+      SubnetNodesData::<T>::insert(subnet_id, validator.account_id.clone(), validator);
+    }
   }
+
+  /// Decrease reputation based on attestation percentage
+  fn decrease_reputation_attestation(
+    subnet_id: u32,
+    mut validator: &SubnetNode<T::AccountId>,
+    attestation_percentage: u128, 
+    min_attestation_percentage: u128, 
+    weight: u32
+  ) {
+    if attestation_percentage < min_attestation_percentage {
+      // Scale the PERCENTAGE_FACTOR down to REPUTATION_FACTOR
+      // Example:
+      //  500 = 500000000 / 1000000
+      let attestation_percentage_scaled: u32 = (attestation_percentage / 1_000_000) as u32;
+      // Example:
+      //  660 = 660000000 / 1000000
+      let min_attestation_percentage_scaled: u32 = (min_attestation_percentage / 1_000_000) as u32;
+
+      // Calculate the penalty factor (non-linear formula)
+      // Example 1:
+      //  1109 = 1000 * 1000 / (900 + 1)
+      // Example 2:
+      //  2493 = 1000 * 1000 / (400 + 1)
+      // Example 3:
+      //  2493 = 1000 * 1000 / (400 + 1)
+      // Example 4:
+      //  999 = 1000 * 1000 / (1000 + 1)
+      let penalty_factor: u32 = Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR / (validator.reputation + 1); 
+
+      // Calculate the nominal penalty
+      // Example 1:
+      //  88 = (660 - 500) * 500 * 1109 / 1000000
+      // Example 2:
+      //  199 = (660 - 500) * 500 * 2493 / 1000000
+      // Example 3:
+      //  1 = (660 - 659) * 500 * 2493 / 1000000
+      // Example 4:
+      //  79 = (660 - 500) * 500 * 999 / 1000000
+      let nominal_penalty: u32 = (min_attestation_percentage_scaled - attestation_percentage_scaled) * weight * penalty_factor / (Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR);
+
+      // Example 1:
+      //  88720 = 900 - 
+      // Example 2:
+      //  199440 = (660 - 500) * 500 * 2493 / 1000000
+      // Example 3:
+      //  199440 = (660 - 659) * 500 * 2493 / 1000000
+      // Example 3:
+      //  199440 = (660 - 659) * 500 * 2493 / 1000000
+      validator.reputation.saturating_sub(nominal_penalty);
+
+      if validator.reputation == 0 {
+
+      }
+
+      SubnetNodesData::<T>::insert(subnet_id, validator.account_id.clone(), validator);
+    }
+  }
+
+  // /// Decrease reputation by a fixed amount for failing to submit data
+  // fn decrease_reputation_no_submission(&mut self, default_decrease: f64) {
+  //   self.reputation -= default_decrease;
+  //   // Ensure reputation does not go below 0
+  //   self.reputation = self.reputation.max(0.0);
+  // }
+
+  /// Calculate the weight for a validator based on its reputation score
+  fn calculate_weight(reputation: u32) -> u32 {
+    // If the reputation is 0, the weight is 0 (no chance of being selected).
+    // Otherwise, the weight is directly proportional to the reputation score.
+    if reputation == 0 {
+      0
+    } else {
+      reputation // Higher reputation = higher weight
+    }
+  }
+
+  /// Select a validator randomly based on their reputation (weighted random selection)
+  pub fn select_validator(subnet_id: u32, validators: &[SubnetNode<T::AccountId>], epoch: u32, block: u64) {
+    // Calculate the total weight (sum of all weights)
+    let total_weight: u32 = validators.iter().map(|v| Self::calculate_weight(v.reputation)).sum();
+
+    // If total_weight is 0, no validator can be selected
+    if total_weight == 0 {
+      // Self::deactivate_subnet(
+      //   data.path,
+      //   SubnetRemovalReason::ValidatorReputation,
+      // );
+
+      return
+    }
+
+    // Generate a random number between 0 and total_weight
+    let random_number = Self::get_random_number(total_weight, block as u32);
+
+    // Perform weighted random selection
+    let mut cumulative_weight = 0;
+    for validator in validators {
+      cumulative_weight += validator.reputation;
+      if random_number < cumulative_weight {
+        SubnetRewardsValidator::<T>::insert(subnet_id, epoch, validator.account_id.clone());
+        return
+      }
+    }
+
+    // If no validator is selected (should not happen if total_weight > 0) then remove subnet
+    // Self::deactivate_subnet(
+    //   data.path,
+    //   SubnetRemovalReason::ValidatorReputation,
+    // );
+  }
+
 }

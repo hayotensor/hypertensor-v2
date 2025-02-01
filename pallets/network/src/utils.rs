@@ -278,7 +278,8 @@ impl<T: Config> Pallet<T> {
         // --- Ensure subnet is in registration period and hasn't passed enactment period
         // If subnet hasn't been activated after the enacement period, then remove subnet
 				Self::deactivate_subnet(
-					data.path,
+          None,
+					Some(data.path),
 					SubnetRemovalReason::EnactmentPeriod,
 				);
         continue
@@ -296,7 +297,8 @@ impl<T: Config> Pallet<T> {
       // --- Ensure min delegate stake balance is met
       if subnet_delegate_stake_balance < min_subnet_delegate_stake_balance {
         Self::deactivate_subnet(
-          data.path,
+          None,
+          Some(data.path),
           SubnetRemovalReason::MinSubnetDelegateStake,
         );
         continue
@@ -317,7 +319,8 @@ impl<T: Config> Pallet<T> {
       let penalties = SubnetPenaltyCount::<T>::get(subnet_id);
       if penalties >  max_subnet_penalty_count{
         Self::deactivate_subnet(
-          data.path,
+          None,
+          Some(data.path),
           SubnetRemovalReason::MaxPenalties,
         );
         continue
