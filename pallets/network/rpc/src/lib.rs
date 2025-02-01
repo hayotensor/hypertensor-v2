@@ -41,6 +41,8 @@ pub trait NetworkCustomApi<BlockHash> {
 	fn get_subnet_node_info(&self, subnet_id: u32, at: Option<BlockHash>) -> RpcResult<Vec<u8>>;
 	#[method(name = "network_isSubnetNodeByPeerId")]
 	fn is_subnet_node_by_peer_id(&self, subnet_id: u32, peer_id: Vec<u8>, at: Option<BlockHash>) -> RpcResult<bool>;
+	#[method(name = "network_areSubnetNodesByPeerId")]
+	fn are_subnet_nodes_by_peer_id(&self, subnet_id: u32, peer_ids: Vec<Vec<u8>>, at: Option<BlockHash>) -> RpcResult<BTreeMap<Vec<u8>, bool>>;
 }
 
 /// A struct that implements the `NetworkCustomApi`.
@@ -114,35 +116,35 @@ where
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_subnet_nodes_included(at, subnet_id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to get subnet nodes included: {:?}", e)).into()
 		})
 	}
 	fn get_subnet_nodes_submittable(&self, subnet_id: u32, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<u8>> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_subnet_nodes_submittable(at, subnet_id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to get subnet nodes submittable: {:?}", e)).into()
 		})
 	}
 	fn get_subnet_nodes_subnet_unconfirmed_count(&self, subnet_id: u32, at: Option<<Block as BlockT>::Hash>) -> RpcResult<u32> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_subnet_nodes_subnet_unconfirmed_count(at, subnet_id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to get subnet nodes unconfirmed: {:?}", e)).into()
 		})
 	}
 	fn get_consensus_data(&self, subnet_id: u32, epoch: u32, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<u8>> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_consensus_data(at, subnet_id, epoch).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to get consensus data: {:?}", e)).into()
 		})
 	}
 	fn get_accountant_data(&self, subnet_id: u32, id: u32, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<u8>> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_accountant_data(at, subnet_id, id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to get accountant data: {:?}", e)).into()
 		})
 	}
 	fn get_minimum_subnet_nodes(&self, memory_mb: u128, at: Option<<Block as BlockT>::Hash>) -> RpcResult<u32> {
@@ -156,21 +158,28 @@ where
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_minimum_delegate_stake(at, memory_mb).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get minimum subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to minimuum delegate stake: {:?}", e)).into()
 		})
 	}
 	fn get_subnet_node_info(&self, subnet_id: u32, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<u8>> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_subnet_node_info(at, subnet_id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get minimum subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to get subnet node info: {:?}", e)).into()
 		})
 	}
 	fn is_subnet_node_by_peer_id(&self, subnet_id: u32, peer_id: Vec<u8>, at: Option<<Block as BlockT>::Hash>) -> RpcResult<bool> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.is_subnet_node_by_peer_id(at, subnet_id, peer_id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get minimum subnet nodes: {:?}", e)).into()
+			Error::RuntimeError(format!("Unable to subnet node by peer ID: {:?}", e)).into()
+		})
+	}
+	fn are_subnet_nodes_by_peer_id(&self, subnet_id: u32, peer_ids: Vec<Vec<u8>>, at: Option<<Block as BlockT>::Hash>) -> RpcResult<BTreeMap<Vec<u8>, bool>> {
+		let api = self.client.runtime_api();
+		let at = at.unwrap_or_else(|| self.client.info().best_hash);
+		api.are_subnet_nodes_by_peer_id(at, subnet_id, peer_id).map_err(|e| {
+			Error::RuntimeError(format!("Unable to get subnet nodes by peer IDs: {:?}", e)).into()
 		})
 	}
 }

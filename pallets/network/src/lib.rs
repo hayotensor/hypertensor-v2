@@ -1003,7 +1003,7 @@ pub mod pallet {
 		// 600
 
 		// Local 24 blocks
-		50
+		25
 	}
 	#[pallet::type_value]
 	pub fn DefaultMaxSubnetRegistrationBlocks() -> u64 {
@@ -2948,6 +2948,10 @@ pub mod pallet {
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			// MinSubnetRegistrationBlocks::<T>::put(50);
+
+			if self.subnet_path.last().is_none() {
+				return
+			}
 			
 			let subnet_id = 1;
 

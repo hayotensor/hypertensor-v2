@@ -471,7 +471,7 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 
 parameter_types! {
 	pub const InitialTxRateLimit: u64 = 0;
-	pub const EpochLength: u64 = 10; // Testnet 690 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochLength: u64 = 10; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
 	pub const SubnetInitializationCost: u128 = 100_000_000_000_000_000_000;
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18
@@ -919,6 +919,10 @@ impl_runtime_apis! {
 		fn is_subnet_node_by_peer_id(subnet_id: u32, peer_id: Vec<u8>) -> bool {
 			let result = Network::is_subnet_node_by_peer_id(subnet_id, peer_id);
 			result
+		}	
+		fn are_subnet_nodes_by_peer_id(subnet_id: u32, peer_ids: Vec<Vec<u8>>) -> BTreeMap<Vec<u8>, bool> {
+			let result = Network::is_subnet_node_by_peer_id(subnet_id, peer_id);
+			result.encode()
 		}	
 	}
 

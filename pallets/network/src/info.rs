@@ -117,4 +117,19 @@ impl<T: Config> Pallet<T> {
       Err(()) => false,
     }
   }
+
+  pub fn are_subnet_nodes_by_peer_id(subnet_id: u32, peer_ids: Vec<Vec<u8>>) -> BTreeMap<Vec<u8>, bool> {
+    let mut subnet_nodes: BTreeMap<Vec<u8>, bool> = BTreeMap::new();
+
+    for peer_id in peer_ids.iter() {
+      let is = match SubnetNodeAccount::<T>::try_get(subnet_id, PeerId(peer_id.clone())) {
+        Ok(_) => true,
+        Err(()) => false,
+      };
+      subnet_nodes.insert(peer_id.clone(), is);
+    }
+
+    subnet_nodes
+  }
+
 }
