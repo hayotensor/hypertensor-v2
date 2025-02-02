@@ -38,6 +38,7 @@ impl<T: Config> Pallet<T> {
     let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<T>::get();
 
     let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
+    let reputation_weight = ValidatorReputationWeight::<T>::get();
 
     for (subnet_id, data) in SubnetsData::<T>::iter() {
       // --- We don't check for minimum nodes because nodes cannot validate or attest if they are not met
@@ -106,7 +107,27 @@ impl<T: Config> Pallet<T> {
           // of each other.
           if attestation_percentage < min_vast_majority_attestation_percentage {
             // --- Slash validator and increase penalty score
-            Self::slash_validator(subnet_id, validator, attestation_percentage, block);
+            if let Ok(mut subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, validator.clone()) {
+              Self::slash_validator(
+                  subnet_id, 
+                  &mut subnet_node,
+                  attestation_percentage, 
+                  min_attestation_percentage, 
+                  reputation_weight,
+                  block
+              );
+            }
+                    
+            // SubnetNodesData::<T>::try_get(subnet_id, validator.clone()).map(|subnet_node: SubnetNode<T::AccountId>| {
+            //   Self::slash_validator(
+            //     subnet_id, 
+            //     &mut subnet_node,
+            //     attestation_percentage, 
+            //     min_attestation_percentage, 
+            //     reputation_weight,
+            //     block
+            //   );
+            // });
           }
 
           // --- If the subnet was deemed in a broken stake by the validator, rewards are bypassed
@@ -117,8 +138,27 @@ impl<T: Config> Pallet<T> {
         // We don't increase subnet penalty count here because this is likely the validators fault
         if attestation_percentage < min_attestation_percentage {
           // --- Slash validator and increase penalty score
-          Self::slash_validator(subnet_id, validator, attestation_percentage, block);
-          
+          // SubnetNodesData::<T>::try_get(subnet_id, validator.clone()).map(|subnet_node: &mut SubnetNode<T::AccountId>| {
+          //   Self::slash_validator(
+          //     subnet_id, 
+          //     subnet_node,
+          //     attestation_percentage, 
+          //     min_attestation_percentage, 
+          //     reputation_weight,
+          //     block
+          //   );
+          // });
+          if let Ok(mut subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, validator.clone()) {
+            Self::slash_validator(
+                subnet_id, 
+                &mut subnet_node,
+                attestation_percentage, 
+                min_attestation_percentage, 
+                reputation_weight,
+                block
+            );
+          }
+
           // --- Attestation not successful, move on to next subnet
           continue
         }
@@ -127,8 +167,9 @@ impl<T: Config> Pallet<T> {
         let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
     
         // --- Reward validators
-        for subnet_node in SubnetNodesData::<T>::iter_prefix_values(subnet_id) {
-          let account_id: T::AccountId = subnet_node.account_id;
+        // `subnet_node` mutable for validator reputation increase
+        for mut subnet_node in SubnetNodesData::<T>::iter_prefix_values(subnet_id) {
+          let account_id: T::AccountId = subnet_node.account_id.clone();
 
           // --- (if) Check if subnet node is past the max registration epochs to update to Included
           // --- (else if) Check if past Idle and can be included in validation data
@@ -157,7 +198,7 @@ impl<T: Config> Pallet<T> {
 
           // --- At this point, all nodes should be included in consensus data
 
-          let peer_id: PeerId = subnet_node.peer_id;
+          let peer_id: PeerId = subnet_node.peer_id.clone();
 
           let mut subnet_node_data: SubnetNodeData = SubnetNodeData::default();
 
@@ -259,6 +300,13 @@ impl<T: Config> Pallet<T> {
 
           // --- Increase reward if validator
           if account_id == validator {
+            Self::increase_reputation_attestation(
+              subnet_id,
+              &mut subnet_node,
+              attestation_percentage, 
+              min_attestation_percentage, 
+              reputation_weight
+            );
             account_reward += Self::get_validator_reward(attestation_percentage);    
           }
 
@@ -284,7 +332,7 @@ impl<T: Config> Pallet<T> {
 
         // --- Increment down subnet penalty score on successful epochs
         SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
-      } else if let Ok(rewards_validator) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
+      } else if let Ok(validator) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
         // --- If a validator has been chosen that means they are supposed to be submitting consensus data
         //     since the subnet is past its MinRequiredSubnetConsensusSubmitEpochs
         // --- If there is no submission but validator chosen, increase penalty on subnet and validator
@@ -298,7 +346,16 @@ impl<T: Config> Pallet<T> {
 
         // If validator didn't submit anything, then slash
         // Even if a subnet is in a broken state, the chosen validator must submit blank data
-        Self::slash_validator(subnet_id, rewards_validator, 0, block);
+        if let Ok(mut subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, validator.clone()) {
+          Self::slash_validator(
+              subnet_id, 
+              &mut subnet_node,
+              0, 
+              min_attestation_percentage, 
+              reputation_weight,
+              block
+          );
+        }
       }
 
       // TODO: Automatically remove subnet if greater than max penalties count

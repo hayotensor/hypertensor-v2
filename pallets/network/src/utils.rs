@@ -305,8 +305,13 @@ impl<T: Config> Pallet<T> {
       }
 
       // --- Get all possible validators
-      let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
-      let subnet_nodes_count = subnet_node_accounts.len();
+      // let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+      // let subnet_node_accounts: &[SubnetNode<T::AccountId>] = Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+      // let subnet_node_accounts: [SubnetNode<T::AccountId>] = Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+      let mut subnet_nodes: Vec<SubnetNode<T::AccountId>> = Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+      let subnet_nodes: &[SubnetNode<T::AccountId>] = &subnet_nodes;
+
+      let subnet_nodes_count = subnet_nodes.len();
       
       // --- Ensure min nodes are active
       // Only choose validator if min nodes are present
@@ -326,13 +331,15 @@ impl<T: Config> Pallet<T> {
         continue
       }
 
-      Self::choose_validator(
-        block,
-        subnet_id,
-        subnet_node_accounts.clone(),
-        min_subnet_nodes,
-        epoch,
-      );
+      Self::select_validator(subnet_id, subnet_nodes, epoch, block);
+
+      // Self::choose_validator(
+      //   block,
+      //   subnet_id,
+      //   subnet_node_accounts.clone(),
+      //   min_subnet_nodes,
+      //   epoch,
+      // );
 
       // Self::choose_accountants(
       //   block,
@@ -470,6 +477,19 @@ impl<T: Config> Pallet<T> {
       .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
       .collect()
   }
+  // pub fn get_classified_subnet_nodes<C>(
+  //   subnet_id: u32,
+  //   classification: &SubnetNodeClass,
+  //   epoch: u64,
+  // ) -> C
+  //   where
+  //     C: FromIterator<T::AccountId>,
+  // {
+  //   SubnetNodesData::<T>::iter_prefix_values(subnet_id)
+  //     .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
+  //     .map(|subnet_node| subnet_node.account_id)
+  //     .collect()
+  // }
 
   pub fn get_classified_subnet_node_info(subnet_id: u32, classification: &SubnetNodeClass, epoch: u64) -> Vec<SubnetNodeInfo<T::AccountId>> {
     SubnetNodesData::<T>::iter_prefix_values(subnet_id)
@@ -490,8 +510,8 @@ impl<T: Config> Pallet<T> {
     classification: &SubnetNodeClass,
     epoch: u64,
   ) -> C
-  where
-    C: FromIterator<T::AccountId>,
+    where
+      C: FromIterator<T::AccountId>,
   {
     SubnetNodesData::<T>::iter_prefix_values(subnet_id)
       .filter(|subnet_node| subnet_node.has_classification(classification, epoch))

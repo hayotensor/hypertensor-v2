@@ -468,6 +468,9 @@ pub mod pallet {
 		/// Subnet node as defendant has proposal activated already
 		NodeHasActiveProposal,
 		MustPassSubnetIdOrPath,
+
+		/// The active validator cannot remove themselves until the next epoch, you can deactivate instead
+		ActiveValidatorCannotRemove,
 	}
 	
 	/// Subnet node classification
@@ -793,6 +796,10 @@ pub mod pallet {
 	#[pallet::type_value]
 	pub fn DefaultMaxAccountPenaltyCount() -> u32 {
 		12
+	}
+	#[pallet::type_value]
+	pub fn DefaultValidatorReputationWeight() -> u32 {
+		500
 	}
 	#[pallet::type_value]
 	pub fn DefaultAccountPenaltyCount() -> u32 {
@@ -1235,6 +1242,10 @@ pub mod pallet {
 	//
 	// Validate / Attestation
 	//
+
+	// Maximum subnet peer penalty count
+	#[pallet::storage]
+	pub type ValidatorReputationWeight<T> = StorageValue<_, u32, ValueQuery, DefaultValidatorReputationWeight>;	
 
 	// The account responsible for validating the epochs rewards data
 	#[pallet::storage] // subnet ID => epoch  => data
@@ -1849,6 +1860,18 @@ pub mod pallet {
 		) -> DispatchResult {
 			let account_id: T::AccountId = ensure_signed(origin)?;
 
+			let block: u64 = Self::get_current_block_as_u64();
+			let epoch_length: u64 = T::EpochLength::get();
+			let epoch: u64 = block / epoch_length;
+
+			// --- Cannot remove if active validator of the current epoch
+			if let Ok(validator) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch as u32) {
+				ensure!(
+					account_id != validator,
+					Error::<T>::ActiveValidatorCannotRemove
+				);
+			}
+
 			Self::do_remove_subnet_node(account_id, subnet_id)
 		}
 
@@ -1929,7 +1952,7 @@ pub mod pallet {
 
 			// If account is a peer they can remove stake up to minimum required stake balance
 			// Else they can remove entire balance because they are not hosting subnets according to consensus
-			//		They are removed in `do_remove_subnet_node()` when self or consensus removed
+			//		They are removed in `perform_remove_subnet_node()` when self or consensus removed
 			let is_subnet_node: bool = match SubnetNodesData::<T>::try_get(subnet_id, account_id.clone()) {
 				Ok(_) => true,
 				Err(()) => false,
@@ -2500,10 +2523,6 @@ pub mod pallet {
 		) -> DispatchResult {
 			let block: u64 = Self::get_current_block_as_u64();
 
-			// TODO: Track removal of subnet nodes following validator consensus data submission per epoch
-
-			// We don't check consensus steps here because a subnet peers stake isn't included in calculating rewards 
-			// that hasn't reached their consensus submission epoch yet
 			Self::perform_remove_subnet_node(block, subnet_id, account_id.clone());
 
 			Ok(())

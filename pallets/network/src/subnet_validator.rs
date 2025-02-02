@@ -210,13 +210,20 @@ impl<T: Config> Pallet<T> {
     Self::percent_mul(BaseValidatorReward::<T>::get(), attestation_percentage)
   }
 
-  pub fn slash_validator(subnet_id: u32, validator: T::AccountId, attestation_percentage: u128, block: u64) {
+  pub fn slash_validator(
+    subnet_id: u32, 
+    mut validator: &mut SubnetNode<T::AccountId>,
+    attestation_percentage: u128, 
+    min_attestation_percentage: u128, 
+    weight: u32,
+    block: u64
+  ) {
     // We never ensure balance is above 0 because any validator chosen must have the target stake
     // balance at a minimum
 
     // --- Get stake balance
     // This could be greater than the target stake balance
-    let account_subnet_stake: u128 = AccountSubnetStake::<T>::get(validator.clone(), subnet_id);
+    let account_subnet_stake: u128 = AccountSubnetStake::<T>::get(validator.account_id.clone(), subnet_id);
 
     // --- Get slash amount up to max slash
     //
@@ -228,33 +235,44 @@ impl<T: Config> Pallet<T> {
     if slash_amount > max_slash {
       slash_amount = max_slash
     }
+
+    // --- Add slashing of cooldown funds if validator left before incentives mechanism ran
     
     // --- Decrease account stake
     Self::decrease_account_stake(
-      &validator.clone(),
+      &validator.account_id.clone(),
       subnet_id, 
       slash_amount,
+    );
+
+    Self::decrease_reputation_attestation(
+      subnet_id,
+      validator,
+      attestation_percentage, 
+      min_attestation_percentage, 
+      weight,
+      block
     );
 
     // --- Increase validator penalty count
     // AccountPenaltyCount::<T>::mutate(validator.clone(), |n: &mut u32| *n += 1);
     // SubnetNodePenalties::<T>::mutate(subnet_id, validator.clone(), |n: &mut u32| *n += 1);
 
-    let penalties = SubnetNodePenalties::<T>::get(subnet_id, validator.clone());
-    SubnetNodePenalties::<T>::insert(subnet_id, validator.clone(), penalties + 1);
+    // let penalties = SubnetNodePenalties::<T>::get(subnet_id, validator.clone());
+    // SubnetNodePenalties::<T>::insert(subnet_id, validator.clone(), penalties + 1);
 
     // --- Ensure maximum sequential removal consensus threshold is reached
-    if penalties + 1 > MaxSubnetNodePenalties::<T>::get() {
-      // --- Increase account penalty count
-      Self::perform_remove_subnet_node(block, subnet_id, validator.clone());
-    } else {
+    // if penalties + 1 > MaxSubnetNodePenalties::<T>::get() {
+    //   // --- Increase account penalty count
+    //   Self::perform_remove_subnet_node(block, subnet_id, validator.clone());
+    // } else {
       
-    }
+    // }
 
     Self::deposit_event(
       Event::Slashing { 
         subnet_id: subnet_id, 
-        account_id: validator, 
+        account_id: validator.account_id.clone(), 
         amount: slash_amount,
       }
     );
@@ -262,13 +280,14 @@ impl<T: Config> Pallet<T> {
   }
 
   /// Increase reputation based on attestation percentage (scaled by 1e9)
-  fn increase_reputation_attestation(
+  pub fn increase_reputation_attestation(
     subnet_id: u32,
-    mut validator: &SubnetNode<T::AccountId>,
+    mut validator: &mut SubnetNode<T::AccountId>,
     attestation_percentage: u128, 
     min_attestation_percentage: u128, 
     weight: u32
   ) {
+    log::error!("increase_reputation_attestation");
     if attestation_percentage >= min_attestation_percentage {
       if validator.reputation >= Self::REPUTATION_FACTOR {
         return
@@ -278,9 +297,12 @@ impl<T: Config> Pallet<T> {
       // Example:
       //  500 = 500000000 / 1000000
       let attestation_percentage_scaled: u32 = (attestation_percentage / 1_000_000) as u32;
+      log::error!("increase_reputation_attestation attestation_percentage_scaled {:?}", attestation_percentage_scaled);
+
       // Example:
       //  660 = 660000000 / 1000000
       let min_attestation_percentage_scaled: u32 = (min_attestation_percentage / 1_000_000) as u32;
+      log::error!("increase_reputation_attestation min_attestation_percentage_scaled {:?}", min_attestation_percentage_scaled);
 
       // Calculate the reward factor (non-linear formula)
       // Example 1:
@@ -288,6 +310,7 @@ impl<T: Config> Pallet<T> {
       // Example 2:
       //  2493 = 1000 * 1000 / (400 + 1)
       let reward_factor: u32 = Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR / (validator.reputation + 1); 
+      log::error!("increase_reputation_attestation reward_factor {:?}", reward_factor);
 
       // Calculate the nominal reward
       // Example 1:
@@ -297,33 +320,43 @@ impl<T: Config> Pallet<T> {
       // Example 2:
       //  0 = (660 - 660) * 500 * 2493 / 1000000
       let nominal_reward: u32  = (attestation_percentage_scaled - min_attestation_percentage_scaled) * weight * reward_factor / (Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR);
+      log::error!("increase_reputation_attestation nominal_reward {:?}", nominal_reward);
 
       if nominal_reward == 0 {
         return
       }
-      // Apply the reputation increase and clamp to `REPUTATION_FACTOR`
-      validator.reputation.saturating_add(nominal_reward).min(Self::REPUTATION_FACTOR);
+
+      validator.reputation = validator.reputation.saturating_add(nominal_reward).min(Self::REPUTATION_FACTOR);
+      log::error!("increase_reputation_attestation validator.reputation {:?}", validator.reputation);
 
       SubnetNodesData::<T>::insert(subnet_id, validator.account_id.clone(), validator);
     }
   }
 
   /// Decrease reputation based on attestation percentage
-  fn decrease_reputation_attestation(
+  pub fn decrease_reputation_attestation(
     subnet_id: u32,
-    mut validator: &SubnetNode<T::AccountId>,
+    mut validator: &mut SubnetNode<T::AccountId>,
     attestation_percentage: u128, 
     min_attestation_percentage: u128, 
-    weight: u32
+    weight: u32,
+    block: u64
   ) {
+    log::error!("decrease_reputation_attestation");
+    log::error!("decrease_reputation_attestation attestation_percentage     {:?}", attestation_percentage);
+    log::error!("decrease_reputation_attestation min_attestation_percentage {:?}", min_attestation_percentage);
+
     if attestation_percentage < min_attestation_percentage {
       // Scale the PERCENTAGE_FACTOR down to REPUTATION_FACTOR
       // Example:
       //  500 = 500000000 / 1000000
       let attestation_percentage_scaled: u32 = (attestation_percentage / 1_000_000) as u32;
+      log::error!("decrease_reputation_attestation attestation_percentage_scaled {:?}", attestation_percentage_scaled);
+
       // Example:
       //  660 = 660000000 / 1000000
       let min_attestation_percentage_scaled: u32 = (min_attestation_percentage / 1_000_000) as u32;
+      log::error!("decrease_reputation_attestation min_attestation_percentage_scaled {:?}", min_attestation_percentage_scaled);
 
       // Calculate the penalty factor (non-linear formula)
       // Example 1:
@@ -335,6 +368,7 @@ impl<T: Config> Pallet<T> {
       // Example 4:
       //  999 = 1000 * 1000 / (1000 + 1)
       let penalty_factor: u32 = Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR / (validator.reputation + 1); 
+      log::error!("decrease_reputation_attestation penalty_factor {:?}", penalty_factor);
 
       // Calculate the nominal penalty
       // Example 1:
@@ -346,6 +380,8 @@ impl<T: Config> Pallet<T> {
       // Example 4:
       //  79 = (660 - 500) * 500 * 999 / 1000000
       let nominal_penalty: u32 = (min_attestation_percentage_scaled - attestation_percentage_scaled) * weight * penalty_factor / (Self::REPUTATION_FACTOR * Self::REPUTATION_FACTOR);
+      log::error!("decrease_reputation_attestation nominal_penalty {:?}", nominal_penalty);
+      log::error!("decrease_reputation_attestation validator.reputation {:?}", validator.reputation);
 
       // Example 1:
       //  88720 = 900 - 
@@ -355,10 +391,12 @@ impl<T: Config> Pallet<T> {
       //  199440 = (660 - 659) * 500 * 2493 / 1000000
       // Example 3:
       //  199440 = (660 - 659) * 500 * 2493 / 1000000
-      validator.reputation.saturating_sub(nominal_penalty);
+      validator.reputation.saturating_reduce(nominal_penalty);
+      log::error!("decrease_reputation_attestation validator.reputation {:?}", validator.reputation);
 
       if validator.reputation == 0 {
-
+        Self::perform_remove_subnet_node(block, subnet_id, validator.account_id.clone());
+        return
       }
 
       SubnetNodesData::<T>::insert(subnet_id, validator.account_id.clone(), validator);
@@ -372,29 +410,18 @@ impl<T: Config> Pallet<T> {
   //   self.reputation = self.reputation.max(0.0);
   // }
 
-  /// Calculate the weight for a validator based on its reputation score
-  fn calculate_weight(reputation: u32) -> u32 {
-    // If the reputation is 0, the weight is 0 (no chance of being selected).
-    // Otherwise, the weight is directly proportional to the reputation score.
-    if reputation == 0 {
-      0
-    } else {
-      reputation // Higher reputation = higher weight
-    }
-  }
-
   /// Select a validator randomly based on their reputation (weighted random selection)
   pub fn select_validator(subnet_id: u32, validators: &[SubnetNode<T::AccountId>], epoch: u32, block: u64) {
     // Calculate the total weight (sum of all weights)
-    let total_weight: u32 = validators.iter().map(|v| Self::calculate_weight(v.reputation)).sum();
+    let total_weight: u32 = validators.iter().map(|v| v.reputation).sum();
 
     // If total_weight is 0, no validator can be selected
     if total_weight == 0 {
-      // Self::deactivate_subnet(
-      //   data.path,
-      //   SubnetRemovalReason::ValidatorReputation,
-      // );
-
+      Self::deactivate_subnet(
+        Some(subnet_id),
+        None,
+        SubnetRemovalReason::ValidatorReputation,
+      );
       return
     }
 
@@ -411,11 +438,8 @@ impl<T: Config> Pallet<T> {
       }
     }
 
-    // If no validator is selected (should not happen if total_weight > 0) then remove subnet
-    // Self::deactivate_subnet(
-    //   data.path,
-    //   SubnetRemovalReason::ValidatorReputation,
-    // );
+    // If no validator is selected (should not happen if total_weight > 0), choose index 0
+    SubnetRewardsValidator::<T>::insert(subnet_id, epoch, validators[0].account_id.clone());
   }
 
 }

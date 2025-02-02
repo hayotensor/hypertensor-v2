@@ -114,6 +114,11 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
+  pub fn set_validator_rep_weight(value: u32) -> DispatchResult {
+    ValidatorReputationWeight::<T>::put(value);
+    Ok(())
+  }
+
   pub fn set_subnet_node_sequence_epochs(
     idle: u64,
     included: u64,
