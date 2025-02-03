@@ -17,7 +17,7 @@ use super::*;
 use sp_std::vec::Vec;
 
 impl<T: Config> Pallet<T> {
-  pub fn set_min_nodes_slope_parameters(params: MinNodesCurveParametersSet) -> DispatchResult {
+  pub fn set_min_nodes_slope_parameters(mut params: MinNodesCurveParametersSet) -> DispatchResult {
     let x_curve_start = params.x_curve_start;
     let y_end = params.y_end;
     let y_start = params.y_start;
@@ -46,6 +46,8 @@ impl<T: Config> Pallet<T> {
       max_x >= Self::PERCENTAGE_FACTOR,
       Error::<T>::SubnetNotExist
     );
+
+    params.max_x = max_x;
 
     MinNodesCurveParameters::<T>::put(params);
 

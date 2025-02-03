@@ -920,8 +920,8 @@ impl_runtime_apis! {
 			let result = Network::is_subnet_node_by_peer_id(subnet_id, peer_id);
 			result
 		}	
-		fn are_subnet_nodes_by_peer_id(subnet_id: u32, peer_ids: Vec<Vec<u8>>) -> BTreeMap<Vec<u8>, bool> {
-			let result = Network::is_subnet_node_by_peer_id(subnet_id, peer_id);
+		fn are_subnet_nodes_by_peer_id(subnet_id: u32, peer_ids: Vec<Vec<u8>>) -> Vec<u8> {
+			let result = Network::are_subnet_nodes_by_peer_id(subnet_id, peer_ids);
 			result.encode()
 		}	
 	}

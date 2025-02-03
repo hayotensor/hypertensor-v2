@@ -42,7 +42,7 @@ pub trait NetworkCustomApi<BlockHash> {
 	#[method(name = "network_isSubnetNodeByPeerId")]
 	fn is_subnet_node_by_peer_id(&self, subnet_id: u32, peer_id: Vec<u8>, at: Option<BlockHash>) -> RpcResult<bool>;
 	#[method(name = "network_areSubnetNodesByPeerId")]
-	fn are_subnet_nodes_by_peer_id(&self, subnet_id: u32, peer_ids: Vec<Vec<u8>>, at: Option<BlockHash>) -> RpcResult<BTreeMap<Vec<u8>, bool>>;
+	fn are_subnet_nodes_by_peer_id(&self, subnet_id: u32, peer_ids: Vec<Vec<u8>>, at: Option<BlockHash>) -> RpcResult<Vec<u8>>;
 }
 
 /// A struct that implements the `NetworkCustomApi`.
@@ -175,10 +175,10 @@ where
 			Error::RuntimeError(format!("Unable to subnet node by peer ID: {:?}", e)).into()
 		})
 	}
-	fn are_subnet_nodes_by_peer_id(&self, subnet_id: u32, peer_ids: Vec<Vec<u8>>, at: Option<<Block as BlockT>::Hash>) -> RpcResult<BTreeMap<Vec<u8>, bool>> {
+	fn are_subnet_nodes_by_peer_id(&self, subnet_id: u32, peer_ids: Vec<Vec<u8>>, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<u8>> {
 		let api = self.client.runtime_api();
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
-		api.are_subnet_nodes_by_peer_id(at, subnet_id, peer_id).map_err(|e| {
+		api.are_subnet_nodes_by_peer_id(at, subnet_id, peer_ids).map_err(|e| {
 			Error::RuntimeError(format!("Unable to get subnet nodes by peer IDs: {:?}", e)).into()
 		})
 	}

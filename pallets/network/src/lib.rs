@@ -682,6 +682,7 @@ pub mod pallet {
 		pub y_end: u128, // The ``y`` end point on descending curve
 		pub y_start: u128, // The ``y`` start point on descending curve
 		pub x_rise: u128, // The rise from 0, usually should be 1/100
+		pub max_x: u128,
 	}
 
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
@@ -1030,6 +1031,7 @@ pub mod pallet {
 			y_end: 10 * 1000000000 / 100, // 0.10
 			y_start: 75 * 1000000000 / 100, // 0.75
 			x_rise: 1000000000 / 100, // 0.01
+			max_x: 56 * 1000000000 / 100, // 0.56
 		}
 	}
 	#[pallet::type_value]

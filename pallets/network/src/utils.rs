@@ -188,9 +188,16 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_min_subnet_nodes(base_node_memory: u128, memory_mb: u128) -> u32 {
+    log::error!(" ");
+    log::error!("get_min_subnet_nodes base_node_memory {:?}", base_node_memory);
+    log::error!("get_min_subnet_nodes memory_mb {:?}", memory_mb);
+
     // --- DEFAULT
     // --- Get min nodes based on default memory settings
-    let simple_min_subnet_nodes: u128 = memory_mb / base_node_memory;
+    let simple_min_subnet_nodes: u128 = Self::percent_div(
+      memory_mb * Self::PERCENTAGE_FACTOR, 
+      base_node_memory * Self::PERCENTAGE_FACTOR
+    );
 
     // --- Parameters
     let params: MinNodesCurveParametersSet = MinNodesCurveParameters::<T>::get();
@@ -199,26 +206,26 @@ impl<T: Config> Pallet<T> {
     let y_end = params.y_end;
     let y_start = params.y_start;
     let x_rise = Self::PERCENTAGE_FACTOR / 100;
+    let max_x = params.max_x;
 
     let max_subnet_memory = MaxSubnetMemoryMB::<T>::get();
 
     let mut subnet_mem_position = Self::PERCENTAGE_FACTOR;
     
+    // --- Get the x axis of the memory based on min and max
     // Redundant since subnet memory cannot be surpassed beyond the max subnet memory
     // If max subnet memory in curve is surpassed
     if memory_mb < max_subnet_memory {
       subnet_mem_position = memory_mb * Self::PERCENTAGE_FACTOR / max_subnet_memory;
     }
 
-    // The position of the range where ``memory_mb`` is located
-    // let subnet_mem_position = memory_mb * Self::PERCENTAGE_FACTOR / max_subnet_memory;
-    let mut min_subnet_nodes: u32 = MinSubnetNodes::<T>::get();
+    let mut min_subnet_nodes: u128 = MinSubnetNodes::<T>::get() as u128 * Self::PERCENTAGE_FACTOR;
 
     if subnet_mem_position <= x_curve_start {
-      if simple_min_subnet_nodes as u32 > min_subnet_nodes {
-        min_subnet_nodes = simple_min_subnet_nodes as u32;
+      if simple_min_subnet_nodes  > min_subnet_nodes {
+        min_subnet_nodes = simple_min_subnet_nodes;
       }
-      return min_subnet_nodes
+      return (min_subnet_nodes / Self::PERCENTAGE_FACTOR) as u32
     }
 
     let mut x = 0;
@@ -233,15 +240,26 @@ impl<T: Config> Pallet<T> {
 
     let y = (y_start - y_end) * (Self::PERCENTAGE_FACTOR - x) / Self::PERCENTAGE_FACTOR + y_end;
 
-    // let min_subnet_nodes_on_curve = y * simple_min_subnet_nodes / Self::PERCENTAGE_FACTOR;
-    let min_subnet_nodes_on_curve = Self::percent_mul_round_up(y, simple_min_subnet_nodes);
+    let y_ratio = Self::percent_div(y, y_start);
 
-    // Redundant
-    if min_subnet_nodes_on_curve as u32 > min_subnet_nodes {
-      min_subnet_nodes = min_subnet_nodes_on_curve as u32;
+    let mut min_subnet_nodes_on_curve = Self::percent_mul(simple_min_subnet_nodes, y_ratio);
+
+    // --- If over the max x position, we increase the min nodes to ensure the amount is never less than the previous position
+    if subnet_mem_position > max_x {
+      let x_max_x_ratio = Self::percent_div(max_x, subnet_mem_position);
+      let comp_fraction = Self::PERCENTAGE_FACTOR - x_max_x_ratio;
+      min_subnet_nodes_on_curve = Self::percent_mul(
+        simple_min_subnet_nodes, 
+        comp_fraction
+      ) + min_subnet_nodes_on_curve;
     }
 
-    min_subnet_nodes
+    // Redundant
+    if min_subnet_nodes_on_curve > min_subnet_nodes {
+      min_subnet_nodes = min_subnet_nodes_on_curve;
+    }
+
+    (min_subnet_nodes / Self::PERCENTAGE_FACTOR) as u32
   }
 
   pub fn get_target_subnet_nodes(min_subnet_nodes: u32) -> u32 {
