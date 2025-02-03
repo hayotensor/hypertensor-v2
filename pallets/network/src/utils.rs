@@ -231,10 +231,14 @@ impl<T: Config> Pallet<T> {
       x = Self::PERCENTAGE_FACTOR;
     }
 
+    log::error!("get_min_subnet_nodes x {:?}", x);
+
     let y = (y_start - y_end) * (Self::PERCENTAGE_FACTOR - x) / Self::PERCENTAGE_FACTOR + y_end;
+    log::error!("get_min_subnet_nodes y {:?}", y);
 
     // let min_subnet_nodes_on_curve = y * simple_min_subnet_nodes / Self::PERCENTAGE_FACTOR;
     let min_subnet_nodes_on_curve = Self::percent_mul_round_up(y, simple_min_subnet_nodes);
+    log::error!("get_min_subnet_nodes min_subnet_nodes_on_curve {:?}", min_subnet_nodes_on_curve);
 
     // Redundant
     if min_subnet_nodes_on_curve as u32 > min_subnet_nodes {

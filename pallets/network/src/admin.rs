@@ -17,6 +17,7 @@ use super::*;
 use sp_std::vec::Vec;
 
 impl<T: Config> Pallet<T> {
+  // TODO: TEST CASES
   pub fn set_min_nodes_slope_parameters(params: MinNodesCurveParametersSet) -> DispatchResult {
     let x_curve_start = params.x_curve_start;
     let y_end = params.y_end;
