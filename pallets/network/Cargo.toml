@@ -35,6 +35,8 @@ sp-std.workspace = true
 sp-core = { features = ["serde"], workspace = true }
 sp-runtime = { workspace = true }
 libm.workspace = true
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+rand = { version = "0.8", default-features = false }
 
 [dev-dependencies]
 sp-io = { default-features = true, workspace = true }

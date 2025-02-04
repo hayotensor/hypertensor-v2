@@ -91,6 +91,7 @@ mod rewards;
 mod info;
 mod proposal;
 mod admin;
+mod task;
 
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
 #[frame_support::pallet]
@@ -234,6 +235,9 @@ pub mod pallet {
 		Attestation { subnet_id: u32, account_id: T::AccountId, epoch: u32},
 
 		Slashing { subnet_id: u32, account_id: T::AccountId, amount: u128},
+
+		TaskSubmitted(T::AccountId, u32),
+		ResultsDecrypted(u32),
 	}
 
 	/// Errors that can be returned by this pallet.
@@ -467,6 +471,10 @@ pub mod pallet {
 		ProposalComplete,
 		/// Subnet node as defendant has proposal activated already
 		NodeHasActiveProposal,
+
+		TaskNotFound,
+		InvalidPrivateKey,
+		DecryptionFailed,
 	}
 	
 	/// Subnet node classification
@@ -764,6 +772,13 @@ pub mod pallet {
 		pub complete: bool,
 	}
 
+	#[derive(Encode, Decode, Default, Clone, PartialEq, scale_info::TypeInfo)]
+	pub struct Task<AccountId> {
+		pub owner: AccountId,
+		pub data: Vec<u8>,
+		pub encrypted_responses: BTreeSet<Vec<u8>>, // Store encrypted responses
+	}
+	
 	#[pallet::type_value]
 	pub fn DefaultZeroU32() -> u32 {
 		0
@@ -1725,6 +1740,21 @@ pub mod pallet {
 	// Consensus required to pass proposal
 	#[pallet::storage]
 	pub type ProposalConsensusThreshold<T> = StorageValue<_, u128, ValueQuery, DefaultProposalConsensusThreshold>;
+
+	//
+	// Tasks
+	//
+
+	/// Storage for tasks: TaskID -> (TaskData, EncryptedResults)
+	#[pallet::storage]
+	pub type Tasks<T: Config> = 
+		StorageMap<_, Blake2_128Concat, u32, Task<T::AccountId>, OptionQuery>;
+
+	/// Stores decrypted results for each task_id.
+	#[pallet::storage]
+	pub type DecryptedResults<T: Config> = 
+		StorageMap<_, Blake2_128Concat, u32, BTreeSet<Vec<u8>>, OptionQuery>;
+
 
 	/// The pallet's dispatchable functions ([`Call`]s).
 	///

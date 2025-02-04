@@ -31,7 +31,7 @@ use crate::{
   SubnetPaths, MinRequiredUnstakeEpochs, MaxAccountPenaltyCount, MinSubnetNodes, TotalSubnetNodes,
   TotalActiveSubnetNodes,
   SubnetNodesData, SubnetNodeAccount, SubnetNodeClass,
-  SubnetsData,
+  SubnetsData, 
   AccountSubnetStake, MinStakeBalance,
   VotingPeriod, Proposals, ProposalsCount, ChallengePeriod, VoteType,
   AccountSubnetDelegateStakeShares, TotalSubnetDelegateStakeShares, TotalSubnetDelegateStakeBalance,
@@ -45,6 +45,7 @@ use crate::{
   MinSubnetDelegateStakePercentage, MaxSubnetPenaltyCount, 
   TotalAccountStake, MaxSubnetMemoryMB, SubnetStakeUnbondingLedger, TotalSubnetMemoryMB,MaxTotalSubnetMemoryMB,
   TotalSubnetStake, MinSubnetRegistrationBlocks, MaxSubnetRegistrationBlocks, SubnetActivationEnactmentPeriod,
+  Tasks, DecryptedResults,
 };
 use frame_support::BoundedVec;
 use strum::IntoEnumIterator;
@@ -55,6 +56,8 @@ use frame_support::pallet_prelude::Encode;
 use sp_runtime::traits::IdentifyAccount;
 use sp_core::Pair;
 use sp_std::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
+use rand::rngs::OsRng; // Import OsRng for secure randomness
+use x25519_dalek::{StaticSecret, PublicKey};
 
 type AccountIdOf<Test> = <Test as frame_system::Config>::AccountId;
 // type PeerIdOf<Test> = PeerId;
@@ -7507,4 +7510,99 @@ fn test_get_min_subnet_nodes_scaled() {
       i += step;
     }
   });
+}
+
+#[test]
+fn test_submit_task() {
+  new_test_ext().execute_with(|| {
+    // Simulating the origin of the sender (user)
+    let task_id = 100;
+    let data = vec![1, 2, 3, 4, 5]; // Task data
+    let encrypted_responses = BTreeSet::new(); // Empty responses for now
+
+    assert_ok!(
+      Network::submit_task(
+        RuntimeOrigin::signed(account(0)), 
+        task_id, 
+        data.clone(), 
+        encrypted_responses
+      )
+    );
+
+    // Check that the task was actually added to the storage
+    let task = Tasks::<Test>::get(task_id).expect("Task should be in storage");
+    assert_eq!(task.owner, account(0));
+    assert_eq!(task.data, data);
+  });
+}
+
+#[test]
+fn test_reveal_results() {
+  new_test_ext().execute_with(|| {
+    let task_id = 100;
+    
+    let mut csprng = OsRng;
+    let private_key = StaticSecret::new(&mut csprng);
+
+    // Derive the public key for encryption (just for testing purpose)
+    let public_key = PublicKey::from(&private_key);
+
+    // Send plain text task in
+    let task_data = vec![1, 2, 3, 4, 5];
+
+    // get encrypted data
+    let response_data = vec![1, 2, 3, 4, 5];
+    let response_data2 = vec![6, 7, 8, 9, 1];
+
+    let encrypted_data = encrypt_data(&private_key, &public_key, response_data.clone());
+    let encrypted_data2 = encrypt_data(&private_key, &public_key, response_data2.clone());
+
+    let mut encrypted_responses = BTreeSet::from([encrypted_data.clone()]);
+    encrypted_responses.insert(encrypted_data2.clone());
+
+    assert_ok!(
+      Network::submit_task(
+        RuntimeOrigin::signed(account(0)), 
+        task_id, 
+        task_data.clone(), 
+        encrypted_responses
+      )
+    );
+
+    // Now test revealing results (decrypting)
+    let private_key_bytes = private_key.to_bytes(); // Convert to bytes
+    assert_ok!(
+      Network::reveal_results(
+        RuntimeOrigin::signed(account(0)), 
+        task_id, 
+        private_key_bytes, 
+      )
+    );
+
+    let mut expected_decrypted_data: BTreeSet<Vec<u8>> = BTreeSet::from([response_data.clone()]);
+    expected_decrypted_data.insert(response_data2.clone());
+
+    // Check the decrypted results are stored (this would depend on your storage setup)
+    let decrypted_results = DecryptedResults::<Test>::get(task_id);
+    assert!(decrypted_results.is_some(), "Decrypted results should be stored");
+    assert_eq!(Some(expected_decrypted_data), decrypted_results);
+  });
+}
+
+fn encrypt_data(sender_private_key: &StaticSecret, recipient_public_key: &PublicKey, data: Vec<u8>) -> Vec<u8> {
+  // Perform a Diffie-Hellman key exchange to get the shared secret
+  let shared_secret = sender_private_key.diffie_hellman(recipient_public_key);
+
+  // Encrypt the data by XORing it with the shared secret
+  let encrypted_data: Vec<u8> = data
+      .iter()
+      .zip(shared_secret.as_bytes().iter().cycle())
+      .map(|(byte, key_byte)| byte ^ key_byte)
+      .collect();
+
+  // Return the encrypted data, prepended with the recipient's public key
+  let mut encrypted = vec![];
+  encrypted.extend_from_slice(recipient_public_key.as_bytes()); // Add the recipient's public key
+  encrypted.extend_from_slice(&encrypted_data); // Add the encrypted data
+  encrypted
 }
