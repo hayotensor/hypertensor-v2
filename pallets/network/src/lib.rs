@@ -82,14 +82,15 @@ pub use weights::*;
 
 mod utils;
 mod staking;
-mod delegate_staking;
+mod node_delegate_staking;
+mod subnet_delegate_staking;
 mod subnet_validator;
 mod math;
 mod randomness;
 mod accountant;
 mod rewards;
 mod info;
-mod proposal;
+mod disputes;
 mod admin;
 
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
@@ -197,6 +198,17 @@ pub mod pallet {
 		DelegateStakeAdded(u32, T::AccountId, u128),
 		DelegateStakeRemoved(u32, T::AccountId, u128),
 		DelegateStakeSwitched(u32, u32, T::AccountId, u128),
+
+		DelegateNodeStakeAdded { account_id: T::AccountId, subnet_id: u32, node_account_id: T::AccountId, amount: u128 },
+		DelegateNodeStakeRemoved { account_id: T::AccountId, subnet_id: u32, node_account_id: T::AccountId, amount: u128 },
+		DelegateNodeStakeSwitched { 
+			account_id: T::AccountId, 
+			from_subnet_id: u32, 
+			from_node_account_id: T::AccountId, 
+			to_subnet_id: u32, 
+			to_node_account_id: T::AccountId, 
+			amount: u128 
+		},
 
 		// Admin 
 		SetVoteSubnetIn(Vec<u8>),
@@ -1511,15 +1523,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type LastDelegateStakeTransfer<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery, DefaultZeroU64>;
 
-	// #[pallet::storage] // subnet_id --> (account_id, (initialized or removal block))
-	// pub type SubnetAccountDelegateStake<T: Config> = StorageMap<
-	// 	_,
-	// 	Blake2_128Concat,
-	// 	u32,
-	// 	BTreeMap<T::AccountId, u64>,
-	// 	ValueQuery,
-	// >;
-
 	// Percentage of epoch rewards that go towards delegate stake pools
 	#[pallet::storage]
 	pub type DelegateStakeRewardsPercentage<T: Config> = StorageValue<_, u128, ValueQuery, DefaultDelegateStakeRewardsPercentage>;
@@ -1573,6 +1576,50 @@ pub mod pallet {
 		ValueQuery,
 		DefaultDelegateStakeUnbondingLedger,
 	>;
+
+	//
+	// Node Delegate Stake
+	//
+
+	// Total stake sum of shares in specified subnet node
+	#[pallet::storage]
+	pub type TotalNodeDelegateStakeShares<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		T::AccountId,
+		u128,
+		ValueQuery,
+		DefaultAccountTake,
+	>;
+
+	// Total stake sum of balance in specified subnet node
+	#[pallet::storage]
+	pub type TotalNodeDelegateStakeBalance<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		T::AccountId,
+		u128,
+		ValueQuery,
+		DefaultAccountTake,
+	>;
+	
+	// account_id -> subnet_id -> node_account_id -> shares
+	#[pallet::storage] 
+	pub type AccountNodeDelegateStakeShares<T: Config> = StorageNMap<
+		_,
+		(
+			NMapKey<Blake2_128Concat, T::AccountId>,
+			NMapKey<Identity, u32>,
+			NMapKey<Blake2_128Concat, T::AccountId>,
+		),
+		u128,
+		ValueQuery,
+	>;
+
 	
 	//
 	// Accountants
@@ -2315,10 +2362,11 @@ pub mod pallet {
 
 		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
-		pub fn clear_subnet(
+		pub fn add_to_node_delegate_stake(
 			origin: OriginFor<T>, 
 			subnet_id: u32,
-	) -> DispatchResult {
+			peer_id: PeerId,
+		) -> DispatchResult {
 			ensure_signed(origin)?;
 			Ok(())
 		}
@@ -3103,160 +3151,6 @@ impl<T: Config> IncreaseStakeVault for Pallet<T> {
 pub trait IncreaseStakeVault {
 	fn increase_stake_vault(amount: u128) -> DispatchResult;
 }
-
-impl<T: Config> SubnetVote<OriginFor<T>, T::AccountId> for Pallet<T> {
-	fn vote_subnet_in(vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult {
-		Ok(())
-	}
-	fn vote_subnet_out(vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult {
-		Ok(())
-	}
-	fn vote_activated(activator: T::AccountId, path: Vec<u8>, proposer: T::AccountId, vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult {
-		Ok(())
-	}
-	fn vote_deactivated(deactivator: T::AccountId, path: Vec<u8>, proposer: T::AccountId, vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult {
-		Self::deactivate_subnet(
-			vote_subnet_data.clone().data.path,
-			SubnetRemovalReason::SubnetDemocracy
-		)
-	}
-	fn vote_add_subnet_node(
-		origin: OriginFor<T>, 
-		subnet_id: u32, 
-		peer_id: PeerId, 
-		stake_to_be_added: u128,
-	) -> DispatchResult {
-		Ok(())
-	}
-	fn get_total_subnets() -> u32 {
-		TotalSubnets::<T>::get()
-	}
-	fn get_subnet_initialization_cost() -> u128 {
-		let block: u64 = Self::get_current_block_as_u64();
-		Self::get_subnet_initialization_cost(block)
-	}
-	fn get_subnet_path_exist(path: Vec<u8>) -> bool {
-		if SubnetPaths::<T>::contains_key(path) {
-			true
-		} else {
-			false
-		}
-	}
-	fn get_subnet_id_by_path(path: Vec<u8>) -> u32 {
-		if !SubnetPaths::<T>::contains_key(path.clone()) {
-			return 0
-		} else {
-			return SubnetPaths::<T>::get(path.clone()).unwrap()
-		}
-	}
-	fn get_subnet_id_exist(id: u32) -> bool {
-		if SubnetsData::<T>::contains_key(id) {
-			true
-		} else {
-			false
-		}
-	}
-	// Should never be called unless contains_key is confirmed
-	fn get_subnet_data(id: u32) -> SubnetData {
-		SubnetsData::<T>::get(id).unwrap()
-	}
-	// fn get_min_subnet_nodes() -> u32 {
-	// 	MinSubnetNodes::<T>::get()
-	// }
-	fn get_max_subnet_nodes() -> u32 {
-		MaxSubnetNodes::<T>::get()
-	}
-	fn get_min_stake_balance() -> u128 {
-		MinStakeBalance::<T>::get()
-	}
-	fn is_submittable_subnet_node_account(account_id: T::AccountId) -> bool {
-		true
-	}
-	fn is_subnet_initialized(id: u32) -> bool {
-		let subnet_data = SubnetsData::<T>::get(id).unwrap();
-		let subnet_initialized = subnet_data.initialized;
-
-		let epoch_length: u64 = T::EpochLength::get();
-		let min_required_subnet_consensus_submit_epochs = MinRequiredSubnetConsensusSubmitEpochs::<T>::get();
-		let block: u64 = Self::get_current_block_as_u64();
-
-		block >= Self::get_eligible_epoch_block(
-			epoch_length, 
-			subnet_initialized, 
-			min_required_subnet_consensus_submit_epochs
-		)
-	}
-	fn get_total_subnet_errors(id: u32) -> u32 {
-		SubnetPenaltyCount::<T>::get(id)
-	}
-	fn get_min_subnet_nodes(memory_mb: u128) -> u32 {
-		let base_node_memory: u128 = BaseSubnetNodeMemoryMB::<T>::get();
-		Self::get_min_subnet_nodes(base_node_memory, memory_mb)
-	}
-	fn get_target_subnet_nodes(min_subnet_nodes: u32) -> u32 {
-		Self::get_target_subnet_nodes(min_subnet_nodes)
-	}
-	fn get_stake_balance(account_id: T::AccountId) -> u128 {
-		Self::get_account_total_stake_balance(account_id)
-	}
-	fn get_delegate_stake_balance(account_id: T::AccountId) -> u128 {
-		let mut total_delegate_stake_balance = 0;
-		for (subnet_id, _) in SubnetsData::<T>::iter() {
-			total_delegate_stake_balance += Self::convert_account_shares_to_balance(
-				&account_id,
-				subnet_id
-			);
-		}
-		total_delegate_stake_balance
-	}
-	fn get_voting_power() -> u128 {
-		Self::get_total_voting_power()
-	}
-}
-
-pub trait SubnetVote<OriginFor, AccountId> {
-	fn vote_subnet_in(vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult;
-	fn vote_subnet_out(vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult;
-	fn vote_activated(activator: AccountId, path: Vec<u8>, proposer: AccountId, vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult;
-	fn vote_deactivated(deactivator: AccountId, path: Vec<u8>, proposer: AccountId, vote_subnet_data: SubnetDemocracySubnetData) -> DispatchResult;
-	fn vote_add_subnet_node(
-		origin: OriginFor, 
-		subnet_id: u32, 
-		peer_id: PeerId, 
-		stake_to_be_added: u128,
-	) -> DispatchResult;
-	fn get_total_subnets() -> u32;
-	fn get_subnet_initialization_cost() -> u128;
-	fn get_subnet_path_exist(path: Vec<u8>) -> bool;
-	fn get_subnet_id_by_path(path: Vec<u8>) -> u32;
-	fn get_subnet_id_exist(id: u32) -> bool;
-	fn get_subnet_data(id: u32) -> SubnetData;
-	fn get_max_subnet_nodes() -> u32;
-	fn get_min_stake_balance() -> u128;
-	fn is_submittable_subnet_node_account(account_id: AccountId) -> bool;
-	fn is_subnet_initialized(id: u32) -> bool;
-	fn get_total_subnet_errors(id: u32) -> u32;
-	fn get_min_subnet_nodes(memory_mb: u128) -> u32;
-	fn get_target_subnet_nodes(min_subnet_nodes: u32) -> u32;
-	fn get_stake_balance(account_id: AccountId) -> u128;
-	fn get_delegate_stake_balance(account_id: AccountId) -> u128;
-	fn get_voting_power() -> u128;
-}
-
-// impl<T: Config> Tester<OriginFor<T>, T::AccountId> for Pallet<T> {
-// 	// pub trait OriginFor<T> = <T as crate::Config>::RuntimeOrigin;
-// 	fn test_function(account_id: T::AccountId) -> u128 {
-// 		1
-// 	}
-// 	fn test_function2(origin: OriginFor<T>) -> u128 {
-// 		1
-// 	}
-// }
-
-// pub trait Tester<OriginFor, AccountId> {
-// 	fn test_function(account_id: AccountId) -> u128;
-// 	fn test_function2(origin: OriginFor) -> u128;
-// }
 
 // Admin logic
 impl<T: Config> AdminInterface<T::AccountId> for Pallet<T> {
