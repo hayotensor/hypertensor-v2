@@ -974,6 +974,11 @@ pub mod pallet {
 		875000000
 	}
 	#[pallet::type_value]
+	pub fn DefaultMinSuperMajorityAttestationPercentage() -> u128 {
+		// 7/8
+		875000000
+	}
+	#[pallet::type_value]
 	pub fn DefaultTargetSubnetNodesMultiplier() -> u128 {
 		// 1/3
 		333333333

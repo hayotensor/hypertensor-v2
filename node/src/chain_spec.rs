@@ -83,6 +83,7 @@ fn peer(id: u8) -> OpaquePeerId {
 	OpaquePeerId(peer_id.into())
 }
 
+// ./target/release/solochain-template-node --dev
 pub fn development_config() -> Result<ChainSpec, String> {
 	let mut accounts = (0..255).map(|x| get_account_id_from_seed::<sr25519::Public>(&x.to_string())).collect::<Vec<_>>();
 	accounts.extend(get_test_accounts());

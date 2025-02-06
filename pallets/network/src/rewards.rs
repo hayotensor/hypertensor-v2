@@ -65,6 +65,11 @@ impl<T: Config> Pallet<T> {
         let subnet_node: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
         let subnet_node_count = subnet_node.len() as u128;
 
+        // --- Ensure nodes are at min requirement to continue rewards operations
+        if subnet_node_count < min_nodes as u128 {
+          continue
+        }
+
         let attestations: u128 = submission.attests.len() as u128;
         let mut attestation_percentage: u128 = Self::percent_div(attestations, subnet_node_count);
 
@@ -235,10 +240,14 @@ impl<T: Config> Pallet<T> {
           //
 
           // --- If not attested, do not receive rewards
-          // We don't penalize accounts for not attesting data in case data is corrupted
+          // We only penalize accounts on vast majority attestations for not attesting data in case data is corrupted
           // It is up to subnet nodes to remove them via consensus
           // But since consensus was formed at the least, we assume they're against the consensus, therefor likely dishonest
           if !submission.attests.contains_key(&account_id) {
+            if attestation_percentage > min_vast_majority_attestation_percentage {
+              // --- Penalize on vast majority only
+              SubnetNodePenalties::<T>::insert(subnet_id, account_id.clone(), penalties + 1);
+            }  
             continue
           }
 
