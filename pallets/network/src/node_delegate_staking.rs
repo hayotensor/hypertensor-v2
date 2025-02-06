@@ -23,11 +23,11 @@ impl<T: Config> Pallet<T> {
     origin: T::RuntimeOrigin,
     subnet_id: u32,
     node_account_id: T::AccountId,
-    delegate_stake_to_be_added: u128,
+    node_delegate_stake_to_be_added: u128,
   ) -> DispatchResult {
     let account_id: T::AccountId = ensure_signed(origin)?;
 
-    let delegate_stake_as_balance = Self::u128_to_balance(delegate_stake_to_be_added);
+    let delegate_stake_as_balance = Self::u128_to_balance(node_delegate_stake_to_be_added);
 
     ensure!(
       delegate_stake_as_balance.is_some(),
@@ -45,7 +45,7 @@ impl<T: Config> Pallet<T> {
     );
 
     ensure!(
-      account_delegate_stake_balance.saturating_add(delegate_stake_to_be_added) <= MaxDelegateStakeBalance::<T>::get(),
+      account_delegate_stake_balance.saturating_add(node_delegate_stake_to_be_added) <= MaxDelegateStakeBalance::<T>::get(),
       Error::<T>::MaxDelegatedStakeReached
     );
 
@@ -71,7 +71,7 @@ impl<T: Config> Pallet<T> {
   
     // --- Get amount to be added as shares based on stake to balance added to account
     let mut delegate_stake_to_be_added_as_shares = Self::convert_delegate_node_balance_to_shares(
-      delegate_stake_to_be_added,
+      node_delegate_stake_to_be_added,
       total_node_delegated_stake_shares,
       total_node_delegated_stake_balance
     );
@@ -93,7 +93,7 @@ impl<T: Config> Pallet<T> {
       &account_id,
       subnet_id, 
       node_account_id.clone(),
-      delegate_stake_to_be_added,
+      node_delegate_stake_to_be_added,
       delegate_stake_to_be_added_as_shares,
     );
 
@@ -104,7 +104,7 @@ impl<T: Config> Pallet<T> {
       account_id: account_id, 
       subnet_id: subnet_id, 
       node_account_id: node_account_id, 
-      amount: delegate_stake_to_be_added
+      amount: node_delegate_stake_to_be_added
     });
 
     Ok(())
@@ -114,13 +114,13 @@ impl<T: Config> Pallet<T> {
     origin: T::RuntimeOrigin, 
     subnet_id: u32,
     node_account_id: T::AccountId,
-    delegate_stake_shares_to_be_removed: u128,
+    node_delegate_stake_shares_to_be_removed: u128,
   ) -> DispatchResult {
     let account_id: T::AccountId = ensure_signed(origin)?;
 
     // --- Ensure that the delegate_stake amount to be removed is above zero.
     ensure!(
-      delegate_stake_shares_to_be_removed > 0,
+      node_delegate_stake_shares_to_be_removed > 0,
       Error::<T>::NotEnoughStakeToWithdraw
     );
 
@@ -128,7 +128,7 @@ impl<T: Config> Pallet<T> {
     
     // --- Ensure that the account has enough delegate_stake to withdraw.
     ensure!(
-      account_node_delegate_stake_shares >= delegate_stake_shares_to_be_removed,
+      account_node_delegate_stake_shares >= node_delegate_stake_shares_to_be_removed,
       Error::<T>::NotEnoughStakeToWithdraw
     );
       
@@ -162,7 +162,7 @@ impl<T: Config> Pallet<T> {
       subnet_id, 
       node_account_id.clone(), 
       delegate_stake_to_be_removed, 
-      delegate_stake_shares_to_be_removed
+      node_delegate_stake_shares_to_be_removed
     );
     
     // --- We add the balancer to the account_id.  If the above fails we will not credit this account_id.
@@ -421,7 +421,7 @@ impl<T: Config> Pallet<T> {
   /// Rewards are deposited here from the ``rewards.rs`` or by donations
   pub fn do_increase_node_delegate_stake(
     subnet_id: u32,
-    node_account_id: T::AccountId,
+    node_account_id: &T::AccountId,
     amount: u128,
   ) {
     // -- increase total subnet delegate stake 

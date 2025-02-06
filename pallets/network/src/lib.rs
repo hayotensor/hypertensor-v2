@@ -479,6 +479,14 @@ pub mod pallet {
 		ProposalComplete,
 		/// Subnet node as defendant has proposal activated already
 		NodeHasActiveProposal,
+		/// No change between current and new delegate reward rate, make sure to increase or decrease it
+		NoDelegateRewardRateChange,
+		/// Invalid delegate reward rate above 100%
+		InvalidDelegateRewardRate,
+		/// Rate of change to great for decreasing reward rate, see MaxRewardRateDecrease
+		SurpassesMaxRewardRateDecrease,
+		/// Too many updates to reward rate in the RewardRateUpdatePeriod
+		MaxRewardRateUpdates,
 	}
 	
 	/// Subnet node classification
@@ -506,6 +514,8 @@ pub mod pallet {
 		pub peer_id: PeerId,
 		pub initialized: u64,
 		pub classification: SubnetNodeClassification,
+		pub delegate_reward_rate: u128,
+		pub last_delegate_reward_rate_update: u64,
 		pub a: Vec<u8>,
 		pub b: Vec<u8>,
 		pub c: Vec<u8>,
@@ -859,6 +869,8 @@ pub mod pallet {
 				class: SubnetNodeClass::Registered,
 				start_epoch: 0,
 			},
+			delegate_reward_rate: 0,
+			last_delegate_reward_rate_update: 0,
 			a: Vec::new(),
 			b: Vec::new(),
       c: Vec::new(),
@@ -902,6 +914,16 @@ pub mod pallet {
 	#[pallet::type_value]
 	pub fn DefaultMinSubnetDelegateStake() -> u128 {
 		1000e+18 as u128
+	}
+	#[pallet::type_value]
+	pub fn DefaultMaxRewardRateDecrease() -> u128 {
+		// 1%
+		1000000000
+	}
+	#[pallet::type_value]
+	pub fn DefaultRewardRateUpdatePeriod() -> u64 {
+		// 1 day at 6 seconds a block (86,000s per day)
+		14400
 	}
 	#[pallet::type_value]
 	pub fn DefaultMaxDelegateStakeBalance() -> u128 {
@@ -1581,6 +1603,12 @@ pub mod pallet {
 	// Node Delegate Stake
 	//
 
+	#[pallet::storage]
+	pub type RewardRateUpdatePeriod<T: Config> = StorageValue<_, u64, ValueQuery, DefaultRewardRateUpdatePeriod>;
+
+	#[pallet::storage]
+	pub type MaxRewardRateDecrease<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMaxRewardRateDecrease>;
+
 	// Total stake sum of shares in specified subnet node
 	#[pallet::storage]
 	pub type TotalNodeDelegateStakeShares<T: Config> = StorageDoubleMap<
@@ -1888,6 +1916,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			peer_id: PeerId, 
 			stake_to_be_added: u128,
+			delegate_reward_rate: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
 			b: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
 			c: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
@@ -1897,6 +1926,7 @@ pub mod pallet {
 				subnet_id,
 				peer_id,
 				stake_to_be_added,
+				delegate_reward_rate,
 				a,
 				b,
 				c,
@@ -1915,6 +1945,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			peer_id: PeerId, 
 			stake_to_be_added: u128,
+			delegate_reward_rate: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
 			b: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
 			c: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
@@ -1924,6 +1955,7 @@ pub mod pallet {
 				subnet_id,
 				peer_id,
 				stake_to_be_added,
+				delegate_reward_rate,
 				a,
 				b,
 				c,
@@ -2362,13 +2394,101 @@ pub mod pallet {
 
 		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
+		pub fn update_delegate_reward_rate(
+			origin: OriginFor<T>, 
+			subnet_id: u32,
+			new_delegate_reward_rate: u128
+		) -> DispatchResult {
+			let account_id: T::AccountId = ensure_signed(origin)?;
+
+			let subnet = match SubnetsData::<T>::try_get(subnet_id) {
+        Ok(subnet) => subnet,
+        Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
+			};
+
+			let block: u64 = Self::get_current_block_as_u64();
+			let max_reward_rate_decrease = MaxRewardRateDecrease::<T>::get();
+			let reward_rate_update_period = RewardRateUpdatePeriod::<T>::get();
+
+			SubnetNodesData::<T>::try_mutate_exists(
+				subnet_id,
+				account_id.clone(),
+				|maybe_params| -> DispatchResult {
+					let params = maybe_params.as_mut().ok_or(Error::<T>::SubnetNodeExist)?;
+					let mut curr_delegate_reward_rate = params.delegate_reward_rate;
+
+					// --- Ensure rate change surpasses minimum update period
+					ensure!(
+						block - params.last_delegate_reward_rate_update > reward_rate_update_period,
+						Error::<T>::MaxRewardRateUpdates
+					);
+					
+					// --- Ensure rate is being updated
+					ensure!(
+						new_delegate_reward_rate != curr_delegate_reward_rate,
+						Error::<T>::NoDelegateRewardRateChange
+					);
+
+					let mut delegate_reward_rate = params.delegate_reward_rate;
+
+					if new_delegate_reward_rate > curr_delegate_reward_rate {
+						// --- Ensure rate doesn't surpass 100%
+						ensure!(
+							new_delegate_reward_rate <= Self::PERCENTAGE_FACTOR,
+							Error::<T>::InvalidDelegateRewardRate
+						);
+
+						// Freely increase reward rate
+						delegate_reward_rate = new_delegate_reward_rate;
+					} else {
+						// Ensure reward rate decrease doesn't surpass max rate of change
+						let delta = curr_delegate_reward_rate - new_delegate_reward_rate;
+						ensure!(
+							delta <= max_reward_rate_decrease,
+							Error::<T>::SurpassesMaxRewardRateDecrease
+						);
+						delegate_reward_rate = new_delegate_reward_rate
+					}
+
+					params.last_delegate_reward_rate_update = block;
+					params.delegate_reward_rate = delegate_reward_rate;
+					Ok(())
+				}
+			)?;
+
+			Ok(())
+		}
+
+		#[pallet::call_index(26)]
+		#[pallet::weight({0})]
 		pub fn add_to_node_delegate_stake(
 			origin: OriginFor<T>, 
 			subnet_id: u32,
-			peer_id: PeerId,
+			node_account_id: T::AccountId,
+			node_delegate_stake_to_be_added: u128
 		) -> DispatchResult {
-			ensure_signed(origin)?;
-			Ok(())
+			Self::do_add_node_delegate_stake(
+				origin,
+				subnet_id,
+				node_account_id,
+				node_delegate_stake_to_be_added,
+			)
+		}
+
+		#[pallet::call_index(27)]
+		#[pallet::weight({0})]
+		pub fn remove_node_delegate_stake(
+			origin: OriginFor<T>, 
+			subnet_id: u32,
+			node_account_id: T::AccountId,
+			node_delegate_stake_shares_to_be_removed: u128
+		) -> DispatchResult {
+			Self::do_remove_node_delegate_stake(
+				origin,
+				subnet_id,
+				node_account_id,
+				node_delegate_stake_shares_to_be_removed,
+			)
 		}
 
 	}
@@ -2615,6 +2735,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			peer_id: PeerId, 
 			stake_to_be_added: u128,
+			delegate_reward_rate: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
 			b: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
 			c: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
@@ -2681,6 +2802,11 @@ pub mod pallet {
 				Error::<T>::InvalidPeerId
 			);
 
+			ensure!(
+				delegate_reward_rate <= Self::PERCENTAGE_FACTOR,
+				Error::<T>::InvalidDelegateRewardRate
+			);
+
 			// --- Ensure they have no stake on registration
 			// If a subnet node deregisters, then they must fully unstake its stake balance to register again using that same balance
 			ensure!(
@@ -2718,6 +2844,8 @@ pub mod pallet {
 				peer_id: peer_id.clone(),
 				initialized: 0,
 				classification: classification,
+				delegate_reward_rate: delegate_reward_rate,
+				last_delegate_reward_rate_update: block,
 				a: Vec::new(),
 				b: Vec::new(),
 				c: Vec::new(),
