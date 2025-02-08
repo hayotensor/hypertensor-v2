@@ -83,15 +83,6 @@ impl<T: Config> Pallet<T> {
     Some(data?)
   }
 
-  // id is proposal ID
-  pub fn get_accountant_data(
-    subnet_id: u32,
-    id: u32
-  ) -> Option<AccountantDataParams<T::AccountId>> {
-    let data = AccountantData::<T>::get(subnet_id, id);
-    Some(data)
-  }
-
   pub fn get_minimum_subnet_nodes(memory_mb: u128) -> u32 {
     Self::get_min_subnet_nodes(BaseSubnetNodeMemoryMB::<T>::get(), memory_mb)
   }

@@ -31,7 +31,7 @@ use frame_support::{
   traits::EnsureOrigin,
 };
 use sp_std::vec::Vec;
-use pallet_network::{MinNodesCurveParametersSet};
+use pallet_network::{CurveParametersSet};
 
 #[cfg(test)]
 mod mock;
@@ -285,7 +285,7 @@ pub mod pallet {
 
     #[pallet::call_index(24)]
     #[pallet::weight(0)]
-    pub fn set_min_nodes_slope_parameters(origin: OriginFor<T>, params: MinNodesCurveParametersSet) -> DispatchResult {
+    pub fn set_min_nodes_slope_parameters(origin: OriginFor<T>, params: CurveParametersSet) -> DispatchResult {
       T::CollectiveOrigin::ensure_origin(origin)?;
       T::NetworkAdminInterface::set_min_nodes_slope_parameters(params);
       Ok(())

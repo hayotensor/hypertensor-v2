@@ -145,6 +145,12 @@ pub const BLOCKS_PER_HALVING: BlockNumber = YEAR * 2;
 pub const TARGET_MAX_TOTAL_SUPPLY: u128 = 2_800_000_000_000_000_000_000_000;
 pub const INITIAL_REWARD_PER_BLOCK: u128 = (TARGET_MAX_TOTAL_SUPPLY / 2) / BLOCKS_PER_HALVING as u128;
 
+pub const SECS_PER_BLOCK: u64 = 6000 / 1000;
+
+pub const EPOCH_LENGTH: u64 = 10;
+pub const BLOCKS_PER_EPOCH: u64 = SECS_PER_BLOCK * EPOCH_LENGTH;
+pub const EPOCHS_PER_YEAR: u64 = YEAR as u64 / BLOCKS_PER_EPOCH;
+
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
@@ -471,7 +477,8 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 
 parameter_types! {
 	pub const InitialTxRateLimit: u64 = 0;
-	pub const EpochLength: u64 = 10; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	// pub const EpochsPerYear: u64 = 10*10; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
 	pub const SubnetInitializationCost: u128 = 100_000_000_000_000_000_000;
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18
@@ -487,6 +494,7 @@ impl pallet_network::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type EpochLength = EpochLength;
+	// type EpochsPerYear = EpochLength;
 	type StringLimit = ConstU32<12288>;
 	type InitialTxRateLimit = InitialTxRateLimit;
 // 	type OffchainSignature = Signature;
@@ -898,10 +906,6 @@ impl_runtime_apis! {
 		}
 		fn get_consensus_data(subnet_id: u32, epoch: u32) -> Vec<u8> {
 			let result = Network::get_consensus_data(subnet_id, epoch);
-			result.encode()
-		}
-		fn get_accountant_data(subnet_id: u32, id: u32) -> Vec<u8> {
-			let result = Network::get_accountant_data(subnet_id, id);
 			result.encode()
 		}
 		fn get_minimum_subnet_nodes(memory_mb: u128) -> u32 {

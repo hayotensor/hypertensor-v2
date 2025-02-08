@@ -62,14 +62,6 @@ impl<T: Config> Pallet<T> {
     false
   }
   
-  // Get subnet peer is eligible to be a subnet peer
-  // Checks if account penalties do not surpass the max allowed penalties
-  pub fn is_account_eligible(account_id: T::AccountId) -> bool {
-    let max_account_penalty_count = MaxAccountPenaltyCount::<T>::get();
-    let penalties = AccountPenaltyCount::<T>::get(account_id);
-    penalties <= max_account_penalty_count
-  }
-
   pub fn is_subnet_node_eligible(subnet_node: u32, account_id: T::AccountId) -> bool {
     let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get();
     let penalties = SubnetNodePenalties::<T>::get(subnet_node, account_id);
@@ -150,21 +142,6 @@ impl<T: Config> Pallet<T> {
         }
       );
     
-      // AccountantData::<T>::try_mutate_exists(
-      //   subnet_id,
-      //   epoch as u32,
-      //   |params| -> DispatchResult {
-      //     let params = if let Some(params) = params {
-      //       // --- Remove from attestations
-      //       let mut attests = &mut params.attests;
-      //       if attests.remove(&account_id.clone()).is_some() {
-      //         params.attests = attests.clone();
-      //       }
-      //     };
-      //     Ok(())
-      //   }
-      // );
-
       SubnetNodesData::<T>::remove(subnet_id, account_id.clone());
 
       // Remove SubnetNodeAccount peer_id as key
@@ -200,7 +177,7 @@ impl<T: Config> Pallet<T> {
     );
 
     // --- Parameters
-    let params: MinNodesCurveParametersSet = MinNodesCurveParameters::<T>::get();
+    let params: CurveParametersSet = MinNodesCurveParameters::<T>::get();
     let one_hundred = Self::PERCENTAGE_FACTOR;
     let x_curve_start = params.x_curve_start;
     let y_end = params.y_end;
@@ -262,6 +239,29 @@ impl<T: Config> Pallet<T> {
     (min_subnet_nodes / Self::PERCENTAGE_FACTOR) as u32
   }
 
+  pub fn get_subnet_rewards_v2(
+    base_node_memory: u128, 
+    memory_mb: u128, 
+    min_subnet_nodes: u32, 
+    subnet_delegate_stake: u128
+  ) {
+    let min_subnet_delegate_stake_balance = Self::get_min_subnet_delegate_stake_balance(min_subnet_nodes);
+
+    let dif = match subnet_delegate_stake > min_subnet_delegate_stake_balance {
+      true => subnet_delegate_stake - min_subnet_delegate_stake_balance,
+      false => 0,
+    };
+
+  }
+
+  pub fn get_rewards_pool_inflation(subnets_count: u32) {
+
+  }
+
+  pub fn get_overall_subnet_reward() {
+
+  }
+
   pub fn get_target_subnet_nodes(min_subnet_nodes: u32) -> u32 {
     Self::percent_mul(
       min_subnet_nodes.into(), 
@@ -281,8 +281,6 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn do_epoch_preliminaries(block: u64, epoch: u32, epoch_length: u64) {
-    let min_required_subnet_consensus_submit_epochs = MinRequiredSubnetConsensusSubmitEpochs::<T>::get();
-    let target_accountants_len: u32 = TargetAccountantsLength::<T>::get();
     let max_subnet_penalty_count = MaxSubnetPenaltyCount::<T>::get();
     let subnet_activation_enactment_period = SubnetActivationEnactmentPeriod::<T>::get();
 
@@ -348,15 +346,6 @@ impl<T: Config> Pallet<T> {
         min_subnet_nodes,
         epoch,
       );
-
-      // Self::choose_accountants(
-      //   block,
-      //   epoch,
-      //   subnet_id,
-      //   subnet_node_accounts,
-      //   min_subnet_nodes,
-      //   target_accountants_len,
-      // );
     }
   }
 
@@ -382,81 +371,6 @@ impl<T: Config> Pallet<T> {
 
   //   Ok(())
   // }
-
-  pub fn get_account_total_stake_balance(account_id: T::AccountId) -> u128 {
-    let min_required_subnet_consensus_submit_epochs = MinRequiredSubnetConsensusSubmitEpochs::<T>::get();
-    let epoch_length: u64 = T::EpochLength::get();
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch: u64 = block / epoch_length;
-
-		let mut total_stake_balance = 0;
-    for (subnet_id, data) in SubnetsData::<T>::iter() {
-      let min_subnet_nodes = data.min_nodes;
-
-      // --- Ensure subnet is able to submit consensus or don't include in staking balance for subnet democracy 
-      if block < Self::get_eligible_epoch_block(
-        epoch_length, 
-        data.initialized, 
-        min_required_subnet_consensus_submit_epochs
-      ) {
-        continue
-      }
-
-      // let node_sets: BTreeMap<T::AccountId, u64> = SubnetNodesClasses::<T>::get(subnet_id, SubnetNodeClass::Submittable);
-      let subnet_nodes: BTreeSet<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch);
-
-      // --- Ensure min subnet nodes that are submittable are at least the minimum required to include in subnet democracy
-      if (subnet_nodes.len() as u32) < min_subnet_nodes {
-        continue
-      }
-
-      let is_submittable = subnet_nodes.get(&account_id);
-
-      // --- Ensure account is submittable to include in subnet democracy
-      if let Some(is_submittable) = is_submittable {
-        // TODO: Ensure this is removed for subnet node staking cooldown during unbondings
-        total_stake_balance += AccountSubnetStake::<T>::get(&account_id, subnet_id);
-      }
-    }
-		total_stake_balance
-	}
-
-  pub fn get_total_voting_power() -> u128 {
-    let min_required_subnet_consensus_submit_epochs = MinRequiredSubnetConsensusSubmitEpochs::<T>::get();
-    let epoch_length: u64 = T::EpochLength::get();
-    let block: u64 = Self::get_current_block_as_u64();
-
-    let mut total_voting_power = 0;
-    for (subnet_id, data) in SubnetsData::<T>::iter() {
-      // Before increasing voting power on a specific subnet, ensure that the subnet is:
-      // - eligible for consensus
-      // - has the minimum required submittable nodes
-      let min_subnet_nodes = data.min_nodes;
-
-      // --- Ensure subnet is able to submit consensus or don't include in staking balance for subnet democracy 
-      if block < Self::get_eligible_epoch_block(
-        epoch_length, 
-        data.initialized, 
-        min_required_subnet_consensus_submit_epochs
-      ) {
-        continue
-      }
-
-      let node_sets: BTreeMap<T::AccountId, u64> = SubnetNodesClasses::<T>::get(subnet_id, SubnetNodeClass::Submittable);
-
-      // --- Ensure min subnet nodes that are submittable are at least the minimum required to include in subnet democracy
-      if (node_sets.len() as u32) < min_subnet_nodes {
-        continue
-      }
-
-      // Get total subnet node stake balance
-      total_voting_power += TotalSubnetStake::<T>::get(subnet_id);
-
-      // Get total delegate subnet stake balance
-      total_voting_power += TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
-    }
-    total_voting_power
-  }
   
   /// The minimum delegate stake balance for a subnet to stay live
   pub fn get_min_subnet_delegate_stake_balance(min_subnet_nodes: u32) -> u128 {

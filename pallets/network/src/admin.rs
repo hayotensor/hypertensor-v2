@@ -17,7 +17,7 @@ use super::*;
 use sp_std::vec::Vec;
 
 impl<T: Config> Pallet<T> {
-  pub fn set_min_nodes_slope_parameters(mut params: MinNodesCurveParametersSet) -> DispatchResult {
+  pub fn set_min_nodes_slope_parameters(mut params: CurveParametersSet) -> DispatchResult {
     let x_curve_start = params.x_curve_start;
     let y_end = params.y_end;
     let y_start = params.y_start;
@@ -239,7 +239,6 @@ impl<T: Config> Pallet<T> {
   // Set the time required for a subnet to be in storage before consensus can be formed
   // This allows time for peers to become subnet peers to the subnet doesn't increment `no-consensus'`
   pub fn set_min_required_subnet_consensus_submit_epochs(value: u64) -> DispatchResult {
-    MinRequiredSubnetConsensusSubmitEpochs::<T>::put(value);
     Ok(())
   }
 

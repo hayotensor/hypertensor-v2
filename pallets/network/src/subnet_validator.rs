@@ -29,8 +29,7 @@ impl<T: Config> Pallet<T> {
     mut data: Vec<SubnetNodeData>,
     args: Option<BoundedVec<u8, DefaultValidatorArgsLimit>>,
   ) -> DispatchResultWithPostInfo {
-    // TODO: Add parameter for params data in case a validator has a reason behind why they left
-    //       a specific node(s) out of the consensus data for the other subnet nodes to verify
+    // TODO: Add max sum to avoid overflow
 
     // --- Ensure current subnet validator 
     let validator = SubnetRewardsValidator::<T>::get(subnet_id, epoch).ok_or(Error::<T>::InvalidValidator)?;
@@ -235,9 +234,6 @@ impl<T: Config> Pallet<T> {
     );
 
     // --- Increase validator penalty count
-    // AccountPenaltyCount::<T>::mutate(validator.clone(), |n: &mut u32| *n += 1);
-    // SubnetNodePenalties::<T>::mutate(subnet_id, validator.clone(), |n: &mut u32| *n += 1);
-
     let penalties = SubnetNodePenalties::<T>::get(subnet_id, validator.clone());
     SubnetNodePenalties::<T>::insert(subnet_id, validator.clone(), penalties + 1);
 

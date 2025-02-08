@@ -31,8 +31,6 @@ pub trait NetworkCustomApi<BlockHash> {
 	fn get_subnet_nodes_subnet_unconfirmed_count(&self, subnet_id: u32, at: Option<BlockHash>) -> RpcResult<u32>;
 	#[method(name = "network_getConsensusData")]
 	fn get_consensus_data(&self, subnet_id: u32, epoch: u32, at: Option<BlockHash>) -> RpcResult<Vec<u8>>;
-	#[method(name = "network_getAccountantData")]
-	fn get_accountant_data(&self, subnet_id: u32, id: u32, at: Option<BlockHash>) -> RpcResult<Vec<u8>>;
 	#[method(name = "network_getMinimumSubnetNodes")]
 	fn get_minimum_subnet_nodes(&self, memory_mb: u128, at: Option<BlockHash>) -> RpcResult<u32>;
 	#[method(name = "network_getMinimumDelegateStake")]
@@ -138,13 +136,6 @@ where
 		let at = at.unwrap_or_else(|| self.client.info().best_hash);
 		api.get_consensus_data(at, subnet_id, epoch).map_err(|e| {
 			Error::RuntimeError(format!("Unable to get consensus data: {:?}", e)).into()
-		})
-	}
-	fn get_accountant_data(&self, subnet_id: u32, id: u32, at: Option<<Block as BlockT>::Hash>) -> RpcResult<Vec<u8>> {
-		let api = self.client.runtime_api();
-		let at = at.unwrap_or_else(|| self.client.info().best_hash);
-		api.get_accountant_data(at, subnet_id, id).map_err(|e| {
-			Error::RuntimeError(format!("Unable to get accountant data: {:?}", e)).into()
 		})
 	}
 	fn get_minimum_subnet_nodes(&self, memory_mb: u128, at: Option<<Block as BlockT>::Hash>) -> RpcResult<u32> {

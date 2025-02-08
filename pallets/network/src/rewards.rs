@@ -135,11 +135,11 @@ impl<T: Config> Pallet<T> {
         for subnet_node in SubnetNodesData::<T>::iter_prefix_values(subnet_id) {
           let account_id: T::AccountId = subnet_node.account_id;
 
-          // --- (if) Check if subnet node is past the max registration epochs to update to Included
+          // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
           // --- (else if) Check if past Idle and can be included in validation data
           // Always continue if any of these are true
           // Note: Only ``included`` or above nodes can get emissions
-          if subnet_node.classification.class == SubnetNodeClass::Registered {
+          if subnet_node.classification.class <= SubnetNodeClass::Registered {
             if epoch as u64 > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
               Self::perform_remove_subnet_node(block, subnet_id, account_id);
             }
@@ -199,7 +199,6 @@ impl<T: Config> Pallet<T> {
               // TODO: Check the size of subnet and scale it from there
               if penalties + 1 > max_subnet_node_penalties {
                 // --- Increase account penalty count
-                // AccountPenaltyCount::<T>::mutate(account_id.clone(), |n: &mut u32| *n += 1);
                 Self::perform_remove_subnet_node(block, subnet_id, account_id.clone());
               }
             }
@@ -295,7 +294,6 @@ impl<T: Config> Pallet<T> {
         SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
       } else if let Ok(rewards_validator) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
         // --- If a validator has been chosen that means they are supposed to be submitting consensus data
-        //     since the subnet is past its MinRequiredSubnetConsensusSubmitEpochs
         // --- If there is no submission but validator chosen, increase penalty on subnet and validator
         // --- Increase the penalty count for the subnet
         // The next validator on the next epoch can increment the penalty score down

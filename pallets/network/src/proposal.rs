@@ -33,7 +33,7 @@ impl<T: Config> Pallet<T> {
     let block: u64 = Self::get_current_block_as_u64();
     let epoch: u64 = block / T::EpochLength::get();
 
-    // --- Ensure proposer account has peer and is accountant
+    // --- Ensure proposer account has peer and is submittable
     match SubnetNodesData::<T>::try_get(
       subnet_id, 
       account_id.clone()

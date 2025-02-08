@@ -23,7 +23,6 @@ use super::*;
 use crate::Pallet as Network;
 use crate::{
 	SubnetPaths, 
-	MinRequiredUnstakeEpochs, 
 	TotalStake, TotalSubnetDelegateStakeBalance, TotalSubnetDelegateStakeShares, DelegateStakeUnbondingLedger
 };
 use frame_benchmarking::v2::*;
@@ -583,14 +582,6 @@ mod benchmarks {
 		);
 		let account_subnet_stake = Network::<T>::account_subnet_stake(subnet_node_account.clone(), subnet_id);
 		assert_eq!(account_subnet_stake, DEFAULT_SUBNET_NODE_STAKE + DEFAULT_STAKE_TO_BE_ADDED);
-
-		// let epoch_length = T::EpochLength::get();
-    // let min_required_unstake_epochs = MinRequiredUnstakeEpochs::<T>::get();
-
-		// frame_system::Pallet::<T>::set_block_number(
-		// 	frame_system::Pallet::<T>::block_number() + 
-		// 	u64_to_block::<T>(epoch_length * min_required_unstake_epochs + 1)
-		// );
 
 		#[extrinsic_call]
 		remove_stake(RawOrigin::Signed(subnet_node_account.clone()), subnet_id, DEFAULT_STAKE_TO_BE_ADDED);
