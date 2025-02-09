@@ -2768,7 +2768,13 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn do_deactivation_ledger() {			
+		pub fn do_deactivation_ledger() -> Weight {
+			let mut deactivation_ledger = DeactivationLedger::<T>::get();
+
+			if deactivation_ledger.is_empty() {
+				return Weight::zero()
+			}
+	
 			// --- Get current subnet IDs
 			let subnet_ids: BTreeSet<u32> = SubnetsData::<T>::iter_keys()
 				.map(|id| id)
@@ -2781,13 +2787,11 @@ pub mod pallet {
 			let block: u64 = Self::get_current_block_as_u64();
 			let epoch: u64 = block / epoch_length;
 
-			let mut deactivation_ledger = DeactivationLedger::<T>::get();
-
-			let mut i = 0;
+			let mut i: u32 = 0;
 			for data in deactivation_ledger.clone().iter() {
-				// if i == max {
-				// 	break
-				// }
+				if i == max {
+					break
+				}
 				
 				let subnet_id = data.subnet_id;
 
@@ -2814,7 +2818,9 @@ pub mod pallet {
 
 				i+=1;
 			}
-			DeactivationLedger::<T>::set(deactivation_ledger);
+			DeactivationLedger::<T>::set(deactivation_ledger.clone());
+
+			T::WeightInfo::do_deactivation_ledger(subnet_ids.len() as u32, i)
 		}
 
 		/// TODO: Implement, if you're reading this, it's not implemented yet but will be on the next version
@@ -2885,7 +2891,7 @@ pub mod pallet {
 
 			} else if (block - 1) >= epoch_length && (block - 1) % epoch_length == 0 {
 				// --- Execute deactivate ledger before choosing validators
-				Self::do_deactivation_ledger();
+				return Self::do_deactivation_ledger()
 			} else if (block - 2) >= epoch_length && (block - 2) % epoch_length == 0 {
 				// We save some weight by waiting one more block to choose validators
 				// Run the block succeeding form consensus

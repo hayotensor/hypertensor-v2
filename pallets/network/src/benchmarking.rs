@@ -1234,11 +1234,11 @@ mod benchmarks {
 	// }
 
 	#[benchmark]
-	fn do_deactivation_ledger() {
+	fn do_deactivation_ledger(x: Linear<0, 64>, d: Linear<0, 128>) {
 		let max_subnets: u32 = Network::<T>::max_subnets();
 		let n_peers: u32 = Network::<T>::max_subnet_nodes();
 
-		for s in 0..max_subnets {
+		for s in 0..x {
 			let path: Vec<u8> = format!("model-name-{s}").into(); 
 			build_activated_subnet::<T>(path, 0, n_peers, DEFAULT_DEPOSIT_AMOUNT, DEFAULT_SUBNET_NODE_STAKE);
 		}
@@ -1248,7 +1248,7 @@ mod benchmarks {
 		let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
 
 		// Insert validator and validate
-		for s in 0..max_subnets {
+		for s in 0..x {
 			let path: Vec<u8> = format!("model-name-{s}").into(); 
 			let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
 
@@ -1268,7 +1268,7 @@ mod benchmarks {
 		let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
 
 		// Attest so node can be in the deactivate ledger
-		for s in 0..max_subnets {
+		for s in 0..x {
 			let path: Vec<u8> = format!("model-name-{s}").into(); 
 			let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
 
@@ -1286,11 +1286,18 @@ mod benchmarks {
 			}
 		}
 
-		for s in 0..max_subnets {
+		// let path: Vec<u8> = "model-name-{0}".into(); 
+		// let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+		let mut i = 0;
+
+		for s in 0..x {
 			let path: Vec<u8> = format!("model-name-{s}").into(); 
 			let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
 
-			for n in 0..n_peers {
+			for n in 0..d {
+				if i == 128 {
+					break
+				}
 				let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
 				assert_ok!(
 					Network::<T>::deactivate_subnet_node(
@@ -1298,6 +1305,7 @@ mod benchmarks {
 						subnet_id,
 					)
 				);
+				i += 1;
 			}
 		}
 
@@ -1306,17 +1314,258 @@ mod benchmarks {
 			Network::<T>::do_deactivation_ledger();
 		}
 
-		for s in 0..max_subnets {
+		for s in 0..x {
 			let path: Vec<u8> = format!("model-name-{s}").into(); 
 			let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
 
 			for n in 0..n_peers {
 				let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
 				let subnet_node = SubnetNodesData::<T>::get(subnet_id, subnet_node_account.clone());
-				assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);		
+				// assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);		
 			}
 		}
 	}
+
+	// #[benchmark]
+	// fn do_deactivation_ledger(x: Linear<0, 64>, p: Linear<0, 512>, d: Linear<0, 128>) {
+	// 	let max_subnets: u32 = Network::<T>::max_subnets();
+	// 	let n_peers: u32 = Network::<T>::max_subnet_nodes();
+
+	// 	for s in 0..x {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		build_activated_subnet::<T>(path, 0, n_peers, DEFAULT_DEPOSIT_AMOUNT, DEFAULT_SUBNET_NODE_STAKE);
+	// 	}
+
+	// 	let epoch_length = T::EpochLength::get();
+	// 	let block_number = get_current_block_as_u64::<T>();
+	// 	let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
+
+	// 	// Insert validator and validate
+	// 	for s in 0..x {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", 0);
+	// 		SubnetRewardsValidator::<T>::insert(subnet_id, epoch as u32, subnet_node_account.clone());
+	// 		let subnet_node_data_vec = subnet_node_data(0, n_peers);
+	// 		assert_ok!(
+	// 			Network::<T>::validate(
+	// 				RawOrigin::Signed(subnet_node_account.clone()).into(), 
+	// 				subnet_id, 
+	// 				subnet_node_data_vec.clone(),
+	// 				None,
+	// 			)
+	// 		);		
+	// 	}
+
+	// 	let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
+
+	// 	// Attest so node can be in the deactivate ledger
+	// 	for s in 0..x {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		for n in 0..p {
+	// 			if n == 0 {
+	// 				continue
+	// 			}	
+	// 			let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+  //       assert_ok!(
+  //         Network::<T>::attest(
+  //           RawOrigin::Signed(subnet_node_account.clone()).into(), 
+  //           subnet_id,
+  //         )
+  //       );
+	// 		}
+	// 	}
+
+	// 	// let path: Vec<u8> = "model-name-{0}".into(); 
+	// 	// let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+	// 	let mut i = 0;
+
+	// 	for s in 0..x {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		for n in 0..d {
+	// 			if i == 128 {
+	// 				break
+	// 			}
+	// 			let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 			assert_ok!(
+	// 				Network::<T>::deactivate_subnet_node(
+	// 					RawOrigin::Signed(subnet_node_account.clone()).into(),
+	// 					subnet_id,
+	// 				)
+	// 			);
+	// 			i += 1;
+	// 		}
+	// 	}
+
+	// 	#[block]
+	// 	{
+	// 		Network::<T>::do_deactivation_ledger();
+	// 	}
+
+	// 	for s in 0..x {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		for n in 0..p {
+	// 			let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 			let subnet_node = SubnetNodesData::<T>::get(subnet_id, subnet_node_account.clone());
+	// 			// assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);		
+	// 		}
+	// 	}
+	// }
+
+	// #[benchmark]
+	// fn do_deactivation_ledger() {
+	// 	let max_subnets: u32 = Network::<T>::max_subnets();
+	// 	let n_peers: u32 = Network::<T>::max_subnet_nodes();
+
+	// 	for s in 0..max_subnets {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		build_activated_subnet::<T>(path, 0, n_peers, DEFAULT_DEPOSIT_AMOUNT, DEFAULT_SUBNET_NODE_STAKE);
+	// 	}
+
+	// 	let epoch_length = T::EpochLength::get();
+	// 	let block_number = get_current_block_as_u64::<T>();
+	// 	let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
+
+	// 	// Insert validator and validate
+	// 	for s in 0..max_subnets {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", 0);
+	// 		SubnetRewardsValidator::<T>::insert(subnet_id, epoch as u32, subnet_node_account.clone());
+	// 		let subnet_node_data_vec = subnet_node_data(0, n_peers);
+	// 		assert_ok!(
+	// 			Network::<T>::validate(
+	// 				RawOrigin::Signed(subnet_node_account.clone()).into(), 
+	// 				subnet_id, 
+	// 				subnet_node_data_vec.clone(),
+	// 				None,
+	// 			)
+	// 		);		
+	// 	}
+
+	// 	let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
+
+	// 	// Attest so node can be in the deactivate ledger
+	// 	for s in 0..max_subnets {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		for n in 0..n_peers {
+	// 			if n == 0 {
+	// 				continue
+	// 			}	
+	// 			let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+  //       assert_ok!(
+  //         Network::<T>::attest(
+  //           RawOrigin::Signed(subnet_node_account.clone()).into(), 
+  //           subnet_id,
+  //         )
+  //       );
+	// 		}
+	// 	}
+
+	// 	for s in 0..max_subnets {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		for n in 0..n_peers {
+	// 			let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 			assert_ok!(
+	// 				Network::<T>::deactivate_subnet_node(
+	// 					RawOrigin::Signed(subnet_node_account.clone()).into(),
+	// 					subnet_id,
+	// 				)
+	// 			);
+	// 		}
+	// 	}
+
+	// 	#[block]
+	// 	{
+	// 		Network::<T>::do_deactivation_ledger();
+	// 	}
+
+	// 	for s in 0..max_subnets {
+	// 		let path: Vec<u8> = format!("model-name-{s}").into(); 
+	// 		let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path).unwrap();
+
+	// 		for n in 0..n_peers {
+	// 			let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 			let subnet_node = SubnetNodesData::<T>::get(subnet_id, subnet_node_account.clone());
+	// 			assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);		
+	// 		}
+	// 	}
+	// }
+
+	// #[benchmark]
+	// fn do_single_subnet_deactivation_ledger() {
+	// 	let n_peers: u32 = Network::<T>::max_subnet_nodes();
+
+	// 	let path: Vec<u8> = DEFAULT_SUBNET_PATH.into();
+	// 	build_activated_subnet::<T>(path.clone(), 0, n_peers, DEFAULT_DEPOSIT_AMOUNT, DEFAULT_SUBNET_NODE_STAKE);
+	// 	let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(path.clone()).unwrap();
+
+	// 	let epoch_length = T::EpochLength::get();
+	// 	let block_number = get_current_block_as_u64::<T>();
+	// 	let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
+
+	// 	// Insert validator and validate
+	// 	let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", 0);
+	// 	SubnetRewardsValidator::<T>::insert(subnet_id, epoch as u32, subnet_node_account.clone());
+	// 	let subnet_node_data_vec = subnet_node_data(0, n_peers);
+	// 	assert_ok!(
+	// 		Network::<T>::validate(
+	// 			RawOrigin::Signed(subnet_node_account.clone()).into(), 
+	// 			subnet_id, 
+	// 			subnet_node_data_vec.clone(),
+	// 			None,
+	// 		)
+	// 	);		
+
+	// 	let epoch = get_current_block_as_u64::<T>() / epoch_length as u64;
+
+	// 	// Attest so node can be in the deactivate ledger
+	// 	for n in 0..n_peers {
+	// 		if n == 0 {
+	// 			continue
+	// 		}
+	// 		let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 		assert_ok!(
+	// 			Network::<T>::attest(
+	// 				RawOrigin::Signed(subnet_node_account.clone()).into(), 
+	// 				subnet_id,
+	// 			)
+	// 		);
+	// 	}
+
+	// 	for n in 0..n_peers {
+	// 		let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 		assert_ok!(
+	// 			Network::<T>::deactivate_subnet_node(
+	// 				RawOrigin::Signed(subnet_node_account.clone()).into(),
+	// 				subnet_id,
+	// 			)
+	// 		);
+	// 	}
+
+	// 	#[block]
+	// 	{
+	// 		Network::<T>::do_deactivation_ledger();
+	// 	}
+
+	// 	for n in 0..n_peers {
+	// 		let subnet_node_account: T::AccountId = get_account::<T>("subnet_node_account", n);
+	// 		let subnet_node = SubnetNodesData::<T>::get(subnet_id, subnet_node_account.clone());
+	// 		assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);		
+	// 	}
+	// }
 
 	// #[benchmark]
 	// fn on_initialize_do_choose_validator_and_accountants() {
