@@ -120,7 +120,7 @@ impl<T: Config> Pallet<T> {
       let epoch_length: u64 = T::EpochLength::get();
 			let epoch: u64 = block / epoch_length;
 
-      let submittable_nodes: BTreeSet<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch);
+      let submittable_nodes: BTreeSet<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
 
       SubnetRewardsSubmission::<T>::try_mutate_exists(
         subnet_id,
@@ -165,9 +165,9 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_min_subnet_nodes(base_node_memory: u128, memory_mb: u128) -> u32 {
-    log::error!(" ");
-    log::error!("get_min_subnet_nodes base_node_memory {:?}", base_node_memory);
-    log::error!("get_min_subnet_nodes memory_mb {:?}", memory_mb);
+    // log::error!(" ");
+    // log::error!("get_min_subnet_nodes base_node_memory {:?}", base_node_memory);
+    // log::error!("get_min_subnet_nodes memory_mb {:?}", memory_mb);
 
     // --- DEFAULT
     // --- Get min nodes based on default memory settings
@@ -319,7 +319,7 @@ impl<T: Config> Pallet<T> {
       }
 
       // --- Get all possible validators
-      let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+      let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
       let subnet_nodes_count = subnet_node_accounts.len();
       
       // --- Ensure min nodes are active

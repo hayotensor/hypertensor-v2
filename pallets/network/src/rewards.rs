@@ -60,9 +60,9 @@ impl<T: Config> Pallet<T> {
         let min_nodes = data.min_nodes;
 
         // --- Get subnet nodes count to check against attestation count
-        // ``reward_subnuts`` is called before ``shift_node_classes`` so we can know how many nodes are submittable
+        // ``reward_subnuts`` is called before ``shift_node_classes`` so we can know how many nodes are validators
         // while in this function that should have in the epoch the rewards are destined for
-        let subnet_node: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+        let subnet_node: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
         let subnet_node_count = subnet_node.len() as u128;
 
         // --- Ensure nodes are at min requirement to continue rewards operations
@@ -214,13 +214,13 @@ impl<T: Config> Pallet<T> {
           // By this point, node is validated, update to submittable if they have no penalties
           let is_included = subnet_node.classification.class == SubnetNodeClass::Included;
           if is_included && penalties == 0 {
-            // --- Upgrade to Submittable
+            // --- Upgrade to Validator
             SubnetNodesData::<T>::mutate(
               subnet_id,
               account_id.clone(),
               |params: &mut SubnetNode<T::AccountId>| {
                 params.classification = SubnetNodeClassification {
-                  class: SubnetNodeClass::Submittable,
+                  class: SubnetNodeClass::Validator,
                   start_epoch: (epoch) as u64, // in case rewards are called late, we add them to the next epoch, 2 from the consensus data
                 };
               },

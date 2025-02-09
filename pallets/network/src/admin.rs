@@ -128,7 +128,7 @@ impl<T: Config> Pallet<T> {
     );
     // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Idle, idle);
     // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Included, included);
-    // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Submittable, submittable);
+    // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Validator, submittable);
     // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Accountant, accountant);
     Ok(())
   }
@@ -156,13 +156,13 @@ impl<T: Config> Pallet<T> {
     //   value > SubnetNodeClassEpochs::<T>::get(SubnetNodeClass::Included),
     //   Error::<T>::SubnetNotExist
     // );
-    // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Submittable, value);
+    // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Validator, value);
     Ok(())
   }
 
   pub fn set_subnet_node_accountant_epochs(value: u64) -> DispatchResult {
     // ensure!(
-    //   value > SubnetNodeClassEpochs::<T>::get(SubnetNodeClass::Submittable),
+    //   value > SubnetNodeClassEpochs::<T>::get(SubnetNodeClass::Validator),
     //   Error::<T>::SubnetNotExist
     // );
     // SubnetNodeClassEpochs::<T>::insert(SubnetNodeClass::Accountant, value);

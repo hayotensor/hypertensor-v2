@@ -34,7 +34,7 @@ impl<T: Config> Pallet<T> {
     let block: u64 = Self::get_current_block_as_u64();
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;
-    Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Submittable, epoch)
+    Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Validator, epoch)
   }
 
   pub fn get_subnet_node_info(
@@ -46,7 +46,7 @@ impl<T: Config> Pallet<T> {
     let block: u64 = Self::get_current_block_as_u64();
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;
-    Self::get_classified_subnet_node_info(subnet_id, &SubnetNodeClass::Submittable, epoch)
+    Self::get_classified_subnet_node_info(subnet_id, &SubnetNodeClass::Validator, epoch)
   }
 
   pub fn get_subnet_nodes_subnet_unconfirmed_count(
@@ -101,7 +101,7 @@ impl<T: Config> Pallet<T> {
     }
   }
 
-  // TODO: Make this only return true is Submittable subnet node
+  // TODO: Make this only return true is Validator subnet node
   pub fn is_subnet_node_by_peer_id(subnet_id: u32, peer_id: Vec<u8>) -> bool {
     match SubnetNodeAccount::<T>::try_get(subnet_id, PeerId(peer_id)) {
       Ok(account_id) => true,

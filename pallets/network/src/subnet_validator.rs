@@ -114,7 +114,7 @@ impl<T: Config> Pallet<T> {
       subnet_id, 
       account_id.clone()
     ) {
-      Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Submittable, epoch as u64),
+      Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Validator, epoch as u64),
       Err(()) => return Err(Error::<T>::SubnetNodeNotExist.into()),
     };
 
@@ -256,7 +256,7 @@ impl<T: Config> Pallet<T> {
   }
 
   /// Increase a subnet nodes classification
-  // Nodes that enter before the activation of a subnet are automatically Submittable, otherwise
+  // Nodes that enter before the activation of a subnet are automatically Validator, otherwise
   // on entry they are classified as `Idle`
   // After `x` epochs, they can increase their classification to `Inclusion`
   //    - This is used as a way for subnets nodes to do preliminary events before they are ready to be included in

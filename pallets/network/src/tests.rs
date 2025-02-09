@@ -45,6 +45,7 @@ use crate::{
   MinSubnetDelegateStakePercentage, MaxSubnetPenaltyCount, 
   TotalAccountStake, MaxSubnetMemoryMB, SubnetStakeUnbondingLedger, TotalSubnetMemoryMB,MaxTotalSubnetMemoryMB,
   TotalSubnetStake, MinSubnetRegistrationBlocks, MaxSubnetRegistrationBlocks, SubnetActivationEnactmentPeriod,
+  SubnetNodeClassification, DeactivationLedger, SubnetNode, SubnetNodeDeactivation
 };
 use frame_support::BoundedVec;
 use strum::IntoEnumIterator;
@@ -178,9 +179,9 @@ fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, deposi
     assert_eq!(subnet_node_data.hotkey, account(n));
     assert_eq!(subnet_node_data.peer_id, peer(n));
     assert_eq!(subnet_node_data.initialized, block_number);
-    // --- Is ``Submittable`` if registered before subnet activation
-    assert_eq!(subnet_node_data.classification.class, SubnetNodeClass::Submittable);
-    assert!(subnet_node_data.has_classification(&SubnetNodeClass::Submittable, epoch));
+    // --- Is ``Validator`` if registered before subnet activation
+    assert_eq!(subnet_node_data.classification.class, SubnetNodeClass::Validator);
+    assert!(subnet_node_data.has_classification(&SubnetNodeClass::Validator, epoch));
 
     let subnet_node_account = SubnetNodeAccount::<Test>::get(subnet_id, peer(n));
     assert_eq!(subnet_node_account, account(n));
@@ -393,7 +394,7 @@ fn make_subnet_submittable() {
 // fn make_subnet_node_consensus_data_submittable() {
 //   // increase blocks
 //   let epoch_length = EpochLength::get();
-// 	let epochs = SubnetNodeClassEpochs::<Test>::get(SubnetNodeClass::Submittable);
+// 	let epochs = SubnetNodeClassEpochs::<Test>::get(SubnetNodeClass::Validator);
 //   System::set_block_number(System::block_number() + epoch_length * epochs);
 //   // make_consensus_data_submittable();
 // }
@@ -2016,7 +2017,7 @@ fn test_deactivate_subnet_node_reactivate() {
     let total_active_subnet_nodes = TotalActiveSubnetNodes::<Test>::get(subnet_id);
 
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
-    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Submittable);    
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Validator);    
 
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
@@ -2046,7 +2047,7 @@ fn test_deactivate_subnet_node_reactivate() {
     );
 
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
-    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Submittable);    
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Validator);    
     assert_eq!(subnet_node.classification.start_epoch, epoch + 1);    
 
   })
@@ -2102,7 +2103,7 @@ fn test_get_classification_subnet_nodes() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
   
-    let submittable = Network::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Submittable, epoch as u64);
+    let submittable = Network::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
 
     assert_eq!(submittable.len() as u32, total_subnet_nodes);
   })
@@ -4624,7 +4625,7 @@ fn test_reward_subnets_remove_subnet_node() {
       // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
       let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(
         subnet_id, 
-        &SubnetNodeClass::Submittable, 
+        &SubnetNodeClass::Validator, 
         epoch as u64
       );
 
@@ -4822,7 +4823,7 @@ fn test_reward_subnets_check_balances() {
     let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
 
     // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
-    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch);
+    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
     let submission_nodes_count = submission_nodes.len() as u128;
 
     Network::reward_subnets(System::block_number(), epoch as u32);
@@ -7326,7 +7327,7 @@ fn test_epoch_steps() {
 
       log::error!("included_nodes_count {:?}", included_nodes_count);
   
-      let submittable_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch);
+      let submittable_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
       let submittable_nodes_count = submittable_nodes.len() as u128;
 
       let validator = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
@@ -7396,12 +7397,12 @@ fn test_epoch_steps() {
         let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(n_peers));
         assert_eq!(subnet_node.classification.class, SubnetNodeClass::Included);    
       } else if n == 2 {
-        // automatically upgraded to Submittable after first next epoch
+        // automatically upgraded to Validator after first next epoch
         let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(n_peers));
-        assert_eq!(subnet_node.classification.class, SubnetNodeClass::Submittable);    
+        assert_eq!(subnet_node.classification.class, SubnetNodeClass::Validator);    
       } else {
         let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(n_peers));
-        assert_eq!(subnet_node.classification.class, SubnetNodeClass::Submittable);    
+        assert_eq!(subnet_node.classification.class, SubnetNodeClass::Validator);    
       }
   
       increase_epochs(1);
@@ -7439,5 +7440,209 @@ fn test_get_min_subnet_nodes_scaled() {
       last_min_subnet_nodes = min_subnet_nodes;
       i += step;
     }
+  });
+}
+
+#[test]
+fn test_deactivat_subnet_node() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    assert_ok!(
+      Network::deactivate_subnet_node(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+      )
+    );
+  
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);
+  });
+}
+
+#[test]
+fn test_deactivat_subnet_node_and_reactivate() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    assert_ok!(
+      Network::deactivate_subnet_node(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+      )
+    );
+  
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);
+  });
+}
+
+#[test]
+fn test_deactivation_ledger_as_attestor() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
+
+    // insert node as validator to place them into the ledger
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, account(1));
+    let validator = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    assert!(validator != None, "Validator is None");
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(account(1)), 
+        subnet_id,
+        subnet_node_data_vec.clone(),
+        None,
+      )
+    );
+
+    // Attest
+    for n in 0..total_subnet_nodes {
+      if account(n) == validator.clone().unwrap() {
+        continue
+      }
+      assert_ok!(
+        Network::attest(
+          RuntimeOrigin::signed(account(n)), 
+          subnet_id,
+        )
+      );
+    }
+
+    assert_ok!(
+      Network::deactivate_subnet_node(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+      )
+    );
+  
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Validator);
+
+    let subnet_node_deactivation_validator = SubnetNodeDeactivation {
+      subnet_id: subnet_id,
+      subnet_node: subnet_node,
+    };
+    let deactivation_ledger = DeactivationLedger::<Test>::get();
+    assert_ne!(deactivation_ledger.get(&subnet_node_deactivation_validator), None);
+
+    Network::do_deactivation_ledger();
+    
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);
+
+    let subnet_node_deactivation_deactivated = SubnetNodeDeactivation {
+      subnet_id: subnet_id,
+      subnet_node: subnet_node,
+    };
+
+    let deactivation_ledger = DeactivationLedger::<Test>::get();
+    assert_eq!(deactivation_ledger.get(&subnet_node_deactivation_validator), None);
+    assert_eq!(deactivation_ledger.get(&subnet_node_deactivation_deactivated), None);
+  });
+}
+
+#[test]
+fn test_deactivation_ledger_as_chosen_validator() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+
+    // let mut ledger = BTreeSet::new();
+
+    // let subnet_node = SubnetNode {
+    //   account_id: account(0),
+    //   hotkey: account(0),
+    //   peer_id: peer(0),
+    //   initialized: 1,
+    //   classification: SubnetNodeClassification {
+    //     class: SubnetNodeClass::Validator,
+    //     start_epoch: 1,
+    //   },
+    //   a: Vec::new(),
+    //   b: Vec::new(),
+    //   c: Vec::new(),
+    // };
+
+    let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
+
+    // insert node as validator to place them into the ledger
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, account(0));
+
+    assert_ok!(
+      Network::deactivate_subnet_node(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+      )
+    );
+  
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Validator);
+    let subnet_node_deactivation_validator = SubnetNodeDeactivation {
+      subnet_id: subnet_id,
+      subnet_node: subnet_node,
+    };
+    let deactivation_ledger = DeactivationLedger::<Test>::get();
+    assert_ne!(deactivation_ledger.get(&subnet_node_deactivation_validator), None);
+
+    Network::do_deactivation_ledger();
+    
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Deactivated);
+
+    let subnet_node_deactivation_deactivated = SubnetNodeDeactivation {
+      subnet_id: subnet_id,
+      subnet_node: subnet_node,
+    };
+
+    let deactivation_ledger = DeactivationLedger::<Test>::get();
+    assert_eq!(deactivation_ledger.get(&subnet_node_deactivation_validator), None);
+    assert_eq!(deactivation_ledger.get(&subnet_node_deactivation_deactivated), None);
+
+    // ledger.insert(
+    //   SubnetNodeDeactivation {
+    //     subnet_id: 1,
+    //     subnet_node: subnet_node,
+    //   }
+    // );
+
+    // DeactivationLedger::<Test>::set(ledger);
+
   });
 }

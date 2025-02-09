@@ -472,7 +472,7 @@ pub mod pallet {
 	/// a:							(Optional) Unique data for subnet to use and lookup via RPC, can only be added at registration
 	/// b:							(Optional) Data for subnet to use and lookup via RPC
 	/// c:							(Optional) Data for subnet to use and lookup via RPC
-	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
 	pub struct SubnetNode<AccountId> {
 		pub account_id: AccountId,
 		pub hotkey: AccountId,
@@ -606,18 +606,18 @@ pub mod pallet {
 	/// Registered: Subnet node registered, not included in consensus
 	/// Idle: Subnet node is activated as idle, unless subnet is registering, and automatically updates on the first successful consensus epoch
 	/// Included: Subnet node automatically updates to Included from Idle on the first successful consensus epoch after being Idle
-	/// Submittable: Subnet node updates to Submittble from Included on the first successful consensus epoch they are included in consensus data
+	/// Validator: Subnet node updates to Submittble from Included on the first successful consensus epoch they are included in consensus data
 	/// Accountant:  Subnet node updates to Accountant after multiple successful validations
-	#[derive(Default, EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
+	#[derive(Default, EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, Ord, scale_info::TypeInfo)]
   pub enum SubnetNodeClass {
 		Deactivated,
 		#[default] Registered,
     Idle,
     Included,
-		Submittable,
+		Validator,
   }
 
-	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, Ord, PartialOrd, scale_info::TypeInfo)]
 	pub struct SubnetNodeClassification {
 		pub class: SubnetNodeClass,
 		pub start_epoch: u64,
@@ -758,18 +758,6 @@ pub mod pallet {
 		0
 	}
 	#[pallet::type_value]
-	pub fn DefaultSubnetDemocracySubnetData() -> SubnetDemocracySubnetData {
-		let pre_subnet_data = RegistrationSubnetData {
-			path: Vec::new(),
-			memory_mb: 0,
-			registration_blocks: 0,
-		};
-		return SubnetDemocracySubnetData {
-			data: pre_subnet_data,
-			active: false,
-		}
-	}
-	#[pallet::type_value]
 	pub fn DefaultMaxSubnetPenaltyCount() -> u32 {
 		16
 	}
@@ -790,10 +778,6 @@ pub mod pallet {
 	
 	// #[pallet::type_value]
 	// pub fn DefaultRegisteredSubnetNodeLedger() -> BTreeSet {
-	// 	BTreeSet::new()
-	// }
-	// #[pallet::type_value]
-	// pub fn DefaultDeregisteredSubnetNodeLedger() -> BTreeSet {
 	// 	BTreeSet::new()
 	// }
 	#[pallet::type_value]
@@ -820,7 +804,8 @@ pub mod pallet {
 	pub fn DefaultMaxSubnetNodes() -> u32 {
 		// 94
 		// 1024
-		254
+		// 254
+		512
 	}
 	#[pallet::type_value]
 	pub fn DefaultAccountTake() -> u128 {
@@ -1099,7 +1084,40 @@ pub mod pallet {
 	// pub type RegisteredSubnetNodeLedger<T: Config> = StorageValue<_, BTreeSet, ValueQuery, DefaultRegisteredSubnetNodeLedger>;
 	
 	// #[pallet::storage]
-	// pub type DeregisteredSubnetNodeLedger<T: Config> = StorageValue<_, BTreeSet, ValueQuery, DefaultDeregisteredSubnetNodeLedger>;
+	// pub type DeactivationLedger<T: Config> = 
+	// 	StorageValue<_, BTreeSet<SubnetNode<T::AccountId>>, ValueQuery, DefaultDeactivationLedger<T>>;
+
+	#[pallet::type_value]
+	pub fn DefaultDeactivationLedger<T: Config>() -> BTreeSet<SubnetNodeDeactivation<T::AccountId>> {
+		BTreeSet::new()
+	}
+
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo, PartialOrd, Ord)]
+	pub struct SubnetNodeDeactivation<AccountId> {
+		pub subnet_id: u32,
+		pub subnet_node: SubnetNode<AccountId>,
+	}
+
+	// #[pallet::storage]
+	// pub type DeactivationLedger<T: Config> = 
+	// 	StorageValue<_, BTreeSet<T>, ValueQuery, DefaultDeactivationLedger<T>>;
+
+	#[pallet::storage]
+	pub type MaxDeactivations<T: Config> = 
+		StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
+
+	#[pallet::storage]
+	pub type DeactivationLedger<T: Config> = 
+		StorageValue<_, BTreeSet<SubnetNodeDeactivation<T::AccountId>>, ValueQuery, DefaultDeactivationLedger<T>>;
+
+	#[pallet::type_value]
+	pub fn DefaultDeactivationLedger2<T: Config>() -> BTreeSet<SubnetNode<T::AccountId>> {
+		BTreeSet::new()
+	}
+	
+	#[pallet::storage]
+	pub type DeactivationLedger2<T: Config> =
+		StorageMap<_, Blake2_128Concat, u32, BTreeSet<SubnetNode<T::AccountId>>, ValueQuery, DefaultDeactivationLedger2<T>>;
 
 	// struct SubnetNodeLedger {
   //   nodes: HashMap<String, NodeState>,
@@ -1275,7 +1293,7 @@ pub mod pallet {
 	
 	// If subnet node is absent from inclusion in consensus information or attestings, or validator data isn't attested
 	// We don't count penalties per account because a user can bypass this by having multiple accounts
-	#[pallet::storage] // subnet_id -> class_id -> BTreeMap(account_id, block)
+	#[pallet::storage]
 	pub type SubnetNodePenalties<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
@@ -2252,7 +2270,7 @@ pub mod pallet {
 			// --- Ensure minimum nodes are activated
 			let epoch_length: u64 = T::EpochLength::get();
 			let epoch: u64 = block / epoch_length;
-			let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Submittable, epoch);
+			let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
       let subnet_nodes_count: u32 = subnet_node_accounts.len() as u32;
 
 			if subnet_nodes_count < subnet.min_nodes {
@@ -2329,6 +2347,9 @@ pub mod pallet {
 
 			// Remove proposals
 			let _ = Proposals::<T>::clear_prefix(subnet_id, u32::MAX, None);
+
+			// Remove deactivation ledger
+			// let _ = DeactivationLedger2::<T>::remove(subnet_id);
 	
 			Self::deposit_event(Event::SubnetDeactivated { subnet_id: subnet_id, reason: reason });
 
@@ -2341,12 +2362,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			let block: u64 = Self::get_current_block_as_u64();
 
-			// TODO: Track removal of subnet nodes following validator consensus data submission per epoch
-
 			// We don't check consensus steps here because a subnet peers stake isn't included in calculating rewards 
 			// that hasn't reached their consensus submission epoch yet
 			Self::perform_remove_subnet_node(block, subnet_id, account_id.clone());
-
 			Ok(())
 		}
 
@@ -2534,21 +2552,20 @@ pub mod pallet {
 					// );
 					// --- If subnet activated, activate starting at `Idle`
 					let mut class = SubnetNodeClass::Idle;
-					let mut epoch_increase = 0;
-					// --- If subnet in registration, activate starting at `Submittable` to start off subnet consensus
+					// --- Increase epoch by one to ensure node starts on a fresh epoch unless subnet is still registering
+					let mut epoch_increase = 1;
+					// --- If subnet in registration, activate starting at `Validator` to start off subnet consensus
 					// --- Initial nodes before activation are entered as ``submittable`` nodes
 					// They initiate the first consensus epoch and are responsible for increasing classifications
 					// of other nodes that come in post activation
 					if subnet.activated == 0 {
-						class = SubnetNodeClass::Submittable
+						class = SubnetNodeClass::Validator;
+						epoch_increase -= 1;
 					} else if params.classification.class == SubnetNodeClass::Deactivated {
-						// --- If coming out od deactivation, start back at Submittable on the following epoch
-						class = SubnetNodeClass::Submittable;
-						epoch_increase += 1;
-					} else {
-						// --- Increase start epoch when `Idle` so they always start on a fresh epoch after a successful consensus epoch
-						epoch_increase += 1;
+						// --- If coming out od deactivation, start back at Validator on the following epoch
+						class = SubnetNodeClass::Validator;
 					}
+					
 					params.initialized = block;
 					params.classification = SubnetNodeClassification {
 						class: class,
@@ -2608,12 +2625,12 @@ pub mod pallet {
 		// 			// --- If subnet activated, activate starting at `Idle`
 		// 			let mut class = SubnetNodeClass::Idle;
 		// 			let mut epoch_increase = 0;
-		// 			// --- If subnet in registration, activate starting at `Submittable` to start off subnet consensus
+		// 			// --- If subnet in registration, activate starting at `Validator` to start off subnet consensus
 		// 			// --- Initial nodes before activation are entered as ``submittable`` nodes
 		// 			// They initiate the first consensus epoch and are responsible for increasing classifications
 		// 			// of other nodes that come in post activation
 		// 			if subnet.activated == 0 {
-		// 				class = SubnetNodeClass::Submittable
+		// 				class = SubnetNodeClass::Validator
 		// 			} else {
 		// 				// --- Increase start epoch when `Idle` so they always start on a fresh epoch after a successful consensus epoch
 		// 				epoch_increase += 1;
@@ -2650,13 +2667,67 @@ pub mod pallet {
 			let block: u64 = Self::get_current_block_as_u64();
 			let epoch: u64 = block / epoch_length;
 
+			let subnet_node = match SubnetNodesData::<T>::try_get(subnet_id, account_id.clone()) {
+				Ok(subnet_node) => {
+					ensure!(
+						subnet_node.classification.class >= SubnetNodeClass::Validator,
+            Error::<T>::SubnetNodeNotActivated
+					);
+					subnet_node
+				},
+				Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
+			};	
+
+			// --- Check if attested or validator, if so, add to actions to remove after rewards
+      let use_ledger: bool = match SubnetRewardsSubmission::<T>::try_get(
+        subnet_id, 
+        epoch as u32
+      ) {
+        Ok(submission) => {
+					let mut is_attestor = false;
+					let attests = submission.attests;
+					if attests.get(&account_id.clone()).is_some() {
+						is_attestor = true
+					}
+					is_attestor
+				},
+        Err(()) => {
+					let is_validator: bool = match SubnetRewardsValidator::<T>::try_get(subnet_id, epoch as u32) {
+						Ok(validator) => {
+							let mut is_validator = false;
+							if account_id == validator {
+								is_validator = true
+							}
+							is_validator
+						},
+						Err(()) => false,
+					};
+					is_validator
+				},
+      };
+
+			if use_ledger {
+				let mut deactivation_ledger = DeactivationLedger::<T>::get();
+
+				deactivation_ledger.insert(
+					SubnetNodeDeactivation {
+						subnet_id: subnet_id,
+						subnet_node: subnet_node,
+					}	
+				);
+
+				DeactivationLedger::<T>::set(deactivation_ledger);
+
+				return Ok(())
+			}
+
 			SubnetNodesData::<T>::try_mutate_exists(
 				subnet_id,
 				account_id.clone(),
 				|maybe_params| -> DispatchResult {
 					let params = maybe_params.as_mut().ok_or(Error::<T>::SubnetNodeExist)?;	
 					ensure!(
-						params.classification.class >= SubnetNodeClass::Submittable,
+						params.classification.class >= SubnetNodeClass::Validator,
             Error::<T>::SubnetNodeNotActivated
 					);
 
@@ -2695,6 +2766,55 @@ pub mod pallet {
 			);
 
 			Ok(())
+		}
+
+		pub fn do_deactivation_ledger() {			
+			// --- Get current subnet IDs
+			let subnet_ids: BTreeSet<u32> = SubnetsData::<T>::iter_keys()
+				.map(|id| id)
+				.collect();
+
+			let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
+			let max = MaxDeactivations::<T>::get();
+
+			let epoch_length: u64 = T::EpochLength::get();
+			let block: u64 = Self::get_current_block_as_u64();
+			let epoch: u64 = block / epoch_length;
+
+			let mut deactivation_ledger = DeactivationLedger::<T>::get();
+
+			let mut i = 0;
+			for data in deactivation_ledger.clone().iter() {
+				// if i == max {
+				// 	break
+				// }
+				
+				let subnet_id = data.subnet_id;
+
+				// --- If subnet and subnet node exists, otherwise pass and remove set
+				if subnet_ids.get(&subnet_id) != None {
+					let account_id = &data.subnet_node.account_id;
+					SubnetNodesData::<T>::try_mutate_exists(
+						subnet_id,
+						account_id,
+						|maybe_params| -> DispatchResult {
+							let params = maybe_params.as_mut().ok_or(Error::<T>::SubnetNodeExist)?;							
+							params.initialized = block;
+							params.classification = SubnetNodeClassification {
+								class: SubnetNodeClass::Deactivated,
+								start_epoch: epoch + 1,
+							};
+							Ok(())
+						}
+					);
+				}
+
+				// --- Remove from ledger
+				deactivation_ledger.remove(data);
+
+				i+=1;
+			}
+			DeactivationLedger::<T>::set(deactivation_ledger);
 		}
 
 		/// TODO: Implement, if you're reading this, it's not implemented yet but will be on the next version
@@ -2764,6 +2884,9 @@ pub mod pallet {
 					.saturating_add(T::DbWeight::get().writes(12002_u64));
 
 			} else if (block - 1) >= epoch_length && (block - 1) % epoch_length == 0 {
+				// --- Execute deactivate ledger before choosing validators
+				Self::do_deactivation_ledger();
+			} else if (block - 2) >= epoch_length && (block - 2) % epoch_length == 0 {
 				// We save some weight by waiting one more block to choose validators
 				// Run the block succeeding form consensus
 				let epoch: u64 = block / epoch_length;
@@ -2822,54 +2945,54 @@ pub mod pallet {
 				return
 			}
 			
-			let subnet_id = 1;
+			// let subnet_id = 1;
 
-			let base_node_memory: u128 = BaseSubnetNodeMemoryMB::<T>::get();
+			// let base_node_memory: u128 = BaseSubnetNodeMemoryMB::<T>::get();
 
-			// --- Get min nodes based on default memory settings
-			let real_min_subnet_nodes: u128 = self.memory_mb.clone() / base_node_memory;
-			let mut min_subnet_nodes: u32 = MinSubnetNodes::<T>::get();
-			if real_min_subnet_nodes as u32 > min_subnet_nodes {
-				min_subnet_nodes = real_min_subnet_nodes as u32;
-			}
+			// // --- Get min nodes based on default memory settings
+			// let real_min_subnet_nodes: u128 = self.memory_mb.clone() / base_node_memory;
+			// let mut min_subnet_nodes: u32 = MinSubnetNodes::<T>::get();
+			// if real_min_subnet_nodes as u32 > min_subnet_nodes {
+			// 	min_subnet_nodes = real_min_subnet_nodes as u32;
+			// }
 				
-			let target_subnet_nodes: u32 = (min_subnet_nodes as u128).saturating_mul(TargetSubnetNodesMultiplier::<T>::get()).saturating_div(1000000000) as u32 + min_subnet_nodes;
+			// let target_subnet_nodes: u32 = (min_subnet_nodes as u128).saturating_mul(TargetSubnetNodesMultiplier::<T>::get()).saturating_div(1000000000) as u32 + min_subnet_nodes;
 
-			let subnet_data = SubnetData {
-				id: subnet_id,
-				path: self.subnet_path.clone(),
-				min_nodes: min_subnet_nodes,
-				target_nodes: target_subnet_nodes,
-				memory_mb: self.memory_mb.clone(),
-				registration_blocks: MinSubnetRegistrationBlocks::<T>::get(),
-				initialized: 1,
-				activated: 0,
-			};
+			// let subnet_data = SubnetData {
+			// 	id: subnet_id,
+			// 	path: self.subnet_path.clone(),
+			// 	min_nodes: min_subnet_nodes,
+			// 	target_nodes: target_subnet_nodes,
+			// 	memory_mb: self.memory_mb.clone(),
+			// 	registration_blocks: MinSubnetRegistrationBlocks::<T>::get(),
+			// 	initialized: 1,
+			// 	activated: 0,
+			// };
 
-			// Increase total subnet memory
-			TotalSubnetMemoryMB::<T>::mutate(|n: &mut u128| *n += subnet_data.memory_mb);			
-			// Store unique path
-			SubnetPaths::<T>::insert(self.subnet_path.clone(), subnet_id);
-			// Store subnet data
-			SubnetsData::<T>::insert(subnet_id, subnet_data.clone());
-			// Increase total subnets count
-			TotalSubnets::<T>::mutate(|n: &mut u32| *n += 1);
+			// // Increase total subnet memory
+			// TotalSubnetMemoryMB::<T>::mutate(|n: &mut u128| *n += subnet_data.memory_mb);			
+			// // Store unique path
+			// SubnetPaths::<T>::insert(self.subnet_path.clone(), subnet_id);
+			// // Store subnet data
+			// SubnetsData::<T>::insert(subnet_id, subnet_data.clone());
+			// // Increase total subnets count
+			// TotalSubnets::<T>::mutate(|n: &mut u32| *n += 1);
 
-			// Increase delegate stake to allow activation of subnet model
-			let min_stake_balance = MinStakeBalance::<T>::get();
-			// --- Get minimum subnet stake balance
-			let min_subnet_stake_balance = min_stake_balance * min_subnet_nodes as u128;
-			// --- Get required delegate stake balance for a subnet to have to stay live
-			let mut min_subnet_delegate_stake_balance = (min_subnet_stake_balance as u128).saturating_mul(MinSubnetDelegateStakePercentage::<T>::get()).saturating_div(1000000000);
+			// // Increase delegate stake to allow activation of subnet model
+			// let min_stake_balance = MinStakeBalance::<T>::get();
+			// // --- Get minimum subnet stake balance
+			// let min_subnet_stake_balance = min_stake_balance * min_subnet_nodes as u128;
+			// // --- Get required delegate stake balance for a subnet to have to stay live
+			// let mut min_subnet_delegate_stake_balance = (min_subnet_stake_balance as u128).saturating_mul(MinSubnetDelegateStakePercentage::<T>::get()).saturating_div(1000000000);
 
-			// --- Get absolute minimum required subnet delegate stake balance
-			let min_subnet_delegate_stake = MinSubnetDelegateStake::<T>::get();
-			// --- Return here if the absolute minimum required subnet delegate stake balance is greater
-			//     than the calculated minimum requirement
-			if min_subnet_delegate_stake > min_subnet_delegate_stake_balance {
-				min_subnet_delegate_stake_balance = min_subnet_delegate_stake
-			}	
-			TotalSubnetDelegateStakeBalance::<T>::insert(subnet_id, min_subnet_delegate_stake_balance);
+			// // --- Get absolute minimum required subnet delegate stake balance
+			// let min_subnet_delegate_stake = MinSubnetDelegateStake::<T>::get();
+			// // --- Return here if the absolute minimum required subnet delegate stake balance is greater
+			// //     than the calculated minimum requirement
+			// if min_subnet_delegate_stake > min_subnet_delegate_stake_balance {
+			// 	min_subnet_delegate_stake_balance = min_subnet_delegate_stake
+			// }	
+			// TotalSubnetDelegateStakeBalance::<T>::insert(subnet_id, min_subnet_delegate_stake_balance);
 			
 			// --- Initialize subnet nodes
 			// Only initialize to test using subnet nodes
@@ -2924,7 +3047,7 @@ pub mod pallet {
 			// 	// Insert peer into storage
 			// 	// ========================
 			// 	let classification = SubnetNodeClassification {
-			// 		class: SubnetNodeClass::Submittable,
+			// 		class: SubnetNodeClass::Validator,
 			// 		start_epoch: 0,
 			// 	};
 
