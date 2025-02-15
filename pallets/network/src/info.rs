@@ -122,5 +122,4 @@ impl<T: Config> Pallet<T> {
 
     subnet_nodes
   }
-
 }

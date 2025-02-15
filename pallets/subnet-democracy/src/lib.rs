@@ -971,7 +971,7 @@ pub mod pallet {
       // Get account match
       let mut is_subnet_node = false;
       for subnet_node in proposal.subnet_nodes {
-        if subnet_node.account_id == account_id {
+        if subnet_node.hotkey == account_id {
           is_subnet_node = true;
           break;
         }
@@ -1049,7 +1049,7 @@ pub mod pallet {
       // Get account match
       let mut is_subnet_node = false;
       for subnet_node in proposal.subnet_nodes {
-        if subnet_node.account_id == account_id {
+        if subnet_node.hotkey == account_id {
           is_subnet_node = true;
           break;
         }
@@ -1133,7 +1133,7 @@ pub mod pallet {
       // Get account match
       let mut is_subnet_node = false;
       for subnet_node in proposal.subnet_nodes {
-        if subnet_node.account_id == account_id {
+        if subnet_node.hotkey == account_id {
           is_subnet_node = true;
           break;
         }

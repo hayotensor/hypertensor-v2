@@ -40,6 +40,8 @@ impl<T: Config> Pallet<T> {
     let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
 
     for (subnet_id, data) in SubnetsData::<T>::iter() {
+      let mut attestation_percentage: u128 = 0;
+
       // --- We don't check for minimum nodes because nodes cannot validate or attest if they are not met
       //     as they the validator will not be chosen in ``do_epoch_preliminaries`` if the 
       //     min nodes are not met on that epoch.
@@ -71,7 +73,7 @@ impl<T: Config> Pallet<T> {
         }
 
         let attestations: u128 = submission.attests.len() as u128;
-        let mut attestation_percentage: u128 = Self::percent_div(attestations, subnet_node_count);
+        attestation_percentage = Self::percent_div(attestations, subnet_node_count);
 
         // Redundant
         // When subnet nodes exit, the consensus data is updated to remove them from it
@@ -133,7 +135,7 @@ impl<T: Config> Pallet<T> {
     
         // --- Reward validators
         for subnet_node in SubnetNodesData::<T>::iter_prefix_values(subnet_id) {
-          let account_id: T::AccountId = subnet_node.account_id;
+          let account_id: T::AccountId = subnet_node.hotkey;
 
           // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
           // --- (else if) Check if past Idle and can be included in validation data
@@ -311,6 +313,13 @@ impl<T: Config> Pallet<T> {
       // TODO: Automatically remove subnet if greater than max penalties count
       // TODO: Get benchmark for removing max subnets in one epoch to ensure does not surpass max weights
 
+      Self::deposit_event(
+        Event::RewardResult { 
+          subnet_id: subnet_id, 
+          attestation_percentage: attestation_percentage, 
+        }
+      );
+  
       // --- If subnet is past its max penalty count, remove
       let subnet_penalty_count = SubnetPenaltyCount::<T>::get(subnet_id);
       if subnet_penalty_count > max_subnet_penalty_count {

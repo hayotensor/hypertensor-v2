@@ -165,6 +165,8 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_min_subnet_nodes(base_node_memory: u128, memory_mb: u128) -> u32 {
+    // TODO: Needs to be updated for smoother curve
+
     // log::error!(" ");
     // log::error!("get_min_subnet_nodes base_node_memory {:?}", base_node_memory);
     // log::error!("get_min_subnet_nodes memory_mb {:?}", memory_mb);
@@ -405,7 +407,7 @@ impl<T: Config> Pallet<T> {
       .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
       .map(|subnet_node| {
         SubnetNodeInfo {
-          account_id: subnet_node.account_id,
+          coldkey: KeyOwner::<T>::get(subnet_node.hotkey.clone()),
           hotkey: subnet_node.hotkey,
           peer_id: subnet_node.peer_id,
         }
@@ -424,7 +426,7 @@ impl<T: Config> Pallet<T> {
   {
     SubnetNodesData::<T>::iter_prefix_values(subnet_id)
       .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
-      .map(|subnet_node| subnet_node.account_id)
+      .map(|subnet_node| subnet_node.hotkey)
       .collect()
   }
 }
