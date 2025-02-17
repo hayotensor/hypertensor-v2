@@ -19,8 +19,8 @@ use sp_runtime::Saturating;
 impl<T: Config> Pallet<T> {
   pub fn do_add_stake(
     origin: T::RuntimeOrigin,
-    hotkey: T::AccountId,
     subnet_id: u32,
+    hotkey: T::AccountId,
     stake_to_be_added: u128,
   ) -> DispatchResult {
     let coldkey: T::AccountId = ensure_signed(origin)?;
@@ -80,8 +80,8 @@ impl<T: Config> Pallet<T> {
 
   pub fn do_remove_stake(
     origin: T::RuntimeOrigin, 
-    hotkey: T::AccountId,
     subnet_id: u32,
+    hotkey: T::AccountId,
     is_subnet_node: bool,
     stake_to_be_removed: u128,
   ) -> DispatchResult {

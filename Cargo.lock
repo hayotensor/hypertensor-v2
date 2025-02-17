@@ -4838,8 +4838,10 @@ dependencies = [
 name = "network-custom-rpc"
 version = "0.0.1"
 dependencies = [
+ "frame-support",
  "jsonrpsee",
  "network-custom-rpc-runtime-api",
+ "pallet-network",
  "parity-scale-codec",
  "serde",
  "sp-api",

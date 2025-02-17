@@ -45,7 +45,7 @@ use crate::{
   MinSubnetDelegateStakePercentage, MaxSubnetPenaltyCount, 
   TotalAccountStake, MaxSubnetMemoryMB, SubnetStakeUnbondingLedger, TotalSubnetMemoryMB,MaxTotalSubnetMemoryMB,
   TotalSubnetStake, MinSubnetRegistrationBlocks, MaxSubnetRegistrationBlocks, SubnetActivationEnactmentPeriod,
-  SubnetNodeClassification, DeactivationLedger, SubnetNode, SubnetNodeDeactivation
+  SubnetNodeClassification, DeactivationLedger, SubnetNode, SubnetNodeDeactivation, DefaultSubnetNodeUniqueParamLimit
 };
 use frame_support::BoundedVec;
 use strum::IntoEnumIterator;
@@ -165,8 +165,8 @@ fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, deposi
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(n)),
-        account(n),
         subnet_id,
+        account(n),
         peer(n),
         amount,
         None,
@@ -241,8 +241,8 @@ fn build_subnet_nodes(subnet_id: u32, start: u32, end: u32, deposit_amount: u128
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(n)),
-        account(n),
         subnet_id,
+        account(n),
         peer(n),
         amount,
         None,
@@ -271,8 +271,8 @@ fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(n)),
-        account(n),
         subnet_id,
+        account(n),
         stake_balance,
       ) 
     );
@@ -543,8 +543,8 @@ fn add_subnet_node(
 ) -> Result<(), sp_runtime::DispatchError> {
   Network::add_subnet_node(
     RuntimeOrigin::signed(account(account_id)),
-    account(account_id),
     subnet_id,
+    account(account_id),
     peer(peer_id),
     amount,
     None,
@@ -817,8 +817,8 @@ fn test_activate_subnet() {
       assert_ok!(
         Network::add_subnet_node(
           RuntimeOrigin::signed(account(n)),
-          account(n),
           subnet_id,
+          account(n),
           peer(n),
           amount,
           None,
@@ -910,8 +910,8 @@ fn test_activate_subnet_invalid_subnet_id_error() {
       assert_ok!(
         Network::add_subnet_node(
           RuntimeOrigin::signed(account(n)),
-          account(n),
           subnet_id,
+          account(n),
           peer(n),
           amount,
           None,
@@ -975,8 +975,8 @@ fn test_activate_subnet_already_activated_err() {
       assert_ok!(
         Network::add_subnet_node(
           RuntimeOrigin::signed(account(n)),
-          account(n),
           subnet_id,
+          account(n),
           peer(n),
           amount,
           None,
@@ -1061,8 +1061,8 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
       assert_ok!(
         Network::add_subnet_node(
           RuntimeOrigin::signed(account(n)),
-          account(n),
           subnet_id,
+          account(n),
           peer(n),
           amount,
           None,
@@ -1158,8 +1158,8 @@ fn test_activate_subnet_initializing_error() {
       assert_ok!(
         Network::add_subnet_node(
           RuntimeOrigin::signed(account(n)),
-          account(n),
           subnet_id,
+          account(n),
           peer(n),
           amount,
           None,
@@ -1299,8 +1299,8 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
       assert_ok!(
         Network::add_subnet_node(
           RuntimeOrigin::signed(account(n)),
-          account(n),
           subnet_id,
+          account(n),
           peer(n),
           amount,
           None,
@@ -1714,8 +1714,8 @@ fn test_register_subnet_node() {
     assert_ok!(
       Network::register_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -1787,8 +1787,8 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
     assert_err!(
       Network::register_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(0),
         amount,
         None,
@@ -1834,8 +1834,8 @@ fn test_register_subnet_node_then_activate() {
     assert_ok!(
       Network::register_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(0),
         amount,
         None,
@@ -1872,8 +1872,8 @@ fn test_activate_subnet_then_register_subnet_node_then_activate() {
     assert_ok!(
       Network::register_subnet_node(
         RuntimeOrigin::signed(account(n_account)),
-        account(n_account),
         subnet_id,
+        account(n_account),
         peer(n_account),
         amount,
         None,
@@ -1925,8 +1925,8 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
     assert_ok!(
       Network::register_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(0),
         amount,
         None,
@@ -1967,8 +1967,8 @@ fn test_register_subnet_node_activate_subnet_node() {
     assert_ok!(
       Network::register_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2078,8 +2078,8 @@ fn test_add_subnet_node_subnet_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(0),
         amount,
         None,
@@ -2093,8 +2093,8 @@ fn test_add_subnet_node_subnet_err() {
 
     assert_err!(Network::add_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(0),
         amount,
         None,
@@ -2144,8 +2144,8 @@ fn test_add_subnet_node_not_exists_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(1),
         amount,
         None,
@@ -2161,8 +2161,8 @@ fn test_add_subnet_node_not_exists_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(0),
         subnet_id,
+        account(0),
         peer(0),
         amount,
         None,
@@ -2178,8 +2178,8 @@ fn test_add_subnet_node_not_exists_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         peer(1),
         amount,
         None,
@@ -2213,8 +2213,8 @@ fn test_add_subnet_node_stake_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2245,8 +2245,8 @@ fn test_add_subnet_node_stake_not_enough_balance_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2277,8 +2277,8 @@ fn test_add_subnet_node_invalid_peer_id_err() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer,
         amount,
         None,
@@ -2355,8 +2355,8 @@ fn test_add_subnet_node_remove_readd() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2377,8 +2377,8 @@ fn test_add_subnet_node_remove_readd() {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         account_subnet_stake,
       )
     );
@@ -2386,8 +2386,8 @@ fn test_add_subnet_node_remove_readd() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2417,8 +2417,8 @@ fn test_add_subnet_node_remove_readd_must_unstake_error() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2437,8 +2437,8 @@ fn test_add_subnet_node_remove_readd_must_unstake_error() {
     assert_err!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2469,8 +2469,8 @@ fn test_add_subnet_node_remove_stake_partial_readd() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2500,8 +2500,8 @@ fn test_add_subnet_node_remove_stake_partial_readd() {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         account_subnet_stake,
       )
     );
@@ -2510,8 +2510,8 @@ fn test_add_subnet_node_remove_stake_partial_readd() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2539,8 +2539,8 @@ fn test_add_subnet_node_remove_stake_readd() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2566,8 +2566,8 @@ fn test_add_subnet_node_remove_stake_readd() {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         remaining_account_stake_balance,
       )
     );
@@ -2576,8 +2576,8 @@ fn test_add_subnet_node_remove_stake_readd() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2586,6 +2586,122 @@ fn test_add_subnet_node_remove_stake_readd() {
       ) 
     );
   });
+}
+
+#[test]
+fn test_register_subnet_node_with_a_param() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), deposit_amount);
+
+    let total_active_subnet_nodes = TotalActiveSubnetNodes::<Test>::get(subnet_id);
+
+    let a: Vec<u8> = "a".into();
+    let bounded_a: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = a.try_into().expect("String too long");
+
+    assert_ok!(
+      Network::register_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
+        amount,
+        Some(bounded_a.clone()),
+        None,
+        None,
+      )
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
+    assert_eq!(subnet_node.a, Some(bounded_a.clone()));
+  })
+}
+
+#[test]
+fn test_register_subnet_node_and_then_update_a_param() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), deposit_amount);
+
+    let total_active_subnet_nodes = TotalActiveSubnetNodes::<Test>::get(subnet_id);
+
+    assert_ok!(
+      Network::register_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
+        amount,
+        None,
+        None,
+        None,
+      )
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
+    assert_eq!(subnet_node.a, None);
+
+    
+    let a: Vec<u8> = "a".into();
+    let bounded_a: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = a.try_into().expect("String too long");
+
+    assert_ok!(
+      Network::register_subnet_node_a_parameter(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        bounded_a.clone(),
+      )
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
+    assert_eq!(subnet_node.a, Some(bounded_a.clone()));
+
+    assert_err!(
+      Network::register_subnet_node_a_parameter(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        bounded_a.clone(),
+      ),
+      Error::<Test>::SubnetNodeUniqueParamTaken
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
+    assert_eq!(subnet_node.a, Some(bounded_a.clone()));
+
+    let a_v2: Vec<u8> = "a_v2".into();
+    let bounded_a_v2: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = a_v2.try_into().expect("String too long");
+
+    assert_err!(
+      Network::register_subnet_node_a_parameter(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        bounded_a_v2.clone(),
+      ),
+      Error::<Test>::SubnetNodeUniqueParamIsSet
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
+    assert_eq!(subnet_node.a, Some(bounded_a.clone()));
+
+  })
 }
 
 // #[test]
@@ -2722,8 +2838,8 @@ fn test_remove_peer_unstake_total_balance() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2759,8 +2875,8 @@ fn test_remove_peer_unstake_total_balance() {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         remaining_account_stake_balance,
       )
     );
@@ -2789,8 +2905,8 @@ fn test_claim_stake_unbondings() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2818,8 +2934,8 @@ fn test_claim_stake_unbondings() {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         stake_balance,
       )
     );
@@ -2876,8 +2992,8 @@ fn test_claim_stake_unbondings_no_unbondings_err() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount,
         None,
@@ -2921,8 +3037,8 @@ fn test_remove_to_stake_max_unlockings_reached_err() {
     assert_ok!(
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
         amount*2,
         None,
@@ -2938,8 +3054,8 @@ fn test_remove_to_stake_max_unlockings_reached_err() {
         assert_err!(
           Network::remove_stake(
             RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-            account(total_subnet_nodes+1),
             subnet_id,
+            account(total_subnet_nodes+1),
             1000,
           ),
           Error::<Test>::MaxUnlockingsReached
@@ -2948,8 +3064,8 @@ fn test_remove_to_stake_max_unlockings_reached_err() {
         assert_ok!(
           Network::remove_stake(
             RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-            account(total_subnet_nodes+1),
             subnet_id,
+            account(total_subnet_nodes+1),
             1000,
           )
         );
@@ -3043,8 +3159,8 @@ fn test_add_to_stake_err() {
     assert_err!(
       Network::add_to_stake(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         0,
+        account(0),
         amount,
       ),
       Error::<Test>::SubnetNotExist,
@@ -3064,8 +3180,8 @@ fn test_add_to_stake_err() {
     assert_err!(
       Network::add_to_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        account(total_subnet_nodes+1),
         subnet_id,
+        account(total_subnet_nodes+1),
         amount,
       ),
       Error::<Test>::SubnetNodeNotExist,
@@ -3094,8 +3210,8 @@ fn test_add_to_stake() {
     assert_ok!(
       Network::add_to_stake(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         amount,
       ) 
     );
@@ -3173,8 +3289,8 @@ fn test_remove_stake() {
     assert_ok!(
       Network::add_to_stake(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         amount,
       ) 
     );
@@ -3190,8 +3306,8 @@ fn test_remove_stake() {
     assert_ok!(
       Network::remove_stake(
         RuntimeOrigin::signed(account(0)),
-        account(0),
         subnet_id,
+        account(0),
         amount,
       )
     );
@@ -7440,8 +7556,8 @@ fn test_epoch_steps() {
         assert_ok!(
           Network::add_subnet_node(
             RuntimeOrigin::signed(account(n_peers)),
-            account(n_peers),
             subnet_id,
+            account(n_peers),
             peer(n_peers),
             amount,
             None,

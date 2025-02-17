@@ -466,6 +466,12 @@ pub mod pallet {
 		NodeHasActiveProposal,
 		/// Not the key owner
 		NotKeyOwner,
+		/// Subnet Node param A must be unique
+		SubnetNodeUniqueParamTaken,
+		/// Subnet node param A is already set
+		SubnetNodeUniqueParamIsSet,
+		/// Subnet node params must be Some
+		SubnetNodeNonUniqueParamMustBeSome,
 	}
 	
 	/// account_id: 		Coldkey of subnet node
@@ -483,9 +489,9 @@ pub mod pallet {
 		pub peer_id: PeerId,
 		pub initialized: u64,
 		pub classification: SubnetNodeClassification,
-		pub a: Vec<u8>,
-		pub b: Vec<u8>,
-		pub c: Vec<u8>,
+		pub a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+		pub b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
@@ -799,9 +805,9 @@ pub mod pallet {
 				class: SubnetNodeClass::Registered,
 				start_epoch: 0,
 			},
-			a: Vec::new(),
-			b: Vec::new(),
-      c: Vec::new(),
+			a: Some(BoundedVec::new()),
+			b: Some(BoundedVec::new()),
+      c: Some(BoundedVec::new()),
 		};
 	}
 	#[pallet::type_value]
@@ -931,7 +937,9 @@ pub mod pallet {
 	#[pallet::type_value]
 	pub fn DefaultMinSubnetNodes() -> u32 {
 		// testnet is 4
-		4
+		// 4
+		// local
+		1
 	}
 	#[pallet::type_value]
 	pub fn DefaultMinSubnetRegistrationBlocks() -> u64 {
@@ -981,7 +989,7 @@ pub mod pallet {
 		0
 	}
 	#[pallet::type_value]
-	pub fn DefaultSubnetNodeParamLimit() -> u32 {
+	pub fn DefaultSubnetNodeUniqueParamLimit() -> u32 {
 		2024
 	}
 	#[pallet::type_value]
@@ -1196,17 +1204,34 @@ pub mod pallet {
 		DefaultAccountId<T>,
 	>;
 
-	// Used for unique peer_ids
+	// Used for unique parameters
 	#[pallet::storage] // subnet_id --> param --> peer_id
-	pub type SubnetNodeParam<T: Config> = StorageDoubleMap<
+	pub type SubnetNodeUniqueParam<T> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
 		Identity,
-		Vec<u8>,
+		BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>,
 		PeerId,
 		ValueQuery,
 		DefaultPeerId,
+	>;
+	
+	#[pallet::storage]
+	pub type MaxSubnetNodeNonUniqueParamUpdate<T: Config> = 
+		StorageValue<_, u32, ValueQuery, DefaultMaxDeactivations>;
+
+	// Last update of non unique subnet node params
+	#[pallet::storage]
+	pub type SubnetNodeNonUniqueParamLastSet<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		T::AccountId,
+		u32,
+		ValueQuery,
+		DefaultZeroU32,
 	>;
 	
 	#[pallet::storage] // subnet_id -> class_id -> BTreeMap(account_id, block)
@@ -1674,18 +1699,18 @@ pub mod pallet {
 		#[pallet::weight({0})]
 		pub fn add_subnet_node(
 			origin: OriginFor<T>, 
-			hotkey: T::AccountId,
 			subnet_id: u32, 
+			hotkey: T::AccountId,
 			peer_id: PeerId, 
 			stake_to_be_added: u128,
-			a: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
-			b: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
-			c: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
+			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 		) -> DispatchResult {
 			Self::do_register_subnet_node(
 				origin.clone(),
-				hotkey,
 				subnet_id,
+				hotkey,
 				peer_id,
 				stake_to_be_added,
 				a,
@@ -1703,18 +1728,18 @@ pub mod pallet {
 		#[pallet::weight({0})]
 		pub fn register_subnet_node(
 			origin: OriginFor<T>, 
-			hotkey: T::AccountId,
 			subnet_id: u32, 
+			hotkey: T::AccountId,
 			peer_id: PeerId, 
 			stake_to_be_added: u128,
-			a: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
-			b: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
-			c: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
+			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 		) -> DispatchResult {
 			Self::do_register_subnet_node(
 				origin,
-				hotkey,
 				subnet_id,
+				hotkey,
 				peer_id,
 				stake_to_be_added,
 				a,
@@ -1782,8 +1807,8 @@ pub mod pallet {
 		#[pallet::weight({0})]
 		pub fn add_to_stake(
 			origin: OriginFor<T>, 
-			hotkey: T::AccountId,
 			subnet_id: u32,
+			hotkey: T::AccountId,
 			stake_to_be_added: u128,
 		) -> DispatchResult {
 			let account_id: T::AccountId = ensure_signed(origin.clone())?;
@@ -1810,8 +1835,8 @@ pub mod pallet {
 
 			Self::do_add_stake(
 				origin, 
-				hotkey,
 				subnet_id,
+				hotkey,
 				stake_to_be_added,
 			)
 		}
@@ -1825,8 +1850,8 @@ pub mod pallet {
 		#[pallet::weight({0})]
 		pub fn remove_stake(
 			origin: OriginFor<T>, 
-			hotkey: T::AccountId,
 			subnet_id: u32, 
+			hotkey: T::AccountId,
 			stake_to_be_removed: u128
 		) -> DispatchResult {
 			let account_id: T::AccountId = ensure_signed(origin.clone())?;
@@ -1849,8 +1874,8 @@ pub mod pallet {
 			// 		else: can remove total stake balance
 			Self::do_remove_stake(
 				origin, 
-				hotkey,
 				subnet_id,
+				hotkey,
 				is_subnet_node,
 				stake_to_be_removed,
 			)
@@ -2152,15 +2177,73 @@ pub mod pallet {
 
 		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
-		pub fn clear_subnet(
+		pub fn register_subnet_node_a_parameter(
 			origin: OriginFor<T>, 
 			subnet_id: u32,
+			a: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>,
 		) -> DispatchResult {
 			let account_id: T::AccountId = ensure_signed(origin)?;
-			Ok(())
+
+			ensure!(
+				!SubnetNodeUniqueParam::<T>::contains_key(subnet_id, a.clone()),
+				Error::<T>::SubnetNodeUniqueParamTaken
+			);
+
+			SubnetNodesData::<T>::try_mutate_exists(
+				subnet_id,
+				account_id.clone(),
+				|maybe_params| -> DispatchResult {
+					let params = maybe_params.as_mut().ok_or(Error::<T>::SubnetNodeExist)?;
+					ensure!(
+						params.a.is_none(),
+						Error::<T>::SubnetNodeUniqueParamIsSet
+					);
+					SubnetNodeUniqueParam::<T>::insert(subnet_id, a.clone(), params.peer_id.clone());
+					params.a = Some(a.clone());
+
+					Ok(())
+				}
+			)
 		}
 
 		#[pallet::call_index(26)]
+		#[pallet::weight({0})]
+		pub fn register_subnet_node_non_unique_parameter(
+			origin: OriginFor<T>, 
+			subnet_id: u32,
+			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+		) -> DispatchResult {
+			let account_id: T::AccountId = ensure_signed(origin)?;
+
+			ensure!(
+				b.is_some() || c.is_some(),
+				Error::<T>::SubnetNodeNonUniqueParamMustBeSome
+			);
+
+
+			let last_update_epoch = SubnetNodeNonUniqueParamLastSet::<T>::get(subnet_id, account_id.clone());
+
+			SubnetNodesData::<T>::try_mutate_exists(
+				subnet_id,
+				account_id.clone(),
+				|maybe_params| -> DispatchResult {
+					let params = maybe_params.as_mut().ok_or(Error::<T>::SubnetNodeExist)?;
+
+					if b.is_some() {
+						params.b = Some(b.clone().unwrap());
+					}
+
+					if c.is_some() {
+						params.c = Some(c.clone().unwrap());
+					}
+
+					Ok(())
+				}
+			)
+		}
+
+		#[pallet::call_index(27)]
 		#[pallet::weight({0})]
 		pub fn update_coldkey(
 			origin: OriginFor<T>, 
@@ -2187,7 +2270,7 @@ pub mod pallet {
 			})
 		}
 
-		#[pallet::call_index(27)]
+		#[pallet::call_index(28)]
 		#[pallet::weight({0})]
 		pub fn update_hotkey(
 			origin: OriginFor<T>, 
@@ -2415,6 +2498,7 @@ pub mod pallet {
 			let _ = SubnetNodesData::<T>::clear_prefix(subnet_id, u32::MAX, None);
 			let _ = TotalSubnetNodes::<T>::remove(subnet_id);
 			let _ = SubnetNodeAccount::<T>::clear_prefix(subnet_id, u32::MAX, None);
+			let _ = SubnetNodeUniqueParam::<T>::clear_prefix(subnet_id, u32::MAX, None);
 
 			// Remove all subnet consensus data
 			let _ = SubnetPenaltyCount::<T>::remove(subnet_id);
@@ -2447,13 +2531,13 @@ pub mod pallet {
 
 		pub fn do_register_subnet_node(
 			origin: OriginFor<T>,
-			hotkey: T::AccountId,
 			subnet_id: u32, 
+			hotkey: T::AccountId,
 			peer_id: PeerId, 
 			stake_to_be_added: u128,
-			a: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
-			b: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
-			c: Option<BoundedVec<u8, DefaultSubnetNodeParamLimit>>,
+			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 		) -> DispatchResult {
 			let account_id: T::AccountId = ensure_signed(origin.clone())?;
 
@@ -2490,9 +2574,10 @@ pub mod pallet {
 			// [here]
 			if a.is_some() {
 				ensure!(
-					!SubnetNodeParam::<T>::contains_key(subnet_id, a.unwrap()),
-					Error::<T>::SubnetNodeExist
-				);	
+					!SubnetNodeUniqueParam::<T>::contains_key(subnet_id, a.clone().unwrap()),
+					Error::<T>::SubnetNodeUniqueParamTaken
+				);
+				SubnetNodeUniqueParam::<T>::insert(subnet_id, a.clone().unwrap(), peer_id.clone());
 			}
 
 			// Unique subnet_id -> PeerId
@@ -2531,8 +2616,8 @@ pub mod pallet {
 			// ====================
 			Self::do_add_stake(
 				origin.clone(), 
-				hotkey.clone(),
 				subnet_id,
+				hotkey.clone(),
 				stake_to_be_added,
 			).map_err(|e| e)?;
 
@@ -2556,9 +2641,9 @@ pub mod pallet {
 				peer_id: peer_id.clone(),
 				initialized: 0,
 				classification: classification,
-				a: Vec::new(),
-				b: Vec::new(),
-				c: Vec::new(),
+				a: a,
+				b: b,
+				c: c,
 			};
 
 			// Insert hotkey -> coldkey
@@ -3093,83 +3178,83 @@ pub mod pallet {
 			// Only initialize to test using subnet nodes
 			// If testing using subnet nodes in a subnet, comment out the ``for`` loop
 
-			let mut stake_amount: u128 = MinStakeBalance::<T>::get();
+			// let mut stake_amount: u128 = MinStakeBalance::<T>::get();
 			
-			let mut count = 0;
-			for (account_id, peer_id) in &self.subnet_nodes {
-				// Redundant
-				// Unique subnet_id -> PeerId
-				// Ensure peer ID doesn't already exist within subnet regardless of account_id
-				let peer_exists: bool = match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
-					Ok(_) => true,
-					Err(()) => false,
-				};
+			// let mut count = 0;
+			// for (account_id, peer_id) in &self.subnet_nodes {
+			// 	// Redundant
+			// 	// Unique subnet_id -> PeerId
+			// 	// Ensure peer ID doesn't already exist within subnet regardless of account_id
+			// 	let peer_exists: bool = match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
+			// 		Ok(_) => true,
+			// 		Err(()) => false,
+			// 	};
 
-				if peer_exists {
-					continue;
-				}
+			// 	if peer_exists {
+			// 		continue;
+			// 	}
 
-				// ====================
-				// Initiate stake logic
-				// ====================
-				// T::Currency::withdraw(
-				// 	&account_id,
-				// 	stake_amount,
-				// 	WithdrawReasons::except(WithdrawReasons::TIP),
-				// 	ExistenceRequirement::KeepAlive,
-				// );
+			// 	// ====================
+			// 	// Initiate stake logic
+			// 	// ====================
+			// 	// T::Currency::withdraw(
+			// 	// 	&account_id,
+			// 	// 	stake_amount,
+			// 	// 	WithdrawReasons::except(WithdrawReasons::TIP),
+			// 	// 	ExistenceRequirement::KeepAlive,
+			// 	// );
 
-				// -- increase account subnet staking balance
-				AccountSubnetStake::<T>::insert(
-					account_id,
-					subnet_id,
-					AccountSubnetStake::<T>::get(account_id, subnet_id).saturating_add(stake_amount),
-				);
+			// 	// -- increase account subnet staking balance
+			// 	AccountSubnetStake::<T>::insert(
+			// 		account_id,
+			// 		subnet_id,
+			// 		AccountSubnetStake::<T>::get(account_id, subnet_id).saturating_add(stake_amount),
+			// 	);
 
-				// -- increase account_id total stake
-				TotalAccountStake::<T>::mutate(account_id, |mut n| *n += stake_amount);
+			// 	// -- increase account_id total stake
+			// 	TotalAccountStake::<T>::mutate(account_id, |mut n| *n += stake_amount);
 
-				// -- increase total subnet stake
-				TotalSubnetStake::<T>::mutate(subnet_id, |mut n| *n += stake_amount);
+			// 	// -- increase total subnet stake
+			// 	TotalSubnetStake::<T>::mutate(subnet_id, |mut n| *n += stake_amount);
 
-				// -- increase total stake overall
-				TotalStake::<T>::mutate(|mut n| *n += stake_amount);
+			// 	// -- increase total stake overall
+			// 	TotalStake::<T>::mutate(|mut n| *n += stake_amount);
 
-				// To ensure the AccountId that owns the PeerId, they must sign the PeerId for others to verify
-				// This ensures others cannot claim to own a PeerId they are not the owner of
-				// Self::validate_signature(&Encode::encode(&peer_id), &signature, &signer)?;
+			// 	// To ensure the AccountId that owns the PeerId, they must sign the PeerId for others to verify
+			// 	// This ensures others cannot claim to own a PeerId they are not the owner of
+			// 	// Self::validate_signature(&Encode::encode(&peer_id), &signature, &signer)?;
 
-				// ========================
-				// Insert peer into storage
-				// ========================
-				let classification = SubnetNodeClassification {
-					class: SubnetNodeClass::Validator,
-					start_epoch: 0,
-				};
+			// 	// ========================
+			// 	// Insert peer into storage
+			// 	// ========================
+			// 	let classification = SubnetNodeClassification {
+			// 		class: SubnetNodeClass::Validator,
+			// 		start_epoch: 0,
+			// 	};
 
-				let subnet_node: SubnetNode<T::AccountId> = SubnetNode {
-					coldkey: account_id.clone(),
-					hotkey: account_id.clone(),
-					peer_id: peer_id.clone(),
-					initialized: 0,
-					classification: classification,
-					a: Vec::new(),
-					b: Vec::new(),
-					c: Vec::new(),
-				};
+			// 	let subnet_node: SubnetNode<T::AccountId> = SubnetNode {
+			// 		coldkey: account_id.clone(),
+			// 		hotkey: account_id.clone(),
+			// 		peer_id: peer_id.clone(),
+			// 		initialized: 0,
+			// 		classification: classification,
+			// 		a: Some(BoundedVec::new()),
+			// 		b: Some(BoundedVec::new()),
+			// 		c: Some(BoundedVec::new()),
+			// 	};
 	
-				// Insert SubnetNodesData with account_id as key
-				SubnetNodesData::<T>::insert(subnet_id, account_id.clone(), subnet_node);
+			// 	// Insert SubnetNodesData with account_id as key
+			// 	SubnetNodesData::<T>::insert(subnet_id, account_id.clone(), subnet_node);
 
-				// Insert subnet peer account to keep peer_ids unique within subnets
-				SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), account_id.clone());
+			// 	// Insert subnet peer account to keep peer_ids unique within subnets
+			// 	SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), account_id.clone());
 
-				// Increase total subnet peers
-				TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
-				TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+			// 	// Increase total subnet peers
+			// 	TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+			// 	TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
 
-				count += 1;
-			}
+			// 	count += 1;
+			// }
 		}
 	}
 }

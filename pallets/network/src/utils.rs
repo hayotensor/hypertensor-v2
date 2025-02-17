@@ -142,7 +142,11 @@ impl<T: Config> Pallet<T> {
         }
       );
     
-      SubnetNodesData::<T>::remove(subnet_id, account_id.clone());
+      let subnet_node = SubnetNodesData::<T>::take(subnet_id, account_id.clone());
+
+      if subnet_node.a.is_some() {
+        SubnetNodeUniqueParam::<T>::remove(subnet_id, subnet_node.a.unwrap())
+      }
 
       // Remove SubnetNodeAccount peer_id as key
       SubnetNodeAccount::<T>::remove(subnet_id, peer_id.clone());
@@ -333,7 +337,7 @@ impl<T: Config> Pallet<T> {
 
       // --- Check penalties and remove subnet is threshold is breached
       let penalties = SubnetPenaltyCount::<T>::get(subnet_id);
-      if penalties >  max_subnet_penalty_count{
+      if penalties >  max_subnet_penalty_count {
         Self::deactivate_subnet(
           data.path,
           SubnetRemovalReason::MaxPenalties,

@@ -45,6 +45,7 @@ pub use frame_support::{
 	StorageValue,
 	PalletId,
 	genesis_builder_helper::{build_state, get_preset},
+	storage::bounded_vec::BoundedVec,
 };
 pub use frame_system::EnsureRoot;
 pub use pallet_balances::Call as BalancesCall;
@@ -54,6 +55,7 @@ use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
+use pallet_network::DefaultSubnetNodeUniqueParamLimit;
 
 pub use pallet_network;
 // pub use pallet_subnet_democracy;
@@ -927,7 +929,11 @@ impl_runtime_apis! {
 		fn are_subnet_nodes_by_peer_id(subnet_id: u32, peer_ids: Vec<Vec<u8>>) -> Vec<u8> {
 			let result = Network::are_subnet_nodes_by_peer_id(subnet_id, peer_ids);
 			result.encode()
-		}	
+		}
+		fn is_subnet_node_by_a(subnet_id: u32, a: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>) -> bool {
+			let result = Network::is_subnet_node_by_a(subnet_id, a);
+			result
+		}
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
