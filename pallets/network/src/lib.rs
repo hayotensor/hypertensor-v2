@@ -496,6 +496,12 @@ pub mod pallet {
 		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 	}
 
+	#[derive(Encode, Decode, scale_info::TypeInfo, Clone, PartialEq, Eq)]
+	pub enum OverwatchSubnetWeights {
+		pub subnet_id: u32,
+		pub weight: u32,
+	}
+
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct SubnetNodeInfo<AccountId> {
 		pub coldkey: AccountId,
