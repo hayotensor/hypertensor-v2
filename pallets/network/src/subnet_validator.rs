@@ -31,11 +31,12 @@ impl<T: Config> Pallet<T> {
   ) -> DispatchResultWithPostInfo {
     // TODO: Add max sum to avoid overflow
 
-    // --- Ensure current subnet validator 
+    // --- Ensure current subnet validator by its hotkey
     let validator = SubnetRewardsValidator::<T>::get(subnet_id, epoch).ok_or(Error::<T>::InvalidValidator)?;
     
+    // --- If account_id is hotkey, ensure it matches validator, otherwise if coldkey -> get hotkey
     ensure!(
-      account_id == validator,
+      account_id == validator || KeyOwner::<T>::get(account_id.clone()) == validator,
       Error::<T>::InvalidValidator
     );
 

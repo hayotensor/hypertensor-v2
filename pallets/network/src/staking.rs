@@ -136,6 +136,19 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
+  pub fn do_swap_hotkey_balance(
+    origin: T::RuntimeOrigin, 
+    subnet_id: u32,
+    old_hotkey: &T::AccountId,
+    new_hotkey: &T::AccountId,
+  ) {
+    Self::swap_account_stake(
+      old_hotkey,
+      new_hotkey,
+      subnet_id, 
+    )
+  }
+
   pub fn add_balance_to_stake_unbonding_ledger(
     coldkey: &T::AccountId,
     subnet_id: u32, 
@@ -181,7 +194,6 @@ impl<T: Config> Pallet<T> {
     let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
     let mut unbondings_copy = unbondings.clone();
 
-    // let mut successful_unbondings = BTreeMap::new();
     let mut successful_unbondings = 0;
 
     for (unbonding_epoch, amount) in unbondings.iter() {
@@ -208,15 +220,12 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn increase_account_stake(
-    coldkey: &T::AccountId,
+    hotkey: &T::AccountId,
     subnet_id: u32, 
     amount: u128,
   ) {
     // -- increase account subnet staking balance
-    AccountSubnetStake::<T>::mutate(coldkey, subnet_id, |mut n| n.saturating_accrue(amount));
-
-    // -- increase coldkey total stake
-    TotalAccountStake::<T>::mutate(coldkey, |mut n| n.saturating_accrue(amount));
+    AccountSubnetStake::<T>::mutate(hotkey, subnet_id, |mut n| n.saturating_accrue(amount));
 
     // -- increase total subnet stake
     TotalSubnetStake::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(amount));
@@ -226,21 +235,35 @@ impl<T: Config> Pallet<T> {
   }
   
   pub fn decrease_account_stake(
-    coldkey: &T::AccountId,
+    hotkey: &T::AccountId,
     subnet_id: u32, 
     amount: u128,
   ) {
     // -- decrease account subnet staking balance
-    AccountSubnetStake::<T>::mutate(coldkey, subnet_id, |mut n| n.saturating_reduce(amount));
-
-    // -- decrease coldkey total stake
-    TotalAccountStake::<T>::mutate(coldkey, |mut n| n.saturating_reduce(amount));
+    AccountSubnetStake::<T>::mutate(hotkey, subnet_id, |mut n| n.saturating_reduce(amount));
 
     // -- decrease total subnet stake
     TotalSubnetStake::<T>::mutate(subnet_id, |mut n| n.saturating_reduce(amount));
 
     // -- decrease total stake overall
     TotalStake::<T>::mutate(|mut n| n.saturating_reduce(amount));
+  }
+
+  fn swap_account_stake(
+    old_hotkey: &T::AccountId,
+    new_hotkey: &T::AccountId,
+    subnet_id: u32, 
+  ) {
+    // -- swap old_hotkey subnet staking balance
+    let old_hotkey_stake_balance = AccountSubnetStake::<T>::take(old_hotkey, subnet_id);
+    // --- Redundant take of new hotkeys stake balance
+    // --- New hotkey is always checked before updating
+    let new_hotkey_stake_balance = AccountSubnetStake::<T>::take(new_hotkey, subnet_id);
+    AccountSubnetStake::<T>::insert(
+      new_hotkey, 
+      subnet_id, 
+      old_hotkey_stake_balance.saturating_add(new_hotkey_stake_balance)
+    );
   }
 
   pub fn can_remove_balance_from_coldkey_account(

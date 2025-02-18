@@ -43,9 +43,10 @@ use crate::{
   BaseRewardPerMB,
   DelegateStakeUnbondingLedger, SubnetRemovalReason, ProposalBidAmount, BaseSubnetNodeMemoryMB,
   MinSubnetDelegateStakePercentage, MaxSubnetPenaltyCount, 
-  TotalAccountStake, MaxSubnetMemoryMB, SubnetStakeUnbondingLedger, TotalSubnetMemoryMB,MaxTotalSubnetMemoryMB,
+  MaxSubnetMemoryMB, SubnetStakeUnbondingLedger, TotalSubnetMemoryMB,MaxTotalSubnetMemoryMB,
   TotalSubnetStake, MinSubnetRegistrationBlocks, MaxSubnetRegistrationBlocks, SubnetActivationEnactmentPeriod,
-  SubnetNodeClassification, DeactivationLedger, SubnetNode, SubnetNodeDeactivation, DefaultSubnetNodeUniqueParamLimit
+  SubnetNodeClassification, DeactivationLedger, SubnetNode, SubnetNodeDeactivation, DefaultSubnetNodeUniqueParamLimit,
+  KeyOwner
 };
 use frame_support::BoundedVec;
 use strum::IntoEnumIterator;
@@ -176,10 +177,14 @@ fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, deposi
     );
 
     let subnet_node_data = SubnetNodesData::<Test>::try_get(subnet_id, account(n)).unwrap();
-    assert_eq!(subnet_node_data.coldkey, account(n));
     assert_eq!(subnet_node_data.hotkey, account(n));
+
+    let key_owner = KeyOwner::<Test>::get(subnet_node_data.hotkey.clone());
+    assert_eq!(key_owner, account(n));
+
     assert_eq!(subnet_node_data.peer_id, peer(n));
     assert_eq!(subnet_node_data.initialized, block_number);
+
     // --- Is ``Validator`` if registered before subnet activation
     assert_eq!(subnet_node_data.classification.class, SubnetNodeClass::Validator);
     assert!(subnet_node_data.has_classification(&SubnetNodeClass::Validator, epoch));
@@ -189,9 +194,6 @@ fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, deposi
 
     let account_subnet_stake = AccountSubnetStake::<Test>::get(account(n), subnet_id);
     assert_eq!(account_subnet_stake, amount);
-
-    // let total_account_stake = TotalAccountStake::<Test>::get(account(n));
-    // assert_eq!(total_account_stake, amount);
   }
 
   let total_subnet_stake = TotalSubnetStake::<Test>::get(subnet_id);
@@ -471,7 +473,7 @@ fn post_successful_add_subnet_node_asserts(
   amount: u128
 ) {
   assert_eq!(Network::account_subnet_stake(account(n), subnet_id), amount);
-  assert_eq!(Network::total_account_stake(account(n)), amount);    
+  // assert_eq!(Network::total_account_stake(account(n)), amount);    
   assert_eq!(Network::total_subnet_nodes(subnet_id), (n + 1) as u32);
 }
 
@@ -1731,7 +1733,7 @@ fn test_register_subnet_node() {
     assert_eq!(new_total_active_subnet_nodes, total_active_subnet_nodes);
 
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
-    assert_eq!(subnet_node.coldkey, account(total_subnet_nodes+1));
+    // assert_eq!(subnet_node.coldkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.hotkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.peer_id, peer(total_subnet_nodes+1));
     assert_eq!(subnet_node.initialized, 0);
@@ -1984,7 +1986,7 @@ fn test_register_subnet_node_activate_subnet_node() {
     assert_eq!(new_total_active_subnet_nodes, total_active_subnet_nodes);
 
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
-    assert_eq!(subnet_node.coldkey, account(total_subnet_nodes+1));
+    // assert_eq!(subnet_node.coldkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.hotkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.peer_id, peer(total_subnet_nodes+1));
     assert_eq!(subnet_node.initialized, 0);
@@ -2162,7 +2164,7 @@ fn test_add_subnet_node_not_exists_err() {
       Network::add_subnet_node(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
         subnet_id,
-        account(0),
+        account(total_subnet_nodes+1),
         peer(0),
         amount,
         None,
@@ -2704,6 +2706,127 @@ fn test_register_subnet_node_and_then_update_a_param() {
   })
 }
 
+#[test]
+fn test_register_subnet_node_with_non_unique_param() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), deposit_amount);
+
+    let total_active_subnet_nodes = TotalActiveSubnetNodes::<Test>::get(subnet_id);
+
+    let b: Vec<u8> = "b".into();
+    let bounded_b: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = b.try_into().expect("String too long");
+
+    let c: Vec<u8> = "c".into();
+    let bounded_c: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = c.try_into().expect("String too long");
+
+    assert_ok!(
+      Network::register_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
+        amount,
+        None,
+        Some(bounded_b.clone()),
+        Some(bounded_c.clone()),
+      )
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(total_subnet_nodes+1));
+    assert_eq!(subnet_node.a, None);
+    assert_eq!(subnet_node.b, Some(bounded_b.clone()));
+    assert_eq!(subnet_node.c, Some(bounded_c.clone()));
+  })
+}
+
+#[test]
+fn test_update_subnet_node_with_non_unique_param() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+
+    let _ = Balances::deposit_creating(&account(0), deposit_amount);
+
+    let b: Vec<u8> = "b".into();
+    let bounded_b: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = b.try_into().expect("String too long");
+
+    let c: Vec<u8> = "c".into();
+    let bounded_c: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = c.try_into().expect("String too long");
+
+    increase_epochs(1);
+
+    assert_ok!(
+      Network::set_subnet_node_non_unique_parameter(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        Some(bounded_b.clone()),
+        Some(bounded_c.clone()),
+      )
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.b, Some(bounded_b.clone()));
+    assert_eq!(subnet_node.c, Some(bounded_c.clone()));
+
+    assert_err!(
+      Network::set_subnet_node_non_unique_parameter(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        Some(bounded_b.clone()),
+        Some(bounded_c.clone()),
+      ),
+      Error::<Test>::SubnetNodeNonUniqueParamUpdateIntervalNotReached
+    );
+
+    increase_epochs(1);
+
+    assert_err!(
+      Network::set_subnet_node_non_unique_parameter(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        None,
+        None,
+      ),
+      Error::<Test>::SubnetNodeNonUniqueParamMustBeSome
+    );
+
+    let b2: Vec<u8> = "b".into();
+    let bounded_b2: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = b2.try_into().expect("String too long");
+
+    let c2: Vec<u8> = "c".into();
+    let bounded_c2: BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit> = c2.try_into().expect("String too long");
+
+    assert_ok!(
+      Network::set_subnet_node_non_unique_parameter(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        Some(bounded_b2.clone()),
+        Some(bounded_c2.clone()),
+      )
+    );
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, account(0));
+    assert_eq!(subnet_node.b, Some(bounded_b2.clone()));
+    assert_eq!(subnet_node.c, Some(bounded_c2.clone()));
+
+  })
+}
 // #[test]
 // fn test_remove_peer_error() {
 //   new_test_ext().execute_with(|| {
@@ -2851,7 +2974,7 @@ fn test_remove_peer_unstake_total_balance() {
 
     assert_eq!(Network::total_subnet_nodes(subnet_id), total_subnet_nodes+1);
     assert_eq!(Network::account_subnet_stake(account(0), subnet_id), amount);
-    assert_eq!(Network::total_account_stake(account(0)), amount);
+    // assert_eq!(Network::total_account_stake(account(0)), amount);
     assert_eq!(Network::total_stake(), amount * (total_subnet_nodes as u128 +1));
     assert_eq!(Network::total_subnet_stake(subnet_id), amount * (total_subnet_nodes as u128 +1));
 
@@ -2941,7 +3064,7 @@ fn test_claim_stake_unbondings() {
     );
 
     assert_eq!(Network::account_subnet_stake(account(total_subnet_nodes+1), 1), 0);
-    assert_eq!(Network::total_account_stake(account(total_subnet_nodes+1)), 0);
+    // assert_eq!(Network::total_account_stake(account(total_subnet_nodes+1)), 0);
 
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
@@ -3103,8 +3226,8 @@ fn test_remove_subnet_node() {
       );
     }
 
-    // let node_set = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Idle, epoch);
-    let node_set: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Idle, epoch);
+    // let node_set = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Idle, epoch);
+    let node_set: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Idle, epoch);
 
     assert_eq!(node_set.len(), (total_subnet_nodes - remove_n_peers) as usize);
     assert_eq!(Network::total_stake(), amount_staked);
@@ -3120,9 +3243,6 @@ fn test_remove_subnet_node() {
   
       let account_subnet_stake = AccountSubnetStake::<Test>::get(account(n), subnet_id);
       assert_eq!(account_subnet_stake, amount);
-  
-      let total_account_stake = TotalAccountStake::<Test>::get(account(n));
-      assert_eq!(total_account_stake, amount);
     }
 
     let total_subnet_stake = TotalSubnetStake::<Test>::get(subnet_id);
@@ -3217,7 +3337,7 @@ fn test_add_to_stake() {
     );
 
     assert_eq!(Network::account_subnet_stake(account(0), subnet_id), amount + amount);
-    assert_eq!(Network::total_account_stake(account(0)), amount + amount);
+    // assert_eq!(Network::total_account_stake(account(0)), amount + amount);
     assert_eq!(Network::total_stake(), amount_staked + amount);
     assert_eq!(Network::total_subnet_stake(subnet_id), amount_staked + amount);
   });
@@ -3296,7 +3416,7 @@ fn test_remove_stake() {
     );
 
     assert_eq!(Network::account_subnet_stake(account(0), subnet_id), amount + amount);
-    assert_eq!(Network::total_account_stake(account(0)), amount + amount);
+    // assert_eq!(Network::total_account_stake(account(0)), amount + amount);
 
     // let epoch_length = EpochLength::get();
     // let min_required_unstake_epochs = StakeCooldownEpochs::get();
@@ -3313,7 +3433,7 @@ fn test_remove_stake() {
     );
 
     assert_eq!(Network::account_subnet_stake(account(0), subnet_id), amount);
-    assert_eq!(Network::total_account_stake(account(0)), amount);
+    // assert_eq!(Network::total_account_stake(account(0)), amount);
   });
 }
 
@@ -4797,7 +4917,7 @@ fn test_reward_subnets_remove_subnet_node() {
       let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
 
       // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
-      let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(
+      let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(
         subnet_id, 
         &SubnetNodeClass::Validator, 
         epoch as u64
@@ -4997,7 +5117,7 @@ fn test_reward_subnets_check_balances() {
     let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
 
     // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
-    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
+    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
     let submission_nodes_count = submission_nodes.len() as u128;
 
     Network::reward_subnets(System::block_number(), epoch as u32);
@@ -7488,7 +7608,7 @@ fn test_epoch_steps() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    let included_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Included, epoch);
+    let included_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Included, epoch);
     let initial_total_subnet_nodes = included_nodes.len() as u32;
 
     for n in 0..6 {
@@ -7497,12 +7617,12 @@ fn test_epoch_steps() {
 
       Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
       
-      let included_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Included, epoch);
+      let included_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Included, epoch);
       let included_nodes_count = included_nodes.len() as u128;
 
       log::error!("included_nodes_count {:?}", included_nodes_count);
   
-      let submittable_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
+      let submittable_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
       let submittable_nodes_count = submittable_nodes.len() as u128;
 
       let validator = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
@@ -7820,5 +7940,85 @@ fn test_deactivation_ledger_as_chosen_validator() {
 
     // DeactivationLedger::<Test>::set(ledger);
 
+  });
+}
+
+#[test]
+fn test_update_coldkey() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    assert_ok!(
+      Network::update_coldkey(
+        RuntimeOrigin::signed(account(0)),
+        account(0),
+        account(total_subnet_nodes+1),
+      )
+    );
+
+    let key_owner = KeyOwner::<Test>::get(account(0));
+    assert_eq!(key_owner, account(total_subnet_nodes+1));
+
+  });
+}
+
+#[test]
+fn test_update_coldkey_key_taken_err() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    assert_err!(
+      Network::update_coldkey(
+        RuntimeOrigin::signed(account(1)),
+        account(0),
+        account(1),
+      ),
+      Error::<Test>::NotKeyOwner
+    );
+  });
+}
+
+#[test]
+fn test_update_hotkey() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    assert_ok!(
+      Network::update_hotkey(
+        RuntimeOrigin::signed(account(0)),
+        account(0),
+        account(total_subnet_nodes+1),
+      )
+    );
+
+    let key_owner = KeyOwner::<Test>::get(account(total_subnet_nodes+1));
+    assert_eq!(key_owner, account(0));
+
+    let subnet_node_data = SubnetNodesData::<Test>::try_get(subnet_id, account(total_subnet_nodes+1)).unwrap();
+    assert_eq!(subnet_node_data.hotkey, account(total_subnet_nodes+1));
   });
 }

@@ -19,7 +19,7 @@ use sp_runtime::traits::TrailingZeroInput;
 impl<T: Config> Pallet<T> {
   // TODO: Max vector string limit
   pub fn do_propose(
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     subnet_id: u32,
     peer_id: PeerId,
     data: Vec<u8>,
@@ -36,7 +36,7 @@ impl<T: Config> Pallet<T> {
     // --- Ensure proposer account has peer and is submittable
     match SubnetNodesData::<T>::try_get(
       subnet_id, 
-      account_id.clone()
+      hotkey.clone()
     ) {
       Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Validator, epoch as u64),
       Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
@@ -49,16 +49,16 @@ impl<T: Config> Pallet<T> {
       Err(()) => return Err(Error::<T>::PeerIdNotExist.into()),
     };
 
-    // --- Disputed account_id cannot be the proposer
+    // --- Disputed hotkey cannot be the proposer
     ensure!(
-      defendant_account_id.clone() != account_id.clone(),
+      defendant_account_id.clone() != hotkey.clone(),
       Error::<T>::PlaintiffIsDefendant
     );
 
     // --- Ensure the minimum required subnet peers exist
     // --- Only submittable can vote on proposals
     // --- Get all eligible voters from this block
-    let subnet_nodes: BTreeSet<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
+    let subnet_nodes: BTreeSet<T::AccountId> = Self::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
     let subnet_nodes_count = subnet_nodes.len();
 
     // There must always be the required minimum subnet peers for each vote
@@ -79,7 +79,7 @@ impl<T: Config> Pallet<T> {
     ensure!(
       !Self::account_has_active_proposal_as_plaintiff(
         subnet_id, 
-        account_id.clone(), 
+        hotkey.clone(), 
         block,
       ),
       Error::<T>::NodeHasActiveProposal
@@ -98,7 +98,7 @@ impl<T: Config> Pallet<T> {
     let proposal_bid_amount_as_balance = Self::u128_to_balance(proposal_bid_amount);
 
     let can_withdraw: bool = Self::can_remove_balance_from_coldkey_account(
-      &account_id.clone(),
+      &hotkey.clone(),
       proposal_bid_amount_as_balance.unwrap(),
     );
 
@@ -109,7 +109,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Withdraw bid amount from proposer accounts
     let _ = T::Currency::withdraw(
-      &account_id.clone(),
+      &hotkey.clone(),
       proposal_bid_amount_as_balance.unwrap(),
       WithdrawReasons::except(WithdrawReasons::TRANSFER),
       ExistenceRequirement::KeepAlive,
@@ -125,7 +125,7 @@ impl<T: Config> Pallet<T> {
       proposal_id,
       ProposalParams {
         subnet_id: subnet_id,
-        plaintiff: account_id.clone(),
+        plaintiff: hotkey.clone(),
         defendant: defendant_account_id.clone(),
         plaintiff_bond: proposal_bid_amount,
         defendant_bond: 0,
@@ -149,7 +149,7 @@ impl<T: Config> Pallet<T> {
         subnet_id: subnet_id, 
         proposal_id: proposal_id,
         epoch: epoch as u32,
-        plaintiff: account_id, 
+        plaintiff: hotkey, 
         defendant: defendant_account_id,
         plaintiff_data: data
       }
@@ -159,7 +159,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn do_attest_proposal(
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     subnet_id: u32,
     proposal_id: u32,
     data: Vec<u8>,
@@ -174,7 +174,7 @@ impl<T: Config> Pallet<T> {
       Event::ProposalAttested{ 
         subnet_id: subnet_id, 
         proposal_id: proposal_id, 
-        account_id: account_id,
+        account_id: hotkey,
         attestor_data: data
       }
     );
@@ -183,7 +183,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn do_challenge_proposal(
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     subnet_id: u32,
     proposal_id: u32,
     data: Vec<u8>,
@@ -196,7 +196,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure defendant
     ensure!(
-      account_id == proposal.defendant,
+      hotkey == proposal.defendant,
       Error::<T>::NotDefendant
     );
 
@@ -226,7 +226,7 @@ impl<T: Config> Pallet<T> {
     let proposal_bid_amount_as_balance = Self::u128_to_balance(proposal.plaintiff_bond);
 
     let can_withdraw: bool = Self::can_remove_balance_from_coldkey_account(
-      &account_id,
+      &hotkey,
       proposal_bid_amount_as_balance.unwrap(),
     );
 
@@ -238,7 +238,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Withdraw bid amount from proposer accounts
     let _ = T::Currency::withdraw(
-      &account_id,
+      &hotkey,
       proposal_bid_amount_as_balance.unwrap(),
       WithdrawReasons::except(WithdrawReasons::TRANSFER),
       ExistenceRequirement::KeepAlive,
@@ -260,7 +260,7 @@ impl<T: Config> Pallet<T> {
       Event::ProposalChallenged { 
         subnet_id: subnet_id, 
         proposal_id: proposal_id,
-        defendant: account_id, 
+        defendant: hotkey, 
         defendant_data: data,
       }
     );
@@ -269,7 +269,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn do_vote(
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     subnet_id: u32,
     proposal_id: u32,
     vote: VoteType
@@ -285,7 +285,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure not plaintiff or defendant
     ensure!(
-      account_id.clone() != plaintiff && account_id.clone() != defendant,
+      hotkey.clone() != plaintiff && hotkey.clone() != defendant,
       Error::<T>::PartiesCannotVote
     );
 
@@ -293,7 +293,7 @@ impl<T: Config> Pallet<T> {
     // Proposal voters are calculated within ``do_proposal`` as ``eligible_voters`` so we check if they
     // are still nodes
     ensure!(
-      SubnetNodesData::<T>::contains_key(subnet_id, account_id.clone()),
+      SubnetNodesData::<T>::contains_key(subnet_id, hotkey.clone()),
       Error::<T>::SubnetNodeNotExist
     );
     
@@ -321,7 +321,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure is eligible to vote
     ensure!(
-      proposal.eligible_voters.get(&account_id).is_some(),
+      proposal.eligible_voters.get(&hotkey).is_some(),
       Error::<T>::NotEligible
     );
 
@@ -330,7 +330,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure hasn't already voted
     ensure!(
-      yays.get(&account_id) == None && nays.get(&account_id) == None,
+      yays.get(&hotkey) == None && nays.get(&hotkey) == None,
       Error::<T>::AlreadyVoted
     );
 
@@ -339,9 +339,9 @@ impl<T: Config> Pallet<T> {
       proposal_id,
       |params: &mut ProposalParams<T::AccountId>| {
         if vote == VoteType::Yay {
-          params.votes.yay.insert(account_id.clone());
+          params.votes.yay.insert(hotkey.clone());
         } else {
-          params.votes.nay.insert(account_id.clone());
+          params.votes.nay.insert(hotkey.clone());
         };  
       }
     );
@@ -350,7 +350,7 @@ impl<T: Config> Pallet<T> {
       Event::ProposalVote { 
         subnet_id: subnet_id, 
         proposal_id: proposal_id,
-        account_id: account_id,
+        account_id: hotkey,
         vote: vote,
       }
     );
@@ -359,7 +359,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn do_cancel_proposal(
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     subnet_id: u32,
     proposal_id: u32,
   ) -> DispatchResult {
@@ -371,7 +371,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure plaintiff
     ensure!(
-      account_id == proposal.plaintiff,
+      hotkey == proposal.plaintiff,
       Error::<T>::NotPlaintiff
     );
     
@@ -408,7 +408,7 @@ impl<T: Config> Pallet<T> {
   /// Finalize the proposal and come to a conclusion
   /// Either plaintiff or defendant win, or neither win if no consensus or quorum is met
   pub fn do_finalize_proposal(
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     subnet_id: u32,
     proposal_id: u32,
   ) -> DispatchResult {
@@ -548,7 +548,7 @@ impl<T: Config> Pallet<T> {
 
   fn account_has_active_proposal_as_plaintiff(
     subnet_id: u32, 
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     block: u64,
   ) -> bool {
     let challenge_period = ChallengePeriod::<T>::get();
@@ -558,7 +558,7 @@ impl<T: Config> Pallet<T> {
 
     for proposal in Proposals::<T>::iter_prefix_values(subnet_id) {
       let plaintiff: T::AccountId = proposal.plaintiff;
-      if plaintiff != account_id {
+      if plaintiff != hotkey {
         continue;
       }
 
@@ -587,7 +587,7 @@ impl<T: Config> Pallet<T> {
   /// Proposal must not be completed to qualify or awaiting challenge
   fn account_has_active_proposal_as_defendant(
     subnet_id: u32, 
-    account_id: T::AccountId, 
+    hotkey: T::AccountId, 
     block: u64,
   ) -> bool {
     let challenge_period = ChallengePeriod::<T>::get();
@@ -597,12 +597,12 @@ impl<T: Config> Pallet<T> {
 
     // Proposals::<T>::iter_prefix_values(subnet_id)
     //   .find(|x| {
-    //     .defendant == *account_id
+    //     .defendant == *hotkey
     //   })
 
     for proposal in Proposals::<T>::iter_prefix_values(subnet_id) {
       let defendant: T::AccountId = proposal.defendant;
-      if defendant != account_id {
+      if defendant != hotkey {
         continue;
       }
 

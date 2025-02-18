@@ -94,8 +94,8 @@ impl<T: Config> Pallet<T> {
 
   pub fn get_subnet_node_stake_by_peer_id(subnet_id: u32, peer_id: PeerId) -> u128 {
     match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
-      Ok(account_id) => {
-        AccountSubnetStake::<T>::get(account_id, subnet_id)
+      Ok(hotkey) => {
+        AccountSubnetStake::<T>::get(hotkey, subnet_id)
       },
       Err(()) => 0,
     }

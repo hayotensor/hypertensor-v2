@@ -110,17 +110,17 @@ impl<T: Config> Pallet<T> {
 
   /// Remove subnet peer from subnet
   // to-do: Add slashing to subnet peers stake balance
-  pub fn perform_remove_subnet_node(block: u64, subnet_id: u32, account_id: T::AccountId) {
-    // Take and remove SubnetNodesData account_id as key
+  pub fn perform_remove_subnet_node(block: u64, subnet_id: u32, hotkey: T::AccountId) {
+    // Take and remove SubnetNodesData hotkey as key
     // `take()` returns and removes data
-    if let Ok(subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, account_id.clone()) {
+    if let Ok(subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, hotkey.clone()) {
       let peer_id = subnet_node.peer_id;
 
       // Remove from attestations
       let epoch_length: u64 = T::EpochLength::get();
 			let epoch: u64 = block / epoch_length;
 
-      let submittable_nodes: BTreeSet<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch);
+      let submittable_nodes: BTreeSet<T::AccountId> = Self::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
 
       SubnetRewardsSubmission::<T>::try_mutate_exists(
         subnet_id,
@@ -134,7 +134,7 @@ impl<T: Config> Pallet<T> {
             
             // --- Remove from attestations
             let mut attests = &mut params.attests;
-            if attests.remove(&account_id.clone()).is_some() {
+            if attests.remove(&hotkey.clone()).is_some() {
               params.attests = attests.clone();
             }
           };
@@ -142,7 +142,7 @@ impl<T: Config> Pallet<T> {
         }
       );
     
-      let subnet_node = SubnetNodesData::<T>::take(subnet_id, account_id.clone());
+      let subnet_node = SubnetNodesData::<T>::take(subnet_id, hotkey.clone());
 
       if subnet_node.a.is_some() {
         SubnetNodeUniqueParam::<T>::remove(subnet_id, subnet_node.a.unwrap())
@@ -155,9 +155,9 @@ impl<T: Config> Pallet<T> {
       TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
 
       // Reset sequential absent subnet node count
-      SubnetNodePenalties::<T>::remove(subnet_id, account_id.clone());
+      SubnetNodePenalties::<T>::remove(subnet_id, hotkey.clone());
 
-			Self::deposit_event(Event::SubnetNodeRemoved { subnet_id: subnet_id, account_id: account_id });
+			Self::deposit_event(Event::SubnetNodeRemoved { subnet_id: subnet_id, account_id: hotkey });
     }
   }
 
@@ -325,7 +325,7 @@ impl<T: Config> Pallet<T> {
       }
 
       // --- Get all possible validators
-      let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_accounts(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
+      let subnet_node_accounts: Vec<T::AccountId> = Self::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
       let subnet_nodes_count = subnet_node_accounts.len();
       
       // --- Ensure min nodes are active
@@ -407,30 +407,30 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_classified_subnet_node_info(subnet_id: u32, classification: &SubnetNodeClass, epoch: u64) -> Vec<SubnetNodeInfo<T::AccountId>> {
-    SubnetNodesData::<T>::iter_prefix_values(subnet_id)
-      .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
-      .map(|subnet_node| {
+    SubnetNodesData::<T>::iter_prefix(subnet_id)
+      .filter(|(hotkey, subnet_node)| subnet_node.has_classification(classification, epoch))
+      .map(|(hotkey, subnet_node)| {
         SubnetNodeInfo {
-          coldkey: KeyOwner::<T>::get(subnet_node.hotkey.clone()),
-          hotkey: subnet_node.hotkey,
+          coldkey: KeyOwner::<T>::get(hotkey.clone()),
+          hotkey: hotkey,
           peer_id: subnet_node.peer_id,
         }
       })
       .collect()
   }
 
-  // Get subnet node ``account_ids`` by classification
-  pub fn get_classified_accounts<C>(
+  // Get subnet node ``hotkeys`` by classification
+  pub fn get_classified_hotkeys<C>(
     subnet_id: u32,
     classification: &SubnetNodeClass,
     epoch: u64,
   ) -> C
-  where
-    C: FromIterator<T::AccountId>,
+    where
+      C: FromIterator<T::AccountId>,
   {
-    SubnetNodesData::<T>::iter_prefix_values(subnet_id)
-      .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
-      .map(|subnet_node| subnet_node.hotkey)
+    SubnetNodesData::<T>::iter_prefix(subnet_id)
+      .filter(|(_, subnet_node)| subnet_node.has_classification(classification, epoch))
+      .map(|(hotkey, _)| hotkey)
       .collect()
   }
 }
