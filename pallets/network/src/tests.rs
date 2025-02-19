@@ -8022,3 +8022,63 @@ fn test_update_hotkey() {
     assert_eq!(subnet_node_data.hotkey, account(total_subnet_nodes+1));
   });
 }
+
+
+// #[test]
+// fn test_encrypt_decrypt_answer() {
+//   new_test_ext().execute_with(|| {
+//     let task_id = 42;
+
+//     let validator = b"validator_pubkey";
+//     let salt = b"unique_salt";
+
+//     // Generate deterministic nonce
+//     let nonce = Network::generate_nonce(task_id, validator, salt);
+
+//     // Define a 32-byte encryption key (in real cases, securely derive/store this)
+//     let key: [u8; 32] = [1; 32]; // Example static key (use secure key derivation in production)
+
+//     // Define plaintext data (e.g., an answer)
+//     let plaintext: &[u8] = b"secret_answer";
+
+//     // Encrypt
+//     let ciphertext = Network::encrypt_answer(&key, &nonce, &plaintext);
+//     assert_ne!(ciphertext, plaintext.to_vec(), "Ciphertext should be different from plaintext");
+
+//     // Decrypt
+//     let decrypted = Network::decrypt_answer(&key, &nonce, &ciphertext);
+//     assert_eq!(decrypted, plaintext.to_vec(), "Decrypted text should match original plaintext");
+//   });
+// }
+
+// #[test]
+// fn test_commit_reveal_flow() {
+//   new_test_ext().execute_with(|| {
+//     let value: u32 = 42; // The number we want to commit
+//     let nonce: u32 = 123456; // A random nonce
+    
+//     // Step 1: Generate commitment (hashed value + nonce)
+//     let commitment = Network::generate_commitment(value, nonce);
+
+//     let recomputed_hash = Network::reveal(value, nonce);
+    
+//     assert_eq!(commitment, recomputed_hash);
+//   });
+// }
+
+#[test]
+fn test_commit_reveal_flow() {
+  new_test_ext().execute_with(|| {
+    let value: u32 = 42; // The number we want to commit
+    let nonce: u32 = 123456; // A random nonce
+    let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
+
+    // Step 1: Generate commitment (hashed value + nonce + seed)
+    let commitment = Network::generate_commitment(value, nonce, &seed);
+
+    // Step 2: Reveal and verify it matches the commitment
+    let recomputed_hash = Network::reveal(value, nonce, &seed);
+    
+    assert_eq!(commitment, recomputed_hash);
+  });
+}

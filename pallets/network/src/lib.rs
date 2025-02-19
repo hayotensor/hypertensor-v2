@@ -90,6 +90,7 @@ mod rewards;
 mod info;
 mod proposal;
 mod admin;
+mod overwatch;
 
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
 #[frame_support::pallet]
@@ -496,10 +497,10 @@ pub mod pallet {
 		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 	}
 
-	#[derive(Encode, Decode, scale_info::TypeInfo, Clone, PartialEq, Eq)]
-	pub enum OverwatchSubnetWeights {
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
+	pub struct SubnetBenchmarkWeightCommitment {
 		pub subnet_id: u32,
-		pub weight: u32,
+		pub weight: Vec<u8>,
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
@@ -758,6 +759,10 @@ pub mod pallet {
 	#[pallet::type_value]
 	pub fn DefaultZeroU64() -> u64 {
 		0
+	}
+	#[pallet::type_value]
+	pub fn DefaultVecU8() -> Vec<u8> {
+		Vec::new()
 	}
 	#[pallet::type_value]
 	pub fn DefaultAccountId<T: Config>() -> T::AccountId {
@@ -1598,6 +1603,45 @@ pub mod pallet {
 	// Consensus required to pass proposal
 	#[pallet::storage]
 	pub type ProposalConsensusThreshold<T> = StorageValue<_, u128, ValueQuery, DefaultProposalConsensusThreshold>;
+
+
+	//
+	// Overwatch
+	//
+
+	#[pallet::type_value]
+	pub fn DefaultSubnetBenchmarkWeightCommitment() -> SubnetBenchmarkWeightCommitment {
+		return SubnetBenchmarkWeightCommitment {
+			subnet_id: 0,
+			weight: Vec::new(),
+		};
+	}
+
+	// epoch -> subnet_id -> SubnetBenchmarkWeightCommitment
+	#[pallet::storage]
+	pub type SubnetBenchmarkCommitments<T> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		u32,
+		SubnetBenchmarkWeightCommitment,
+		ValueQuery,
+		DefaultSubnetBenchmarkWeightCommitment,
+	>;
+
+	// epoch -> subnet_id -> vec![weights]
+	#[pallet::storage]
+	pub type SubnetBenchmarkReveals<T> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		u32,
+		Vec<u8>,
+		ValueQuery,
+		DefaultVecU8,
+	>;
 
 	/// The pallet's dispatchable functions ([`Call`]s).
 	///
