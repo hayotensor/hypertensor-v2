@@ -477,6 +477,15 @@ pub mod pallet {
 		SubnetNodeNonUniqueParamUpdateIntervalNotReached,
 		/// Key owner taken
 		KeyOwnerTaken,
+
+		/// Commitments are greater than length of subnets
+		InvalidOverwatchCommitments,
+
+		CommitNotExist,
+		/// Weight commit reveal mismatch
+		WeightRevealMismatch,
+		/// Weight over PERCENTAGE_FACTOR
+		InvalidWeight,
 	}
 	
 	/// hotkey: 				Hotkey of subnet node for interacting with subnet on-chain communication
@@ -498,9 +507,23 @@ pub mod pallet {
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
+	pub struct OverwatchNode {
+		pub peer_id: PeerId,
+		pub a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+		pub b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+	}
+
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
 	pub struct SubnetBenchmarkWeightCommitment {
 		pub subnet_id: u32,
 		pub weight: Vec<u8>,
+	}
+
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
+	pub struct SubnetBenchmarkWeightReveal {
+		pub subnet_id: u32,
+		pub weight: u128,
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
@@ -765,6 +788,10 @@ pub mod pallet {
 		Vec::new()
 	}
 	#[pallet::type_value]
+	pub fn DefaultVecU32() -> Vec<u32> {
+		Vec::new()
+	}
+	#[pallet::type_value]
 	pub fn DefaultAccountId<T: Config>() -> T::AccountId {
 		T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap()
 	}
@@ -840,6 +867,10 @@ pub mod pallet {
 	#[pallet::type_value]
 	pub fn DefaultMinStakeBalance() -> u128 {
 		1000e+18 as u128
+	}
+	#[pallet::type_value]
+	pub fn DefaultOverwatchMinStakeBalance() -> u128 {
+		28e+18 as u128
 	}
 	#[pallet::type_value]
 	pub fn DefaultMinSubnetDelegateStakePercentage() -> u128 {
@@ -1371,6 +1402,7 @@ pub mod pallet {
 	//
 	// Staking
 	// 
+
 	#[pallet::storage] // stores epoch balance of rewards from block rewards to be distributed to peers/stakers
 	#[pallet::getter(fn stake_vault_balance)]
 	pub type StakeVaultBalance<T> = StorageValue<_, u128, ValueQuery>;
@@ -1501,6 +1533,23 @@ pub mod pallet {
 		ValueQuery,
 		DefaultDelegateStakeUnbondingLedger,
 	>;
+
+	//
+	// Overwatch Node Staking
+	//
+
+	// An accounts stake per subnet
+	#[pallet::storage] // account--> subnet_id --> u128
+	#[pallet::getter(fn account_overwatch_stake)]
+	pub type AccountOverwatchStake<T: Config> = 
+		StorageMap<_, Blake2_128Concat, T::AccountId, u128, ValueQuery, DefaultAccountTake>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn total_overwatch_stake)]
+	pub type TotalOverwatchStake<T: Config> = StorageValue<_, u128, ValueQuery>;
+
+	#[pallet::storage]
+	pub type MinOverwatchStakeBalance<T: Config> = StorageValue<_, u128, ValueQuery, DefaultOverwatchMinStakeBalance>;
 	
 	//
 	// Props
@@ -1609,28 +1658,62 @@ pub mod pallet {
 	// Overwatch
 	//
 
+	// #[pallet::type_value]
+	// pub fn DefaultSubnetBenchmarkWeightCommitment() -> SubnetBenchmarkWeightCommitment {
+	// 	return SubnetBenchmarkWeightCommitment {
+	// 		subnet_id: 0,
+	// 		weight: Vec::new(),
+	// 	};
+	// }
 	#[pallet::type_value]
-	pub fn DefaultSubnetBenchmarkWeightCommitment() -> SubnetBenchmarkWeightCommitment {
-		return SubnetBenchmarkWeightCommitment {
-			subnet_id: 0,
-			weight: Vec::new(),
+	pub fn DefaultSubnetBenchmarkWeightCommitments() -> Vec<SubnetBenchmarkWeightCommitment> {
+		return Vec::new()
+	}
+
+	#[pallet::type_value]
+	pub fn DefaultOverwatchNode() -> OverwatchNode {
+		return OverwatchNode {
+			peer_id: PeerId(Vec::new()),
+			a: Some(BoundedVec::new()),
+			b: Some(BoundedVec::new()),
+      c: Some(BoundedVec::new()),
 		};
 	}
 
-	// epoch -> subnet_id -> SubnetBenchmarkWeightCommitment
 	#[pallet::storage]
-	pub type SubnetBenchmarkCommitments<T> = StorageDoubleMap<
+	pub type OverwatchNodes<T: Config> = 
+		StorageMap<_, Blake2_128Concat, T::AccountId, OverwatchNode, ValueQuery, DefaultOverwatchNode>;
+	
+	// epoch -> subnet_id -> SubnetBenchmarkWeightCommitment
+	// #[pallet::storage]
+	// pub type SubnetBenchmarkCommitments<T> = StorageDoubleMap<
+	// 	_,
+	// 	Blake2_128Concat,
+	// 	u32,
+	// 	Identity,
+	// 	u32,
+	// 	SubnetBenchmarkWeightCommitment,
+	// 	ValueQuery,
+	// 	DefaultSubnetBenchmarkWeightCommitment,
+	// >;
+	#[pallet::storage]
+	pub type SubnetBenchmarkCommitments<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
 		Identity,
-		u32,
-		SubnetBenchmarkWeightCommitment,
+		T::AccountId,
+		Vec<SubnetBenchmarkWeightCommitment>,
 		ValueQuery,
-		DefaultSubnetBenchmarkWeightCommitment,
+		DefaultSubnetBenchmarkWeightCommitments,
 	>;
 
-	// epoch -> subnet_id -> vec![weights]
+	#[pallet::type_value]
+	pub fn DefaultSubnetBenchmarkReveals() -> BTreeMap<u128,u128> {
+		BTreeMap::new()
+	}
+
+	// epoch -> subnet_id -> {stake,weight}
 	#[pallet::storage]
 	pub type SubnetBenchmarkReveals<T> = StorageDoubleMap<
 		_,
@@ -1638,9 +1721,9 @@ pub mod pallet {
 		u32,
 		Identity,
 		u32,
-		Vec<u8>,
+		BTreeMap<u128,u128>,
 		ValueQuery,
-		DefaultVecU8,
+		DefaultSubnetBenchmarkReveals,
 	>;
 
 	/// The pallet's dispatchable functions ([`Call`]s).
@@ -2400,6 +2483,44 @@ pub mod pallet {
 					&new_hotkey.clone(), 
 				);
 			}
+
+			Ok(())
+		}
+
+		#[pallet::call_index(29)]
+		#[pallet::weight({0})]
+		pub fn register_overwatch_node(
+			origin: OriginFor<T>, 
+			peer_id: PeerId, 
+			hotkey: T::AccountId,
+			stake_to_be_added: u128,
+			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+			c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
+		) -> DispatchResult {
+			let coldkey: T::AccountId = ensure_signed(origin.clone())?;
+
+			// Ensure hotkey either has no owner or is the origins hotkey
+			match KeyOwner::<T>::try_get(hotkey.clone()) {
+				Ok(coldkey_owner) => {
+					ensure!(
+						coldkey_owner == coldkey,
+						Error::<T>::KeyOwnerTaken
+					)
+				},
+				// Has no owner
+				Err(()) => (),
+			};
+						
+			OverwatchNodes::<T>::insert(
+				hotkey,
+				OverwatchNode {
+					peer_id: peer_id,
+					a: a,
+					b: b,
+					c: c,
+				}
+			);
 
 			Ok(())
 		}

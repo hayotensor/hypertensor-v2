@@ -30,6 +30,12 @@ impl<T: Config> Pallet<T> {
       .expect("blockchain will not exceed 2^64 blocks; QED.")
   }
   
+  pub fn get_current_epoch_as_u32() -> u32 {
+    let block: u64 = Self::get_current_block_as_u64();
+    let epoch_length: u64 = T::EpochLength::get();
+    (block / epoch_length) as u32
+  }
+
   pub fn get_eligible_epoch_block(epoch_length: u64, initialized: u64, epochs: u64) -> u64 {
     let eligible_block: u64 = initialized - (initialized % epoch_length) + epoch_length * epochs;
     eligible_block

@@ -8069,16 +8069,113 @@ fn test_update_hotkey() {
 #[test]
 fn test_commit_reveal_flow() {
   new_test_ext().execute_with(|| {
-    let value: u32 = 42; // The number we want to commit
-    let nonce: u32 = 123456; // A random nonce
+    let value: u128 = 42; // The number we want to commit
     let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
 
     // Step 1: Generate commitment (hashed value + nonce + seed)
-    let commitment = Network::generate_commitment(value, nonce, &seed);
+    let commitment = Network::generate_commitment(value, &seed);
 
     // Step 2: Reveal and verify it matches the commitment
-    let recomputed_hash = Network::reveal(value, nonce, &seed);
+    let recomputed_hash = Network::reveal(value, &seed);
     
     assert_eq!(commitment, recomputed_hash);
+
+    // Test max value
+
+
+    let value: u128 = 340_282_366_920_938_463_463_374_607_431_768_211_455u128; // The number we want to commit
+    let seed: Vec<u8> = b"yerrrrrrrrrrrrrrrrrrrrrrrp".to_vec(); // Variable-length seed
+
+    // Step 1: Generate commitment (hashed value + nonce + seed)
+    let commitment = Network::generate_commitment(value, &seed);
+
+    // Step 2: Reveal and verify it matches the commitment
+    let recomputed_hash = Network::reveal(value, &seed);
+    
+    assert_eq!(commitment, recomputed_hash);
+
+  });
+}
+
+#[test]
+fn test_adjusted_sqrt() {
+  new_test_ext().execute_with(|| {
+    let factor: f64 = 1e+9;   // 100 is mapped to 1e9
+    let base: f64 = 100.0;   // What the factor is in relation to
+
+    // 1.0
+    let value: f64 = 10000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 10000000.0);
+    
+    // 2.0
+    let value: f64 = 20000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 14142135.62373095);
+
+    // 3.0
+    let value: f64 = 30000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 17320508.075688772);
+
+    // 4.0
+    let value: f64 = 40000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 20000000.0);
+
+    // 5.0
+    let value: f64 = 50000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 22360679.774997897);
+
+    // 20.0
+    let value: f64 = 100000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 31622776.6016838);
+
+    // 20.0
+    let value: f64 = 200000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 44721359.549995795);
+
+    // 30.0
+    let value: f64 = 300000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 54772255.750516616);
+
+    // 40.0
+    let value: f64 = 400000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 63245553.2033676);
+
+    // 50.0
+    let value: f64 = 500000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 70710678.11865476);
+
+    // 60.0
+    let value: f64 = 600000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 77459666.92414834);
+
+    // 70.0
+    let value: f64 = 700000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 83666002.65340756);
+
+    // 80.0
+    let value: f64 = 800000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 89442719.09999159);
+
+    // 90.0
+    let value: f64 = 900000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 94868329.80505139);
+
+    // 100.0
+    let value: f64 = 1000000000.0;
+    let result = Network::adjusted_sqrt(value, factor, base);
+    assert_eq!(result, 100000000.0);
   });
 }
