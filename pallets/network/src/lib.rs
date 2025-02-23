@@ -658,6 +658,7 @@ pub mod pallet {
 		MinSubnetDelegateStake,
 		Council,
 		EnactmentPeriod,
+		MaxSubnets,
   }
 
 	/// Attests format for consensus

@@ -480,6 +480,9 @@ impl<T: Config> Pallet<T> {
     )
   }
 
+  // These conversions can handle over 100T TENSOR (using 1e18) before overflow
+
+
   pub fn convert_to_balance(
     shares: u128,
     total_shares: u128,
@@ -488,7 +491,10 @@ impl<T: Config> Pallet<T> {
     if total_shares == 0 {
       return shares;
     }
-    shares * (total_balance * Self::PERCENTAGE_FACTOR / (total_shares + 1)) / Self::PERCENTAGE_FACTOR
+    // shares * (total_balance * Self::PERCENTAGE_FACTOR / (total_shares + 1)) / Self::PERCENTAGE_FACTOR
+    shares.saturating_mul(
+      total_balance.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(total_shares + 1)
+    ).saturating_div(Self::PERCENTAGE_FACTOR)
   }
 
   pub fn convert_to_shares(
@@ -499,6 +505,9 @@ impl<T: Config> Pallet<T> {
     if total_shares == 0 {
       return balance;
     }
-    balance * (total_shares * Self::PERCENTAGE_FACTOR / (total_balance + 1)) / Self::PERCENTAGE_FACTOR
+    // balance * (total_shares * Self::PERCENTAGE_FACTOR / (total_balance + 1)) / Self::PERCENTAGE_FACTOR
+    balance.saturating_mul(
+      total_shares.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(total_balance + 1)
+    ).saturating_div(Self::PERCENTAGE_FACTOR)
   }
 }

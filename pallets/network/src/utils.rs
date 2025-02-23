@@ -290,7 +290,12 @@ impl<T: Config> Pallet<T> {
     let max_subnet_penalty_count = MaxSubnetPenaltyCount::<T>::get();
     let subnet_activation_enactment_period = SubnetActivationEnactmentPeriod::<T>::get();
 
-    for (subnet_id, data) in SubnetsData::<T>::iter() {
+    let subnets: Vec<_> = SubnetsData::<T>::iter().collect();
+    let total_subnets: u32 = subnets.len() as u32;
+    let excess_subnets: bool = total_subnets > MaxSubnets::<T>::get();
+    let mut subnet_delegate_stake: Vec<(Vec<u8>, u128)> = Vec::new();
+
+    for (subnet_id, data) in subnets {
       // --- Ensure subnet is active is able to submit consensus
       let max_registration_block = data.initialized + data.registration_blocks + subnet_activation_enactment_period;
       if data.activated == 0 && block <= max_registration_block {
@@ -337,12 +342,16 @@ impl<T: Config> Pallet<T> {
 
       // --- Check penalties and remove subnet is threshold is breached
       let penalties = SubnetPenaltyCount::<T>::get(subnet_id);
-      if penalties >  max_subnet_penalty_count {
+      if penalties > max_subnet_penalty_count {
         Self::deactivate_subnet(
           data.path,
           SubnetRemovalReason::MaxPenalties,
         );
         continue
+      }
+
+      if excess_subnets {
+        subnet_delegate_stake.push((data.path, subnet_delegate_stake_balance));
       }
 
       Self::choose_validator(
@@ -351,6 +360,14 @@ impl<T: Config> Pallet<T> {
         subnet_node_accounts.clone(),
         min_subnet_nodes,
         epoch,
+      );
+    }
+
+    if excess_subnets {
+      subnet_delegate_stake.sort_by_key(|&(_, value)| value);
+      Self::deactivate_subnet(
+        subnet_delegate_stake[0].0.clone(),
+        SubnetRemovalReason::MaxSubnets,
       );
     }
   }
