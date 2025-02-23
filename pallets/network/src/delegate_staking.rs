@@ -156,11 +156,9 @@ impl<T: Config> Pallet<T> {
 
     // --- We remove the shares from the account and balance from the pool
     Self::decrease_account_delegate_stake_shares(&account_id, subnet_id, delegate_stake_to_be_removed, delegate_stake_shares_to_be_removed);
-
-    // let remaining_account_delegate_stake_shares: u128 = AccountSubnetDelegateStakeShares::<T>::get(&account_id, subnet_id);
     
     // --- We add the balancer to the account_id.  If the above fails we will not credit this account_id.
-    Self::add_balance_to_delegate_stake_unbonding_ledger(&account_id, subnet_id,  delegate_stake_to_be_removed, block).map_err(|e| e)?;
+    Self::add_balance_to_stake_unbonding_ledger(&account_id, subnet_id,  delegate_stake_to_be_removed, block).map_err(|e| e)?;
 
     // Set last block for rate limiting
     Self::set_last_tx_block(&account_id, block);
@@ -285,127 +283,6 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn add_balance_to_delegate_stake_unbonding_ledger(
-    account_id: &T::AccountId,
-    subnet_id: u32, 
-    balance: u128,
-    block: u64,
-  ) -> DispatchResult {
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
-
-    let unbondings = DelegateStakeUnbondingLedger::<T>::get(account_id.clone(), subnet_id);
-
-
-    // One unlocking per epoch
-    ensure!(
-      unbondings.get(&epoch) == None,
-      Error::<T>::MaxUnlockingsPerEpochReached
-    );
-
-    // --- Ensure we don't surpass max unlockings by attempting to unlock unbondings
-    if unbondings.len() as u32 == T::MaxDelegateStakeUnlockings::get() {
-      Self::do_claim_delegate_stake_unbondings(&account_id, subnet_id);
-    }
-
-    // --- Get updated unbondings after claiming unbondings
-    let mut unbondings = DelegateStakeUnbondingLedger::<T>::get(account_id.clone(), subnet_id);
-
-    // We're about to add another unbonding to the ledger - it must be n-1
-    ensure!(
-      unbondings.len() < T::MaxDelegateStakeUnlockings::get() as usize,
-      Error::<T>::MaxUnlockingsReached
-    );
-
-    unbondings.insert(epoch, balance);
-    DelegateStakeUnbondingLedger::<T>::insert(account_id.clone(), subnet_id, unbondings);
-
-    Ok(())
-  }
-
-  // Infallible
-  pub fn do_claim_delegate_stake_unbondings(account_id: &T::AccountId, subnet_id: u32) -> u32 {
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
-    let unbondings = DelegateStakeUnbondingLedger::<T>::get(account_id.clone(), subnet_id);
-    let mut unbondings_copy = unbondings.clone();
-
-    // --- Count the unbondings so the user knows if it was unsuccessful
-    let mut successful_unbondings = 0;
-
-    for (unbonding_epoch, balance) in unbondings.iter() {
-      if epoch <= unbonding_epoch + T::DelegateStakeCooldownEpochs::get() {
-        continue
-      }
-  
-      let delegate_stake_to_be_added_as_currency = Self::u128_to_balance(*balance);
-      if !delegate_stake_to_be_added_as_currency.is_some() {
-        // Redundant
-        unbondings_copy.remove(&unbonding_epoch);
-        continue
-      }
-      
-      unbondings_copy.remove(&unbonding_epoch);
-      Self::add_balance_to_coldkey_account(&account_id, delegate_stake_to_be_added_as_currency.unwrap());
-      successful_unbondings += 1;
-    }
-
-    if unbondings.len() != unbondings_copy.len() {
-      DelegateStakeUnbondingLedger::<T>::insert(account_id.clone(), subnet_id, unbondings_copy);
-    }
-    successful_unbondings
-  }
-
-  // Infallible
-  // pub fn do_claim_delegate_stake_unbondings(account_id: &T::AccountId, subnet_id: u32) -> u32 {
-  //   let block: u64 = Self::get_current_block_as_u64();
-  //   let epoch_length: u64 = T::EpochLength::get();
-  //   let epoch: u64 = block / epoch_length;
-  //   let unbondings = DelegateStakeUnbondingLedger::<T>::get(account_id.clone(), subnet_id);
-  //   let mut unbondings_copy = unbondings.clone();
-
-  //   // let mut successful_unbondings = BTreeMap::new();
-  //   let mut successful_unbondings = 0;
-
-  //   for (unbonding_epoch, shares) in unbondings.iter() {
-  //     if epoch <= unbonding_epoch + T::DelegateStakeCooldownEpochs::get() {
-  //       continue
-  //     }
-
-  //     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<T>::get(subnet_id);
-  //     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
-  
-  //     // --- Get accounts current balance
-  //     let balance = Self::convert_to_balance(
-  //       *shares,
-  //       total_subnet_delegated_stake_shares,
-  //       total_subnet_delegated_stake_balance
-  //     );
-
-  //     Self::decrease_account_delegate_stake_shares(&account_id, subnet_id, balance, *shares);
-
-  //     log::error!("do_claim_delegate_stake_unbondings shares {:?}", shares);
-  //     log::error!("do_claim_delegate_stake_unbondings balance {:?}", balance);
-  
-  //     let delegate_stake_to_be_added_as_currency = Self::u128_to_balance(balance);
-  //     if !delegate_stake_to_be_added_as_currency.is_some() {
-  //       // Redundant
-  //       unbondings_copy.remove(&unbonding_epoch);
-  //       continue
-  //     }
-      
-  //     unbondings_copy.remove(&unbonding_epoch);
-  //     Self::add_balance_to_coldkey_account(&account_id, delegate_stake_to_be_added_as_currency.unwrap());
-  //     successful_unbondings += 1;
-  //   }
-
-  //   if unbondings.len() != unbondings_copy.len() {
-  //     DelegateStakeUnbondingLedger::<T>::insert(account_id.clone(), subnet_id, unbondings_copy);
-  //   }
-  //   successful_unbondings
-  // }
-
   pub fn increase_account_delegate_stake_shares(
     account_id: &T::AccountId,
     subnet_id: u32, 
@@ -446,20 +323,6 @@ impl<T: Config> Pallet<T> {
     // -- increase total subnet delegate stake 
     TotalSubnetDelegateStakeBalance::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(amount));
   }
-
-  // pub fn get_delegate_stake_balance(
-  //   subnet_id: u32,
-  //   account_id: &T::AccountId,
-  // ) -> u128 {
-  //   0
-  // }
-
-  // pub fn get_delegate_shares_balance(
-  //   subnet_id: u32,
-  //   account_id: &T::AccountId,
-  // ) -> u128 {
-  //   0
-  // }
 
   pub fn convert_account_shares_to_balance(
     account_id: &T::AccountId,

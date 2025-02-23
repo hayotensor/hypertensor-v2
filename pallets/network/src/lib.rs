@@ -90,6 +90,7 @@ mod rewards;
 mod info;
 mod proposal;
 mod admin;
+mod overwatch_stake;
 mod overwatch;
 
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
@@ -486,6 +487,11 @@ pub mod pallet {
 		WeightRevealMismatch,
 		/// Weight over PERCENTAGE_FACTOR
 		InvalidWeight,
+		/// Overwatch node already registered under hotkey
+		OverwatchNodeExists,
+		/// Overwatch node doesn't exist under hotkey
+		OverwatchNodeNotExist,
+
 	}
 	
 	/// hotkey: 				Hotkey of subnet node for interacting with subnet on-chain communication
@@ -870,7 +876,7 @@ pub mod pallet {
 	}
 	#[pallet::type_value]
 	pub fn DefaultOverwatchMinStakeBalance() -> u128 {
-		28e+18 as u128
+		1000e+18 as u128
 	}
 	#[pallet::type_value]
 	pub fn DefaultMinSubnetDelegateStakePercentage() -> u128 {
@@ -1443,6 +1449,10 @@ pub mod pallet {
 		DefaultSubnetStakeUnbondingLedger,
 	>;
 		
+	#[pallet::storage]
+	pub type StakeUnbondingLedger<T: Config> = 
+		StorageMap<_, Blake2_128Concat, T::AccountId, BTreeMap<u64, u128>, ValueQuery, DefaultSubnetStakeUnbondingLedger>;
+
 	// Maximum stake balance per subnet
 	// Only checked on `do_add_stake` and ``
 	// A subnet staker can have greater than the max stake balance although any rewards
@@ -2106,12 +2116,6 @@ pub mod pallet {
 			origin: OriginFor<T>, 
 			subnet_id: u32, 
 		) -> DispatchResult {
-			let coldkey: T::AccountId = ensure_signed(origin)?;
-			let successful_unbondings: u32 = Self::do_claim_delegate_stake_unbondings(&coldkey, subnet_id);
-			ensure!(
-				successful_unbondings > 0,
-        Error::<T>::NoDelegateStakeUnbondingsOrCooldownNotMet
-			);
 			Ok(())
 		}
 		
@@ -2500,6 +2504,11 @@ pub mod pallet {
 		) -> DispatchResult {
 			let coldkey: T::AccountId = ensure_signed(origin.clone())?;
 
+			ensure!(
+				!OverwatchNodes::<T>::contains_key(hotkey.clone()),
+				Error::<T>::OverwatchNodeExists
+			);
+
 			// Ensure hotkey either has no owner or is the origins hotkey
 			match KeyOwner::<T>::try_get(hotkey.clone()) {
 				Ok(coldkey_owner) => {
@@ -2511,6 +2520,12 @@ pub mod pallet {
 				// Has no owner
 				Err(()) => (),
 			};
+
+			Self::do_add_overwatch_stake(
+				origin,
+				hotkey.clone(),
+				stake_to_be_added,
+			).map_err(|e| e)?;
 						
 			OverwatchNodes::<T>::insert(
 				hotkey,
@@ -2520,6 +2535,63 @@ pub mod pallet {
 					b: b,
 					c: c,
 				}
+			);
+
+			Ok(())
+		}
+
+		#[pallet::call_index(30)]
+		#[pallet::weight({0})]
+		pub fn activate_overwatch_node(
+			origin: OriginFor<T>, 
+			hotkey: T::AccountId,
+		) -> DispatchResult {
+
+			Ok(())
+		}
+
+		#[pallet::call_index(31)]
+		#[pallet::weight({0})]
+		pub fn add_to_overwatch_stake(
+			origin: OriginFor<T>, 
+			hotkey: T::AccountId,
+			stake_to_be_added: u128,
+		) -> DispatchResult {
+			let coldkey: T::AccountId = ensure_signed(origin.clone())?;
+
+			ensure!(
+				KeyOwner::<T>::get(hotkey.clone()) == coldkey,
+				Error::<T>::NotKeyOwner
+			);
+
+			ensure!(
+				OverwatchNodes::<T>::contains_key(hotkey.clone()),
+				Error::<T>::OverwatchNodeNotExist
+			);
+
+			Self::do_add_overwatch_stake(
+				origin,
+				hotkey.clone(),
+				stake_to_be_added,
+			)
+		}
+
+		#[pallet::call_index(32)]
+		#[pallet::weight({0})]
+		pub fn remove_overwatch_node(
+			origin: OriginFor<T>, 
+			hotkey: T::AccountId,
+		) -> DispatchResult {
+			let coldkey: T::AccountId = ensure_signed(origin.clone())?;
+
+			ensure!(
+				KeyOwner::<T>::get(hotkey.clone()) == coldkey,
+				Error::<T>::NotKeyOwner
+			);
+
+			ensure!(
+				OverwatchNodes::<T>::contains_key(hotkey.clone()),
+				Error::<T>::OverwatchNodeNotExist
 			);
 
 			Ok(())

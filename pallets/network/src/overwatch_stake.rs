@@ -17,7 +17,7 @@ use super::*;
 use sp_runtime::Saturating;
 
 impl<T: Config> Pallet<T> {
-  pub fn do_add_stake(
+  pub fn do_add_overwatch_stake(
     origin: T::RuntimeOrigin,
     hotkey: T::AccountId,
     stake_to_be_added: u128,
@@ -58,7 +58,7 @@ impl<T: Config> Pallet<T> {
       Error::<T>::BalanceWithdrawalError
     );
   
-    Self::increase_account_stake(
+    Self::increase_account_overwatch_stake(
       &hotkey,
       stake_to_be_added,
     );
@@ -71,7 +71,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn do_remove_stake(
+  pub fn do_remove_overwatch_stake(
     origin: T::RuntimeOrigin, 
     hotkey: T::AccountId,
     is_overwatch_node: bool,
@@ -115,10 +115,10 @@ impl<T: Config> Pallet<T> {
     );
 
     // --- 7. We remove the balance from the hotkey.
-    Self::decrease_account_stake(&hotkey, stake_to_be_removed);
+    Self::decrease_account_overwatch_stake(&hotkey, stake_to_be_removed);
 
     // --- 9. We add the balancer to the coldkey.  If the above fails we will not credit this coldkey.
-    Self::add_balance_to_stake_unbonding_ledger(&coldkey, stake_to_be_removed, block).map_err(|e| e)?;
+    // Self::add_balance_to_stake_unbonding_ledger(&coldkey, stake_to_be_removed, block).map_err(|e| e)?;
 
     // Set last block for rate limiting
     Self::set_last_tx_block(&coldkey, block);
@@ -128,7 +128,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn increase_account_stake(
+  pub fn increase_account_overwatch_stake(
     hotkey: &T::AccountId,
     amount: u128,
   ) {
@@ -139,7 +139,7 @@ impl<T: Config> Pallet<T> {
     TotalOverwatchStake::<T>::mutate(|mut n| n.saturating_accrue(amount));
   }
   
-  pub fn decrease_account_stake(
+  pub fn decrease_account_overwatch_stake(
     hotkey: &T::AccountId,
     amount: u128,
   ) {
@@ -150,60 +150,60 @@ impl<T: Config> Pallet<T> {
     TotalOverwatchStake::<T>::mutate(|mut n| n.saturating_reduce(amount));
   }
 
-  pub fn can_remove_balance_from_coldkey_account(
-    coldkey: &T::AccountId,
-    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  ) -> bool {
-    let current_balance = Self::get_coldkey_balance(coldkey);
-    if amount > current_balance {
-      return false;
-    }
+  // pub fn can_remove_balance_from_coldkey_account(
+  //   coldkey: &T::AccountId,
+  //   amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+  // ) -> bool {
+  //   let current_balance = Self::get_coldkey_balance(coldkey);
+  //   if amount > current_balance {
+  //     return false;
+  //   }
 
-    // This bit is currently untested. @todo
-    let new_potential_balance = current_balance - amount;
-    let can_withdraw = T::Currency::ensure_can_withdraw(
-      &coldkey,
-      amount,
-      WithdrawReasons::except(WithdrawReasons::TIP),
-      new_potential_balance,
-    )
-    .is_ok();
-    can_withdraw
-  }
+  //   // This bit is currently untested. @todo
+  //   let new_potential_balance = current_balance - amount;
+  //   let can_withdraw = T::Currency::ensure_can_withdraw(
+  //     &coldkey,
+  //     amount,
+  //     WithdrawReasons::except(WithdrawReasons::TIP),
+  //     new_potential_balance,
+  //   )
+  //   .is_ok();
+  //   can_withdraw
+  // }
 
-  pub fn remove_balance_from_coldkey_account(
-    coldkey: &T::AccountId,
-    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  ) -> bool {
-    return match T::Currency::withdraw(
-      &coldkey,
-      amount,
-      WithdrawReasons::except(WithdrawReasons::TIP),
-      ExistenceRequirement::KeepAlive,
-    ) {
-      Ok(_result) => true,
-      Err(_error) => false,
-    };
-  }
+  // pub fn remove_balance_from_coldkey_account(
+  //   coldkey: &T::AccountId,
+  //   amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+  // ) -> bool {
+  //   return match T::Currency::withdraw(
+  //     &coldkey,
+  //     amount,
+  //     WithdrawReasons::except(WithdrawReasons::TIP),
+  //     ExistenceRequirement::KeepAlive,
+  //   ) {
+  //     Ok(_result) => true,
+  //     Err(_error) => false,
+  //   };
+  // }
 
-  pub fn add_balance_to_coldkey_account(
-    coldkey: &T::AccountId,
-    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  ) {
-    T::Currency::deposit_creating(&coldkey, amount);
-  }
+  // pub fn add_balance_to_coldkey_account(
+  //   coldkey: &T::AccountId,
+  //   amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+  // ) {
+  //   T::Currency::deposit_creating(&coldkey, amount);
+  // }
 
-  pub fn get_coldkey_balance(
-    coldkey: &T::AccountId,
-  ) -> <<T as pallet::Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance {
-    return T::Currency::free_balance(&coldkey);
-  }
+  // pub fn get_coldkey_balance(
+  //   coldkey: &T::AccountId,
+  // ) -> <<T as pallet::Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance {
+  //   return T::Currency::free_balance(&coldkey);
+  // }
 
-  pub fn u128_to_balance(
-    input: u128,
-  ) -> Option<
-    <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  > {
-    input.try_into().ok()
-  }
+  // pub fn u128_to_balance(
+  //   input: u128,
+  // ) -> Option<
+  //   <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+  // > {
+  //   input.try_into().ok()
+  // }
 }

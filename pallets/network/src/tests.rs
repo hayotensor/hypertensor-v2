@@ -40,13 +40,14 @@ use crate::{
   DelegateStakeRewardsPercentage,
   SubnetPenaltyCount, MaxSubnetNodePenalties, 
   SubnetNodePenalties, RegistrationSubnetData,
-  BaseRewardPerMB,
+  BaseRewardPerMB, StakeUnbondingLedger,
   DelegateStakeUnbondingLedger, SubnetRemovalReason, ProposalBidAmount, BaseSubnetNodeMemoryMB,
   MinSubnetDelegateStakePercentage, MaxSubnetPenaltyCount, 
   MaxSubnetMemoryMB, SubnetStakeUnbondingLedger, TotalSubnetMemoryMB,MaxTotalSubnetMemoryMB,
   TotalSubnetStake, MinSubnetRegistrationBlocks, MaxSubnetRegistrationBlocks, SubnetActivationEnactmentPeriod,
   SubnetNodeClassification, DeactivationLedger, SubnetNode, SubnetNodeDeactivation, DefaultSubnetNodeUniqueParamLimit,
-  KeyOwner
+  KeyOwner, MinOverwatchStakeBalance, TotalOverwatchStake, AccountOverwatchStake, SubnetBenchmarkWeightCommitment,
+  SubnetBenchmarkWeightReveal, SubnetBenchmarkCommitments, SubnetBenchmarkReveals
 };
 use frame_support::BoundedVec;
 use strum::IntoEnumIterator;
@@ -281,6 +282,9 @@ fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
 
     let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(n), subnet_id);
     if delegate_shares != 0 {
+      // increase epoch becuse must have only one unstaking per epoch
+      increase_epochs(1);
+
       assert_ok!(
         Network::remove_delegate_stake(
           RuntimeOrigin::signed(account(n)),
@@ -302,9 +306,11 @@ fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
   for n in start..end {
     System::set_block_number(System::block_number() + ((epoch_length  + 1) * stake_cooldown_epochs));
     let starting_balance = Balances::free_balance(&account(n));
-    let unbondings = SubnetStakeUnbondingLedger::<Test>::get(account(n), subnet_id);
-    assert_eq!(unbondings.len(), 1);
-    let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
+    // let unbondings = SubnetStakeUnbondingLedger::<Test>::get(account(n), subnet_id);
+    let unbondings = StakeUnbondingLedger::<Test>::get(account(n));
+    // assert_eq!(unbondings.len(), 1);
+    // let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
+    let ledger_balance: u128 = unbondings.values().copied().sum();
     assert_ok!(
       Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n)),
@@ -316,28 +322,29 @@ fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
     System::set_block_number(starting_block_number);
   }
 
-  for n in start..end {
-    System::set_block_number(System::block_number() + ((epoch_length  + 1) * DelegateStakeCooldownEpochs::get()));
-    let starting_balance = Balances::free_balance(&account(n));
+  // for n in start..end {
+  //   System::set_block_number(System::block_number() + ((epoch_length  + 1) * DelegateStakeCooldownEpochs::get()));
+  //   let starting_balance = Balances::free_balance(&account(n));
 
-    let unbondings = DelegateStakeUnbondingLedger::<Test>::get(account(n), subnet_id);
-    if unbondings.len() == 0 {
-      continue
-    }
-    assert_eq!(unbondings.len(), 1);
-    let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
+  //   // let unbondings = DelegateStakeUnbondingLedger::<Test>::get(account(n), subnet_id);
+  //   let unbondings = StakeUnbondingLedger::<Test>::get(account(n));
+  //   if unbondings.len() == 0 {
+  //     continue
+  //   }
+  //   assert_eq!(unbondings.len(), 1);
+  //   let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
 
-    assert_ok!(
-      Network::claim_delegate_stake_unbondings(
-        RuntimeOrigin::signed(account(n)),
-        subnet_id,
-      )
-    );
+  //   assert_ok!(
+  //     Network::claim_stake_unbondings(
+  //       RuntimeOrigin::signed(account(n)),
+  //       subnet_id,
+  //     )
+  //   );
 
-    let ending_balance = Balances::free_balance(&account(n));
-    assert_eq!(starting_balance + ledger_balance, ending_balance);
-    System::set_block_number(starting_block_number);
-  }
+  //   let ending_balance = Balances::free_balance(&account(n));
+  //   assert_eq!(starting_balance + ledger_balance, ending_balance);
+  //   System::set_block_number(starting_block_number);
+  // }
 }
 
 // fn build_for_submit_consensus_data(subnet_id: u32, start: u32, end: u32, start_data: u32, end_data: u32) {
@@ -3069,7 +3076,10 @@ fn test_claim_stake_unbondings() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+
+    
     assert_eq!(unbondings.len(), 1);
     let (first_key, first_value) = unbondings.iter().next().unwrap();
     assert_eq!(first_key, &epoch);
@@ -3090,7 +3100,9 @@ fn test_claim_stake_unbondings() {
 
     assert_eq!(post_balance, starting_balance);
 
-    let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+
     assert_eq!(unbondings.len(), 0);
   });
 }
@@ -3192,7 +3204,8 @@ fn test_remove_to_stake_max_unlockings_reached_err() {
             1000,
           )
         );
-        let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+        // let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+        let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
         assert_eq!(unbondings.len() as u32, n+1);  
       }
     }
@@ -3574,7 +3587,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     System::set_block_number(System::block_number() + ((EpochLength::get()  + 1) * DelegateStakeCooldownEpochs::get()));
 
     assert_ok!(
-      Network::claim_delegate_stake_unbondings(
+      Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
         subnet_id,
       )
@@ -3587,7 +3600,8 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
       (post_balance <= starting_delegator_balance)
     );
 
-    let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
     assert_eq!(unbondings.len(), 0);
   });
 }
@@ -3829,18 +3843,19 @@ fn test_claim_removal_of_delegate_stake() {
     let post_balance = Balances::free_balance(&account(n_account));
     assert_eq!(post_balance, balance);
 
-    let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 1);
     let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
     assert_eq!(ledger_epoch, &epoch);
     assert!(*ledger_balance <= delegate_balance);
 
     assert_err!(
-      Network::claim_delegate_stake_unbondings(
+      Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
         subnet_id,
       ),
-      Error::<Test>::NoDelegateStakeUnbondingsOrCooldownNotMet
+      Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
     );
 
     System::set_block_number(System::block_number() + ((epoch_length  + 1) * cooldown_epochs));
@@ -3848,7 +3863,7 @@ fn test_claim_removal_of_delegate_stake() {
     let pre_claim_balance = Balances::free_balance(&account(n_account));
 
     assert_ok!(
-      Network::claim_delegate_stake_unbondings(
+      Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
         subnet_id,
       )
@@ -3863,7 +3878,8 @@ fn test_claim_removal_of_delegate_stake() {
       (post_balance <= starting_delegator_balance)
     );
 
-    let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 0);
   });
 }
@@ -3920,7 +3936,8 @@ fn test_remove_to_delegate_stake_max_unlockings_per_epoch_err() {
         delegate_shares/2,
       )
     );
-    let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 1);
 
     assert_err!(
@@ -3997,7 +4014,8 @@ fn test_remove_to_delegate_stake_max_unlockings_reached_err() {
             1000,
           )
         );
-        let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+        // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+        let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
         assert_eq!(unbondings.len() as u32, n+1);  
       }
     }
@@ -4291,24 +4309,25 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     let post_balance = Balances::free_balance(&account(n_account));
     assert_eq!(post_balance, balance);
 
-    let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 1);
     let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
     assert_eq!(ledger_epoch, &epoch);
     assert!(*ledger_balance <= delegate_balance);
 
     assert_err!(
-      Network::claim_delegate_stake_unbondings(
+      Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
         subnet_id,
       ),
-      Error::<Test>::NoDelegateStakeUnbondingsOrCooldownNotMet
+      Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
     );
 
     System::set_block_number(System::block_number() + ((epoch_length  + 1) * cooldown_epochs));
 
     assert_ok!(
-      Network::claim_delegate_stake_unbondings(
+      Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
         subnet_id,
       )
@@ -4321,7 +4340,8 @@ fn test_remove_delegate_stake_after_subnet_remove() {
       (post_balance <= starting_delegator_balance)
     );
 
-    let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 0);
   });
 }
@@ -8023,49 +8043,6 @@ fn test_update_hotkey() {
   });
 }
 
-
-// #[test]
-// fn test_encrypt_decrypt_answer() {
-//   new_test_ext().execute_with(|| {
-//     let task_id = 42;
-
-//     let validator = b"validator_pubkey";
-//     let salt = b"unique_salt";
-
-//     // Generate deterministic nonce
-//     let nonce = Network::generate_nonce(task_id, validator, salt);
-
-//     // Define a 32-byte encryption key (in real cases, securely derive/store this)
-//     let key: [u8; 32] = [1; 32]; // Example static key (use secure key derivation in production)
-
-//     // Define plaintext data (e.g., an answer)
-//     let plaintext: &[u8] = b"secret_answer";
-
-//     // Encrypt
-//     let ciphertext = Network::encrypt_answer(&key, &nonce, &plaintext);
-//     assert_ne!(ciphertext, plaintext.to_vec(), "Ciphertext should be different from plaintext");
-
-//     // Decrypt
-//     let decrypted = Network::decrypt_answer(&key, &nonce, &ciphertext);
-//     assert_eq!(decrypted, plaintext.to_vec(), "Decrypted text should match original plaintext");
-//   });
-// }
-
-// #[test]
-// fn test_commit_reveal_flow() {
-//   new_test_ext().execute_with(|| {
-//     let value: u32 = 42; // The number we want to commit
-//     let nonce: u32 = 123456; // A random nonce
-    
-//     // Step 1: Generate commitment (hashed value + nonce)
-//     let commitment = Network::generate_commitment(value, nonce);
-
-//     let recomputed_hash = Network::reveal(value, nonce);
-    
-//     assert_eq!(commitment, recomputed_hash);
-//   });
-// }
-
 #[test]
 fn test_commit_reveal_flow() {
   new_test_ext().execute_with(|| {
@@ -8094,6 +8071,97 @@ fn test_commit_reveal_flow() {
     
     assert_eq!(commitment, recomputed_hash);
 
+  });
+}
+
+#[test]
+fn test_submit_benchmark_weights() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+
+    let value: u128 = 42; // The number we want to commit
+    let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
+
+    let commit = SubnetBenchmarkWeightCommitment {
+      subnet_id: subnet_id,
+      weight: Network::generate_commitment(value, &seed).to_vec(),
+    };
+
+    let mut commits: Vec<SubnetBenchmarkWeightCommitment> = Vec::new();
+    commits.push(commit);
+
+    assert_ok!(
+      Network::submit_benchmark_weights(
+        RuntimeOrigin::signed(account(0)),
+        commits
+      )
+    );
+  });
+}
+
+#[test]
+fn test_reveal_benchmark_weights() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+
+    let value: u128 = 42; // The number we want to commit
+    let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
+
+    let commit = SubnetBenchmarkWeightCommitment {
+      subnet_id: subnet_id,
+      weight: Network::generate_commitment(value, &seed).to_vec(),
+    };
+
+    let mut commits: Vec<SubnetBenchmarkWeightCommitment> = Vec::new();
+    commits.push(commit);
+
+    let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
+  
+    assert_ok!(
+      Network::submit_benchmark_weights(
+        RuntimeOrigin::signed(account(0)),
+        commits.clone()
+      )
+    );
+
+    let subnet_benchmark_commitments = SubnetBenchmarkCommitments::<Test>::get(epoch as u32, account(0));
+    assert_eq!(subnet_benchmark_commitments, commits.clone());
+
+    let reveal = SubnetBenchmarkWeightReveal {
+      subnet_id: subnet_id,
+      weight: value,
+    };
+
+    let mut reveals: Vec<SubnetBenchmarkWeightReveal> = Vec::new();
+    reveals.push(reveal);
+
+    assert_ok!(
+      Network::reveal_benchmark_weights(
+        RuntimeOrigin::signed(account(0)),
+        reveals.clone(),
+        &seed,
+      )  
+    );
+
+    // let stake_balance = AccountOverwatchStake::<T>::get(account(0));
+
+    // let subnet_benchmark_reveals = SubnetBenchmarkReveals::<Test>::get(epoch as u32, subnet_id);
+    // assert_eq!(subnet_benchmark_reveals, vec1);
   });
 }
 
@@ -8177,5 +8245,47 @@ fn test_adjusted_sqrt() {
     let value: f64 = 1000000000.0;
     let result = Network::adjusted_sqrt(value, factor, base);
     assert_eq!(result, 100000000.0);
+  });
+}
+
+#[test]
+fn test_register_overwatch_node() {
+  new_test_ext().execute_with(|| {
+    let min_overwatch_stake_balance = MinOverwatchStakeBalance::<Test>::get();
+    let _ = Balances::deposit_creating(&account(0), min_overwatch_stake_balance+1000);
+
+    let starting_total_overwatch_stake = TotalOverwatchStake::<Test>::get();
+
+    assert_ok!(
+      Network::register_overwatch_node(
+        RuntimeOrigin::signed(account(0)),
+        peer(0),
+        account(0),
+        min_overwatch_stake_balance,
+        None,
+        None,
+        None
+      )
+    );
+
+    let account_overwatch_stake = AccountOverwatchStake::<Test>::get(account(0));
+    assert_eq!(account_overwatch_stake, min_overwatch_stake_balance);
+
+    let total_overwatch_stake = TotalOverwatchStake::<Test>::get();
+    assert_eq!(total_overwatch_stake, starting_total_overwatch_stake + account_overwatch_stake);
+
+    assert_err!(
+      Network::register_overwatch_node(
+        RuntimeOrigin::signed(account(0)),
+        peer(0),
+        account(0),
+        min_overwatch_stake_balance,
+        None,
+        None,
+        None
+      ),
+      Error::<Test>::OverwatchNodeExists
+    );
+
   });
 }

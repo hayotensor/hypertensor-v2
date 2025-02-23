@@ -158,7 +158,8 @@ impl<T: Config> Pallet<T> {
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;
 
-    let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    // let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
     // One unlocking per epoch
     ensure!(
@@ -172,7 +173,8 @@ impl<T: Config> Pallet<T> {
     }
 
     // --- Get updated unbondings after claiming unbondings
-    let mut unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    // let mut unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    let mut unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
     // We're about to add another unbonding to the ledger - it must be n-1
     ensure!(
@@ -181,7 +183,8 @@ impl<T: Config> Pallet<T> {
     );
 
     unbondings.insert(epoch, amount);
-    SubnetStakeUnbondingLedger::<T>::insert(coldkey.clone(), subnet_id, unbondings);
+    // SubnetStakeUnbondingLedger::<T>::insert(coldkey.clone(), subnet_id, unbondings);
+    StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings);
 
     Ok(())
   }
@@ -191,7 +194,9 @@ impl<T: Config> Pallet<T> {
     let block: u64 = Self::get_current_block_as_u64();
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;
-    let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    // let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
+
     let mut unbondings_copy = unbondings.clone();
 
     let mut successful_unbondings = 0;
@@ -214,7 +219,8 @@ impl<T: Config> Pallet<T> {
     }
 
     if unbondings.len() != unbondings_copy.len() {
-      SubnetStakeUnbondingLedger::<T>::insert(coldkey.clone(), subnet_id, unbondings_copy);
+      // SubnetStakeUnbondingLedger::<T>::insert(coldkey.clone(), subnet_id, unbondings_copy);
+      StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings_copy);
     }
     successful_unbondings
   }
