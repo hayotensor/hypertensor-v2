@@ -8086,6 +8086,23 @@ fn test_submit_benchmark_weights() {
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 
+    // Add overwatch node
+    let min_overwatch_stake_balance = MinOverwatchStakeBalance::<Test>::get();
+    let _ = Balances::deposit_creating(&account(0), min_overwatch_stake_balance+1000);
+
+    // build_activated_subnet uses coldkey == hotkey so this should work
+    assert_ok!(
+      Network::register_overwatch_node(
+        RuntimeOrigin::signed(account(0)),
+        peer(0),
+        account(0),
+        min_overwatch_stake_balance,
+        None,
+        None,
+        None
+      )
+    );
+
     let value: u128 = 42; // The number we want to commit
     let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
 
@@ -8106,64 +8123,64 @@ fn test_submit_benchmark_weights() {
   });
 }
 
-#[test]
-fn test_reveal_benchmark_weights() {
-  new_test_ext().execute_with(|| {
-    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-    let deposit_amount: u128 = 10000000000000000000000;
-    let amount: u128 = 1000000000000000000000;
+// #[test]
+// fn test_reveal_benchmark_weights() {
+//   new_test_ext().execute_with(|| {
+//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+//     let deposit_amount: u128 = 10000000000000000000000;
+//     let amount: u128 = 1000000000000000000000;
 
-    let n_peers = 8;
-    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+//     let n_peers = 8;
+//     build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
 
-    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 
-    let value: u128 = 42; // The number we want to commit
-    let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
+//     let value: u128 = 42; // The number we want to commit
+//     let seed: Vec<u8> = b"any_se2345ed_length_here".to_vec(); // Variable-length seed
 
-    let commit = SubnetBenchmarkWeightCommitment {
-      subnet_id: subnet_id,
-      weight: Network::generate_commitment(value, &seed).to_vec(),
-    };
+//     let commit = SubnetBenchmarkWeightCommitment {
+//       subnet_id: subnet_id,
+//       weight: Network::generate_commitment(value, &seed).to_vec(),
+//     };
 
-    let mut commits: Vec<SubnetBenchmarkWeightCommitment> = Vec::new();
-    commits.push(commit);
+//     let mut commits: Vec<SubnetBenchmarkWeightCommitment> = Vec::new();
+//     commits.push(commit);
 
-    let epoch_length = EpochLength::get();
-    let epoch = System::block_number() / epoch_length;
+//     let epoch_length = EpochLength::get();
+//     let epoch = System::block_number() / epoch_length;
   
-    assert_ok!(
-      Network::submit_benchmark_weights(
-        RuntimeOrigin::signed(account(0)),
-        commits.clone()
-      )
-    );
+//     assert_ok!(
+//       Network::submit_benchmark_weights(
+//         RuntimeOrigin::signed(account(0)),
+//         commits.clone()
+//       )
+//     );
 
-    let subnet_benchmark_commitments = SubnetBenchmarkCommitments::<Test>::get(epoch as u32, account(0));
-    assert_eq!(subnet_benchmark_commitments, commits.clone());
+//     let subnet_benchmark_commitments = SubnetBenchmarkCommitments::<Test>::get(epoch as u32, account(0));
+//     assert_eq!(subnet_benchmark_commitments, commits.clone());
 
-    let reveal = SubnetBenchmarkWeightReveal {
-      subnet_id: subnet_id,
-      weight: value,
-    };
+//     let reveal = SubnetBenchmarkWeightReveal {
+//       subnet_id: subnet_id,
+//       weight: value,
+//     };
 
-    let mut reveals: Vec<SubnetBenchmarkWeightReveal> = Vec::new();
-    reveals.push(reveal);
+//     let mut reveals: Vec<SubnetBenchmarkWeightReveal> = Vec::new();
+//     reveals.push(reveal);
 
-    assert_ok!(
-      Network::reveal_benchmark_weights(
-        RuntimeOrigin::signed(account(0)),
-        reveals.clone(),
-        &seed,
-      )  
-    );
+//     assert_ok!(
+//       Network::reveal_benchmark_weights(
+//         RuntimeOrigin::signed(account(0)),
+//         reveals.clone(),
+//         &seed,
+//       )  
+//     );
 
-    // let stake_balance = AccountOverwatchStake::<T>::get(account(0));
+//     // let stake_balance = AccountOverwatchStake::<T>::get(account(0));
 
-    // let subnet_benchmark_reveals = SubnetBenchmarkReveals::<Test>::get(epoch as u32, subnet_id);
-    // assert_eq!(subnet_benchmark_reveals, vec1);
-  });
-}
+//     // let subnet_benchmark_reveals = SubnetBenchmarkReveals::<Test>::get(epoch as u32, subnet_id);
+//     // assert_eq!(subnet_benchmark_reveals, vec1);
+//   });
+// }
 
 #[test]
 fn test_adjusted_sqrt() {

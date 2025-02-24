@@ -790,6 +790,10 @@ pub mod pallet {
 		0
 	}
 	#[pallet::type_value]
+	pub fn DefaultZeroU128() -> u128 {
+		0
+	}
+	#[pallet::type_value]
 	pub fn DefaultVecU8() -> Vec<u8> {
 		Vec::new()
 	}
@@ -1545,23 +1549,6 @@ pub mod pallet {
 	>;
 
 	//
-	// Overwatch Node Staking
-	//
-
-	// An accounts stake per subnet
-	#[pallet::storage] // account--> subnet_id --> u128
-	#[pallet::getter(fn account_overwatch_stake)]
-	pub type AccountOverwatchStake<T: Config> = 
-		StorageMap<_, Blake2_128Concat, T::AccountId, u128, ValueQuery, DefaultAccountTake>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn total_overwatch_stake)]
-	pub type TotalOverwatchStake<T: Config> = StorageValue<_, u128, ValueQuery>;
-
-	#[pallet::storage]
-	pub type MinOverwatchStakeBalance<T: Config> = StorageValue<_, u128, ValueQuery, DefaultOverwatchMinStakeBalance>;
-	
-	//
 	// Props
 	//
 	#[pallet::type_value]
@@ -1663,10 +1650,38 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type ProposalConsensusThreshold<T> = StorageValue<_, u128, ValueQuery, DefaultProposalConsensusThreshold>;
 
+	
+	//
+	// Overwatch Node Staking
+	//
+
+	// An accounts stake per subnet
+	#[pallet::storage] // account--> subnet_id --> u128
+	#[pallet::getter(fn account_overwatch_stake)]
+	pub type AccountOverwatchStake<T: Config> = 
+		StorageMap<_, Blake2_128Concat, T::AccountId, u128, ValueQuery, DefaultAccountTake>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn total_overwatch_stake)]
+	pub type TotalOverwatchStake<T: Config> = StorageValue<_, u128, ValueQuery>;
+
+	#[pallet::storage]
+	pub type MinOverwatchStakeBalance<T: Config> = StorageValue<_, u128, ValueQuery, DefaultOverwatchMinStakeBalance>;
+	
 
 	//
 	// Overwatch
 	//
+
+	#[pallet::type_value]
+	pub fn DefaultDefaultOverwatchWeight() -> u128 {
+		// 1.5 (/ 100)
+		15_000_000
+	}
+
+	// Default weight for submissions if none are submitted
+	#[pallet::storage]
+	pub type DefaultOverwatchSubnetWeight<T> = StorageValue<_, u128, ValueQuery, DefaultDefaultOverwatchWeight>;
 
 	// #[pallet::type_value]
 	// pub fn DefaultSubnetBenchmarkWeightCommitment() -> SubnetBenchmarkWeightCommitment {
@@ -1695,17 +1710,6 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, T::AccountId, OverwatchNode, ValueQuery, DefaultOverwatchNode>;
 	
 	// epoch -> subnet_id -> SubnetBenchmarkWeightCommitment
-	// #[pallet::storage]
-	// pub type SubnetBenchmarkCommitments<T> = StorageDoubleMap<
-	// 	_,
-	// 	Blake2_128Concat,
-	// 	u32,
-	// 	Identity,
-	// 	u32,
-	// 	SubnetBenchmarkWeightCommitment,
-	// 	ValueQuery,
-	// 	DefaultSubnetBenchmarkWeightCommitment,
-	// >;
 	#[pallet::storage]
 	pub type SubnetBenchmarkCommitments<T: Config> = StorageDoubleMap<
 		_,
@@ -1735,6 +1739,41 @@ pub mod pallet {
 		ValueQuery,
 		DefaultSubnetBenchmarkReveals,
 	>;
+
+	#[pallet::type_value]
+	pub fn DefaultSubnetFinalBenchmarks() -> BTreeMap<u32,u128> {
+		BTreeMap::new()
+	}
+
+	// epoch >> {weights}
+	#[pallet::storage]
+	pub type SubnetFinalBenchmarks<T> = 
+		StorageMap<_, Blake2_128Concat, u32, BTreeMap<u32,u128>, ValueQuery, DefaultSubnetFinalBenchmarks>;
+
+
+	// #[pallet::storage]
+	// pub type SubnetFinalBenchmarks<T> = StorageDoubleMap<
+	// 	_,
+	// 	Blake2_128Concat,
+	// 	u32,
+	// 	Identity,
+	// 	u32,
+	// 	u128,
+	// 	ValueQuery,
+	// 	DefaultZeroU128,
+	// >;
+	
+	
+	// #[pallet::type_value]
+	// pub fn DefaultMaxOverwatchNodeStakeWeight() -> u128 {
+	// 	// 5.0%
+	// 	50_000_000
+	// }
+
+	// // The max weight an OW node can have toward subnet weight submissions
+	// #[pallet::storage]
+	// pub type MaxOverwatchNodeStakeWeight<T> = StorageValue<_, u128, ValueQuery, DefaultMaxOverwatchNodeStakeWeight>;
+
 
 	/// The pallet's dispatchable functions ([`Call`]s).
 	///
@@ -3284,6 +3323,8 @@ pub mod pallet {
 				return Weight::from_parts(207_283_478_000, 22166406)
 					.saturating_add(T::DbWeight::get().reads(18250_u64))
 					.saturating_add(T::DbWeight::get().writes(12002_u64));
+			} else if (block - 3) >= epoch_length && (block - 3) % epoch_length == 0 {
+
 			}
 
 			// return T::WeightInfo::on_initialize()

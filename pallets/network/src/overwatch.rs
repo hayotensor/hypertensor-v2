@@ -11,6 +11,11 @@ impl<T: Config> Pallet<T> {
   ) -> DispatchResult {
     let hotkey: T::AccountId = ensure_signed(origin)?;
 
+    ensure!(
+      OverwatchNodes::<T>::contains_key(hotkey.clone()),
+      Error::<T>::OverwatchNodeExists
+    );
+
     let subnets: BTreeSet<_> = SubnetsData::<T>::iter().map(|(id, _)| id).collect();
     let total_subnets: u32 = subnets.len() as u32;
     let total_commitments: u32 = encrypted_weights.len() as u32;
@@ -59,28 +64,19 @@ impl<T: Config> Pallet<T> {
       Error::<T>::InvalidOverwatchCommitments
     );
 
-    let min_weight = 15_000_000;
     let stake_balance = AccountOverwatchStake::<T>::get(hotkey.clone());
 
-    let subnets: BTreeSet<_> = SubnetsData::<T>::iter().map(|(id, _)| id).collect();
-    for subnet_id in subnets {
-      let encrypted_weight = encrypted_weights.iter().find(
-        |e| e.subnet_id == subnet_id
-      );
+    for commit in encrypted_weights.iter() {
+      let subnet_id = commit.subnet_id;
+      let encrypted_weight = &commit.weight;
 
       let revealed_weight: Option<&SubnetBenchmarkWeightReveal> = revealed_weights.iter().find(
         |e| e.subnet_id == subnet_id
       );
 
-      // --- If no weight for subnet_id, use default weight value
-      if revealed_weight.is_none() || revealed_weight.is_none() {
-        SubnetBenchmarkReveals::<T>::mutate(epoch as u32, subnet_id, |weights| {
-          weights.insert(stake_balance, min_weight);
-        });  
+      if revealed_weight.is_none() {
         continue
       }
-
-      let encrypted_weight = &encrypted_weight.unwrap().weight;
 
       // --- Ensure weight under 100%
       ensure!(
@@ -90,7 +86,7 @@ impl<T: Config> Pallet<T> {
 
       let reveal = Self::reveal(revealed_weight.unwrap().weight, &seed);
 
-      // --- Ensure reveal matches encrypted commit weight
+      // --- Ensure reveal matches encrypted commit
       ensure!(
         encrypted_weight == &reveal,
         Error::<T>::WeightRevealMismatch
@@ -109,7 +105,12 @@ impl<T: Config> Pallet<T> {
 
     // Factored subnet weights {subnet_id: [..., commit*stake_weight, ...]}
     let mut subnet_node_weights: BTreeMap<u32, Vec<u128>> = BTreeMap::new();
+    let default_weight = DefaultOverwatchSubnetWeight::<T>::get();
 
+    let total_overwatch_stake = TotalOverwatchStake::<T>::get();
+
+    // --- Get final weights for live subnets
+    // Get each nodes submission of each subnet
     for subnet_id in subnets {
       let mut reveals = match SubnetBenchmarkReveals::<T>::try_get(
         epoch,
@@ -119,37 +120,44 @@ impl<T: Config> Pallet<T> {
         Err(()) => BTreeMap::new(),
       };
 
+      let mut weights: Vec<u128> = Vec::new();
+      // --- If no entries, use default weights
+      // No matter what, subnets have entries
       if reveals.is_empty() {
+        weights.push(default_weight);
+        subnet_node_weights.insert(subnet_id, weights);
         continue
       }
 
       // Run IQR and remove outliers
 
       
-      
-      let total_overwatch_stake = 0;
-      let mut subnet_total_weight: u128 = 0;
-      let mut weights: Vec<u128> = Vec::new();
+
+
+
       for reveal in reveals.iter() {
         let stake_balance = reveal.0;
         let weight = reveal.1;
 
+        // --- OW nodes share of total OW stake balance
         let stake_weight = Self::percent_div(*stake_balance, total_overwatch_stake);
 
+        // --- Get submission weight multiplied by stake weight
         let node_subnet_weight = Self::percent_mul(*weight as u128, stake_weight);
 
-        subnet_total_weight = subnet_total_weight.saturating_add(node_subnet_weight);
-        weights.push(subnet_total_weight);
+        weights.push(node_subnet_weight);
       }
 
       subnet_node_weights.insert(subnet_id, weights);
     }
 
+    // --- Get the sum of all weights from each node from their stake weights
     let subnet_node_weights_sum: u128 = subnet_node_weights.values()
       .flat_map(|v| v.iter())
       .copied()
       .sum();
 
+    // Factored subnet weights {subnet_id: weight based on stake weight}
     let mut subnet_weights: BTreeMap<u32, u128> = BTreeMap::new();
 
     // Get percentages
@@ -180,95 +188,13 @@ impl<T: Config> Pallet<T> {
       let subnet_normalized_weight = Self::percent_div(*weight, subnet_normalized_weights_sum);
       subnet_normalized_fair_weights.insert(*subnet_id, subnet_normalized_weight);
     }
+
+    SubnetFinalBenchmarks::<T>::insert(epoch, subnet_normalized_fair_weights);
   }
 
-  // pub fn compute_benchmark_weights(epoch: u32) {
-  //   let subnets: BTreeSet<_> = SubnetsData::<T>::iter().map(|(id, _)| id).collect();
+  pub fn reward_overwatch_nodes(epoch: u32) {
 
-  //   // Factored subnet weights {subnet_id: [..., commit*stake_weight, ...]}
-  //   let mut subnet_node_weights: BTreeMap<u32, Vec<u128>> = BTreeMap::new();
-
-  //   let min_weight = 15_000_000;
-
-  //   for subnet_id in subnets {
-  //     let mut reveals = match SubnetBenchmarkReveals::<T>::try_get(
-  //       epoch,
-  //       subnet_id, 
-  //     ) {
-  //       Ok(reveals) => reveals,
-  //       Err(()) => BTreeMap::new(),
-  //     };
-
-  //     if reveals.is_empty() {
-  //       continue
-  //     }
-
-  //     // Run IQR and remove outliers
-
-      
-      
-  //     let total_overwatch_stake = 0;
-  //     let mut subnet_total_weight: u128 = 0;
-  //     let mut weights: Vec<u128> = Vec::new();
-  //     for reveal in reveals.iter() {
-  //       let stake_balance = reveal.0;
-  //       let weight = reveal.1;
-
-  //       let stake_weight = Self::percent_div(*stake_balance, total_overwatch_stake);
-
-  //       let node_subnet_weight = Self::percent_mul(*weight as u128, stake_weight);
-
-  //       subnet_total_weight = subnet_total_weight.saturating_add(node_subnet_weight);
-  //       weights.push(subnet_total_weight);
-  //     }
-
-  //     subnet_node_weights.insert(subnet_id, weights);
-  //   }
-
-  //   let subnet_node_weights_sum: u128 = subnet_node_weights.values()
-  //     .flat_map(|v| v.iter())
-  //     .copied()
-  //     .sum();
-
-  //   let mut subnet_weights: BTreeMap<u32, u128> = BTreeMap::new();
-
-  //   // Get percentages
-  //   for (subnet_id, weights) in subnet_node_weights.iter() {
-  //     let weight_sum: u128 = weights.iter().sum();
-  //     let subnet_weight = Self::percent_div(weight_sum, subnet_node_weights_sum);
-  //     subnet_weights.insert(*subnet_id, subnet_weight);
-  //   }
-
-  //   // u128 => f64 precision loss starts at around 9007199254740992
-  //   // We max the possible weight at 1e9 so we can handle over 9 million entries
-  //   // before any precision loss begins
-  //   // (9.007m = 9007199254740992 / 1e9)
-
-  //   // Get fair weights
-  //   let mut subnet_weights_sum: u128 = subnet_weights.values().copied().sum();
-  //   let mut subnet_fair_weights: BTreeMap<u32, u128> = BTreeMap::new();
-
-  //   for (subnet_id, weight) in subnet_weights.iter() {
-  //     let fair_weight: f64 = Self::adjusted_sqrt(*weight as f64, Self::PERCENTAGE_FACTOR as f64, 100.0);
-  //     subnet_fair_weights.insert(*subnet_id, fair_weight as u128);
-  //   }
-
-  //   // Normalize fair weights
-  //   let mut subnet_normalized_weights_sum: u128 = subnet_fair_weights.values().copied().sum();
-  //   let mut subnet_normalized_fair_weights: BTreeMap<u32, u128> = BTreeMap::new();
-  //   for (subnet_id, weight) in subnet_fair_weights.iter() {
-  //     let subnet_normalized_weight = Self::percent_div(*weight, subnet_normalized_weights_sum);
-  //     subnet_normalized_fair_weights.insert(*subnet_id, subnet_normalized_weight);
-  //   }
-
-  //   for subnet_id in subnets {
-  //     subnet_fair_weight = subnet_fair_weights.get(&subnet_id);
-  //     if subnet_fair_weight == None {
-  //       subnet_normalized_fair_weights.insert(*subnet_id, subnet_normalized_weight);
-  //       continue
-  //     }
-  //   }
-  // }
+  }
 
   pub fn reveal(value: u128, seed: &[u8]) -> [u8; 32] {
     let mut data = vec![];
