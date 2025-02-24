@@ -1727,6 +1727,32 @@ pub mod pallet {
 		BTreeMap::new()
 	}
 
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
+	pub struct OverwatchNodeReveal<AccountId> {
+		pub hotkey: AccountId,
+		pub peer_id: PeerId,
+		pub stake: u128,
+		pub weight: u128,
+	}
+
+	#[pallet::type_value]
+	pub fn DefaultSubnetBenchmarkReveals2<T: Config>() -> BTreeSet<OverwatchNodeReveal<T::AccountId>> {
+		BTreeSet::new()
+	}
+
+	// epoch -> subnet_id -> {stake,weight}
+	#[pallet::storage]
+	pub type SubnetBenchmarkReveals2<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		u32,
+		BTreeSet<OverwatchNodeReveal<T::AccountId>>,
+		ValueQuery,
+		DefaultSubnetBenchmarkReveals2<T>,
+	>;
+
 	// epoch -> subnet_id -> {stake,weight}
 	#[pallet::storage]
 	pub type SubnetBenchmarkReveals<T> = StorageDoubleMap<

@@ -50,6 +50,11 @@ impl<T: Config> Pallet<T> {
   ) -> DispatchResult {
     let hotkey: T::AccountId = ensure_signed(origin)?;
 
+    let overwatch_node = match OverwatchNodes::<T>::try_get(hotkey.clone()) {
+      Ok(overwatch_node) => overwatch_node,
+      Err(()) => return Err(Error::<T>::OverwatchNodeExists.into()),
+    };
+
     let epoch: u32 = Self::get_current_epoch_as_u32();
 
     let encrypted_weights = match SubnetBenchmarkCommitments::<T>::try_get(epoch, hotkey.clone()) {
@@ -92,9 +97,20 @@ impl<T: Config> Pallet<T> {
         Error::<T>::WeightRevealMismatch
       );
 
-      SubnetBenchmarkReveals::<T>::mutate(epoch as u32, subnet_id, |weights| {
-        weights.insert(stake_balance, revealed_weight.unwrap().weight);
+      let overwatch_node_reveal = OverwatchNodeReveal {
+        hotkey: hotkey.clone(),
+        peer_id: overwatch_node.peer_id.clone(),
+        stake: stake_balance,
+        weight: revealed_weight.unwrap().weight,    
+      };
+
+      SubnetBenchmarkReveals2::<T>::mutate(epoch as u32, subnet_id, |weights| {
+        weights.insert(overwatch_node_reveal);
       });
+
+      // SubnetBenchmarkReveals::<T>::mutate(epoch as u32, subnet_id, |weights| {
+      //   weights.insert(stake_balance, revealed_weight.unwrap().weight);
+      // });
     }
     
     Ok(())
@@ -112,12 +128,19 @@ impl<T: Config> Pallet<T> {
     // --- Get final weights for live subnets
     // Get each nodes submission of each subnet
     for subnet_id in subnets {
-      let mut reveals = match SubnetBenchmarkReveals::<T>::try_get(
+      // let mut reveals = match SubnetBenchmarkReveals::<T>::try_get(
+      //   epoch,
+      //   subnet_id, 
+      // ) {
+      //   Ok(reveals) => reveals,
+      //   Err(()) => BTreeMap::new(),
+      // };
+      let mut reveals = match SubnetBenchmarkReveals2::<T>::try_get(
         epoch,
         subnet_id, 
       ) {
         Ok(reveals) => reveals,
-        Err(()) => BTreeMap::new(),
+        Err(()) => BTreeSet::new(),
       };
 
       let mut weights: Vec<u128> = Vec::new();
@@ -134,16 +157,16 @@ impl<T: Config> Pallet<T> {
       
 
 
-
+      // --- Iterate each node reveal in each subnet
       for reveal in reveals.iter() {
-        let stake_balance = reveal.0;
-        let weight = reveal.1;
+        let stake_balance: u128 = reveal.stake;
+        let weight: u128 = reveal.weight;
 
         // --- OW nodes share of total OW stake balance
-        let stake_weight = Self::percent_div(*stake_balance, total_overwatch_stake);
+        let stake_weight: u128 = Self::percent_div(stake_balance, total_overwatch_stake);
 
         // --- Get submission weight multiplied by stake weight
-        let node_subnet_weight = Self::percent_mul(*weight as u128, stake_weight);
+        let node_subnet_weight: u128 = Self::percent_mul(weight, stake_weight);
 
         weights.push(node_subnet_weight);
       }
@@ -151,7 +174,17 @@ impl<T: Config> Pallet<T> {
       subnet_node_weights.insert(subnet_id, weights);
     }
 
-    // --- Get the sum of all weights from each node from their stake weights
+    //
+    //
+    //
+
+
+
+    //
+    //
+    //
+
+    // --- Get the sum of all subnet weights from each node from their stake weights
     let subnet_node_weights_sum: u128 = subnet_node_weights.values()
       .flat_map(|v| v.iter())
       .copied()
@@ -193,7 +226,73 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn reward_overwatch_nodes(epoch: u32) {
+    let benchmarks = SubnetFinalBenchmarks::<T>::get(epoch);
 
+    let mut overwatch_node_accuracy: BTreeMap<T::AccountId, u128> = BTreeMap::new();
+
+    for benchmark in benchmarks.iter() {
+      let subnet_id: u32 = *benchmark.0;
+
+      let node_reveals = SubnetBenchmarkReveals2::<T>::get(epoch, subnet_id);
+
+      if node_reveals.is_empty() {
+        continue
+      }
+
+      let final_weight: u128 = *benchmark.1;
+      for node_reveal in node_reveals.iter() {
+        let node_weight = node_reveal.weight;
+        let weight_distance = match final_weight > node_weight {
+          true => final_weight - node_weight,
+          false => node_weight - final_weight,  
+        };
+
+        // The max distance is 1e9 (PERCENTAGE_FACTOR) but just in case we check with a match
+        let normalized_distance = match Self::PERCENTAGE_FACTOR > weight_distance {
+          true => Self::PERCENTAGE_FACTOR - weight_distance,
+          false => 0,  
+        };
+
+        let hotkey = node_reveal.hotkey.clone();
+
+        // --- Enter or modify overwatch node rewards weight
+        overwatch_node_accuracy.entry(hotkey).and_modify(|v| *v = normalized_distance).or_insert(normalized_distance);
+      }
+    }
+
+    if overwatch_node_accuracy.is_empty() {
+      // if no entries, return and do nothing
+      return
+    }
+
+    let accuracy_sum: u128 = overwatch_node_accuracy.values().sum();
+    // placer
+    let total_overwatch_rewards: u128 = 1_000_000;
+
+    for overwatch_node in overwatch_node_accuracy.iter() {
+      let weight: u128 = *overwatch_node.1;
+
+      if weight == 0 {
+        continue
+      }
+
+      // --- Get percentage of rewards allocation
+      let rewards_percentage: u128 = Self::percent_div(weight, accuracy_sum);
+
+      if rewards_percentage == 0 {
+        continue
+      }
+
+      // --- Get node reward based on percentage
+      let node_reward: u128 = Self::percent_mul(total_overwatch_rewards, rewards_percentage);
+
+      let hotkey: &T::AccountId = overwatch_node.0;
+
+      Self::increase_account_overwatch_stake(
+        hotkey,
+        node_reward,
+      );
+    }
   }
 
   pub fn reveal(value: u128, seed: &[u8]) -> [u8; 32] {
