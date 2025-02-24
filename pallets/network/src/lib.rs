@@ -1722,11 +1722,6 @@ pub mod pallet {
 		DefaultSubnetBenchmarkWeightCommitments,
 	>;
 
-	// #[pallet::type_value]
-	// pub fn DefaultSubnetBenchmarkReveals() -> BTreeMap<u128,u128> {
-	// 	BTreeMap::new()
-	// }
-
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
 	pub struct OverwatchNodeReveal<AccountId> {
 		pub hotkey: AccountId,
@@ -1753,19 +1748,6 @@ pub mod pallet {
 		DefaultSubnetBenchmarkReveals<T>,
 	>;
 
-	// // epoch -> subnet_id -> {stake,weight}
-	// #[pallet::storage]
-	// pub type SubnetBenchmarkReveals<T> = StorageDoubleMap<
-	// 	_,
-	// 	Blake2_128Concat,
-	// 	u32,
-	// 	Identity,
-	// 	u32,
-	// 	BTreeMap<u128,u128>,
-	// 	ValueQuery,
-	// 	DefaultSubnetBenchmarkReveals,
-	// >;
-
 	#[pallet::type_value]
 	pub fn DefaultSubnetFinalBenchmarks() -> BTreeMap<u32,u128> {
 		BTreeMap::new()
@@ -1775,30 +1757,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type SubnetFinalBenchmarks<T> = 
 		StorageMap<_, Blake2_128Concat, u32, BTreeMap<u32,u128>, ValueQuery, DefaultSubnetFinalBenchmarks>;
-
-
-	// #[pallet::storage]
-	// pub type SubnetFinalBenchmarks<T> = StorageDoubleMap<
-	// 	_,
-	// 	Blake2_128Concat,
-	// 	u32,
-	// 	Identity,
-	// 	u32,
-	// 	u128,
-	// 	ValueQuery,
-	// 	DefaultZeroU128,
-	// >;
-	
-	
-	// #[pallet::type_value]
-	// pub fn DefaultMaxOverwatchNodeStakeWeight() -> u128 {
-	// 	// 5.0%
-	// 	50_000_000
-	// }
-
-	// // The max weight an OW node can have toward subnet weight submissions
-	// #[pallet::storage]
-	// pub type MaxOverwatchNodeStakeWeight<T> = StorageValue<_, u128, ValueQuery, DefaultMaxOverwatchNodeStakeWeight>;
 
 
 	/// The pallet's dispatchable functions ([`Call`]s).
