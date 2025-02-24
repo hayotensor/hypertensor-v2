@@ -104,13 +104,9 @@ impl<T: Config> Pallet<T> {
         weight: revealed_weight.unwrap().weight,    
       };
 
-      SubnetBenchmarkReveals2::<T>::mutate(epoch as u32, subnet_id, |weights| {
+      SubnetBenchmarkReveals::<T>::mutate(epoch as u32, subnet_id, |weights| {
         weights.insert(overwatch_node_reveal);
       });
-
-      // SubnetBenchmarkReveals::<T>::mutate(epoch as u32, subnet_id, |weights| {
-      //   weights.insert(stake_balance, revealed_weight.unwrap().weight);
-      // });
     }
     
     Ok(())
@@ -128,14 +124,7 @@ impl<T: Config> Pallet<T> {
     // --- Get final weights for live subnets
     // Get each nodes submission of each subnet
     for subnet_id in subnets {
-      // let mut reveals = match SubnetBenchmarkReveals::<T>::try_get(
-      //   epoch,
-      //   subnet_id, 
-      // ) {
-      //   Ok(reveals) => reveals,
-      //   Err(()) => BTreeMap::new(),
-      // };
-      let mut reveals = match SubnetBenchmarkReveals2::<T>::try_get(
+      let mut reveals = match SubnetBenchmarkReveals::<T>::try_get(
         epoch,
         subnet_id, 
       ) {
@@ -233,7 +222,7 @@ impl<T: Config> Pallet<T> {
     for benchmark in benchmarks.iter() {
       let subnet_id: u32 = *benchmark.0;
 
-      let node_reveals = SubnetBenchmarkReveals2::<T>::get(epoch, subnet_id);
+      let node_reveals = SubnetBenchmarkReveals::<T>::get(epoch, subnet_id);
 
       if node_reveals.is_empty() {
         continue

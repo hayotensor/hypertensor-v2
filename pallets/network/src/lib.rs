@@ -1722,10 +1722,10 @@ pub mod pallet {
 		DefaultSubnetBenchmarkWeightCommitments,
 	>;
 
-	#[pallet::type_value]
-	pub fn DefaultSubnetBenchmarkReveals() -> BTreeMap<u128,u128> {
-		BTreeMap::new()
-	}
+	// #[pallet::type_value]
+	// pub fn DefaultSubnetBenchmarkReveals() -> BTreeMap<u128,u128> {
+	// 	BTreeMap::new()
+	// }
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, PartialOrd, Ord, scale_info::TypeInfo)]
 	pub struct OverwatchNodeReveal<AccountId> {
@@ -1736,13 +1736,13 @@ pub mod pallet {
 	}
 
 	#[pallet::type_value]
-	pub fn DefaultSubnetBenchmarkReveals2<T: Config>() -> BTreeSet<OverwatchNodeReveal<T::AccountId>> {
+	pub fn DefaultSubnetBenchmarkReveals<T: Config>() -> BTreeSet<OverwatchNodeReveal<T::AccountId>> {
 		BTreeSet::new()
 	}
 
 	// epoch -> subnet_id -> {stake,weight}
 	#[pallet::storage]
-	pub type SubnetBenchmarkReveals2<T: Config> = StorageDoubleMap<
+	pub type SubnetBenchmarkReveals<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
@@ -1750,21 +1750,21 @@ pub mod pallet {
 		u32,
 		BTreeSet<OverwatchNodeReveal<T::AccountId>>,
 		ValueQuery,
-		DefaultSubnetBenchmarkReveals2<T>,
+		DefaultSubnetBenchmarkReveals<T>,
 	>;
 
-	// epoch -> subnet_id -> {stake,weight}
-	#[pallet::storage]
-	pub type SubnetBenchmarkReveals<T> = StorageDoubleMap<
-		_,
-		Blake2_128Concat,
-		u32,
-		Identity,
-		u32,
-		BTreeMap<u128,u128>,
-		ValueQuery,
-		DefaultSubnetBenchmarkReveals,
-	>;
+	// // epoch -> subnet_id -> {stake,weight}
+	// #[pallet::storage]
+	// pub type SubnetBenchmarkReveals<T> = StorageDoubleMap<
+	// 	_,
+	// 	Blake2_128Concat,
+	// 	u32,
+	// 	Identity,
+	// 	u32,
+	// 	BTreeMap<u128,u128>,
+	// 	ValueQuery,
+	// 	DefaultSubnetBenchmarkReveals,
+	// >;
 
 	#[pallet::type_value]
 	pub fn DefaultSubnetFinalBenchmarks() -> BTreeMap<u32,u128> {
