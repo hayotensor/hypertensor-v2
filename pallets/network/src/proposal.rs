@@ -21,9 +21,15 @@ impl<T: Config> Pallet<T> {
   pub fn do_propose(
     hotkey: T::AccountId, 
     subnet_id: u32,
+    subnet_node_id: u32,
     peer_id: PeerId,
     data: Vec<u8>,
   ) -> DispatchResult {
+    ensure!(
+      HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone()) == Some(subnet_node_id),
+      Error::<T>::NotUidOwner
+    );
+
     // --- Ensure subnet exists
     let subnet = match SubnetsData::<T>::try_get(subnet_id) {
       Ok(subnet) => subnet,
@@ -34,9 +40,9 @@ impl<T: Config> Pallet<T> {
     let epoch: u64 = block / T::EpochLength::get();
 
     // --- Ensure proposer account has peer and is submittable
-    match SubnetNodesData::<T>::try_get(
+    match SubnetNodesData2::<T>::try_get(
       subnet_id, 
-      hotkey.clone()
+      subnet_node_id
     ) {
       Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Validator, epoch as u64),
       Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
@@ -271,9 +277,15 @@ impl<T: Config> Pallet<T> {
   pub fn do_vote(
     hotkey: T::AccountId, 
     subnet_id: u32,
+    subnet_node_id: u32,
     proposal_id: u32,
     vote: VoteType
   ) -> DispatchResult {
+    ensure!(
+      HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone()) == Some(subnet_node_id),
+      Error::<T>::NotUidOwner
+    );
+
     let proposal = match Proposals::<T>::try_get(subnet_id, proposal_id) {
       Ok(proposal) => proposal,
       Err(()) =>
@@ -293,7 +305,7 @@ impl<T: Config> Pallet<T> {
     // Proposal voters are calculated within ``do_proposal`` as ``eligible_voters`` so we check if they
     // are still nodes
     ensure!(
-      SubnetNodesData::<T>::contains_key(subnet_id, hotkey.clone()),
+      SubnetNodesData2::<T>::contains_key(subnet_id, subnet_node_id),
       Error::<T>::SubnetNodeNotExist
     );
     
@@ -483,7 +495,7 @@ impl<T: Config> Pallet<T> {
     if yays_len > nays_len {
       // --- Plaintiff wins
       // --- Remove defendant
-      Self::perform_remove_subnet_node(block, subnet_id, proposal.defendant);
+      // Self::perform_remove_subnet_node(block, subnet_id, proposal.defendant);
       // --- Return bond
       T::Currency::deposit_creating(&proposal.plaintiff, plaintiff_bond_as_balance.unwrap());
       // --- Distribute bond to voters in consensus

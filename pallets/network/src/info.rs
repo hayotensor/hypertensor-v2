@@ -67,7 +67,7 @@ impl<T: Config> Pallet<T> {
       return None
     }
 
-    SubnetNodesData::<T>::iter_prefix_values(subnet_id)
+    SubnetNodesData2::<T>::iter_prefix_values(subnet_id)
       .find(|x| {
         // Find by ``a``, a unique parameter
         x.a == Some(a.clone())
@@ -78,7 +78,7 @@ impl<T: Config> Pallet<T> {
   pub fn get_consensus_data(
     subnet_id: u32,
     epoch: u32
-  ) -> Option<RewardsData<T::AccountId>> {
+  ) -> Option<RewardsData> {
     let data = SubnetRewardsSubmission::<T>::get(subnet_id, epoch);
     Some(data?)
   }

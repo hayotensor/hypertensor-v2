@@ -238,7 +238,7 @@ pub mod pallet {
   }
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
-	pub struct SubnetNode<AccountId> {
+	pub struct SubnetNode {
     pub account_id: AccountId,
 		pub peer_id: PeerId,
 	}
@@ -246,7 +246,7 @@ pub mod pallet {
   #[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct ActivatePropsParams<AccountId> {
     pub path: Vec<u8>,
-		pub subnet_nodes: Vec<SubnetNode<AccountId>>,
+		pub subnet_nodes: Vec<SubnetNode>,
     pub end_vote_block: u64,
 	}
 
@@ -258,7 +258,7 @@ pub mod pallet {
     pub proposal_type: PropsType, // Activation or Deactivation
     pub path: Vec<u8>, // path for downloading subnet used in subnet, can be anything (HuggingFace, IPFS, etc.)
     pub subnet_data: RegistrationSubnetData,
-		pub subnet_nodes: Vec<SubnetNode<AccountId>>,
+		pub subnet_nodes: Vec<SubnetNode>,
     pub subnet_nodes_verified: BTreeSet<AccountId>,
     pub subnet_nodes_bonded: BTreeMap<AccountId, u128>,
     pub start_block: u64, // used for data only, not in logic
@@ -269,7 +269,7 @@ pub mod pallet {
   // #[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	// pub struct DeactivatePropsParams<AccountId> {
   //   pub path: Vec<u8>,
-	// 	pub subnet_nodes: Vec<SubnetNode<AccountId>>,
+	// 	pub subnet_nodes: Vec<SubnetNode>,
 	// }
 
   #[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
@@ -290,7 +290,7 @@ pub mod pallet {
 		T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap()
 	}
 	#[pallet::type_value]
-	pub fn DefaultSubnetNode<T: Config>() -> SubnetNode<T::AccountId> {
+	pub fn DefaultSubnetNode<T: Config>() -> SubnetNode {
 		return SubnetNode {
 			account_id: T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
 			peer_id: PeerId(Vec::new()),
@@ -535,7 +535,7 @@ pub mod pallet {
     pub fn propose(
       origin: OriginFor<T>, 
       subnet_data: RegistrationSubnetData,
-      mut subnet_nodes: Vec<SubnetNode<T::AccountId>>,
+      mut subnet_nodes: Vec<SubnetNode>,
       proposal_type: PropsType
     ) -> DispatchResult {
       let account_id: T::AccountId = ensure_signed(origin)?;
@@ -970,12 +970,12 @@ pub mod pallet {
 
       // Get account match
       let mut is_subnet_node = false;
-      for subnet_node in proposal.subnet_nodes {
-        if subnet_node.hotkey == account_id {
-          is_subnet_node = true;
-          break;
-        }
-      }
+      // for subnet_node in proposal.subnet_nodes {
+      //   if subnet_node.hotkey == account_id {
+      //     is_subnet_node = true;
+      //     break;
+      //   }
+      // }
 
       ensure!(
         is_subnet_node,
@@ -1048,12 +1048,12 @@ pub mod pallet {
 
       // Get account match
       let mut is_subnet_node = false;
-      for subnet_node in proposal.subnet_nodes {
-        if subnet_node.hotkey == account_id {
-          is_subnet_node = true;
-          break;
-        }
-      }
+      // for subnet_node in proposal.subnet_nodes {
+      //   if subnet_node.hotkey == account_id {
+      //     is_subnet_node = true;
+      //     break;
+      //   }
+      // }
 
       ensure!(
         is_subnet_node,
@@ -1132,12 +1132,12 @@ pub mod pallet {
 
       // Get account match
       let mut is_subnet_node = false;
-      for subnet_node in proposal.subnet_nodes {
-        if subnet_node.hotkey == account_id {
-          is_subnet_node = true;
-          break;
-        }
-      }
+      // for subnet_node in proposal.subnet_nodes {
+      //   if subnet_node.hotkey == account_id {
+      //     is_subnet_node = true;
+      //     break;
+      //   }
+      // }
 
       ensure!(
         is_subnet_node,
@@ -1194,7 +1194,7 @@ pub mod pallet {
 
 // impl<T: Config + pallet::Config> Pallet<T> {
 impl<T: Config> Pallet<T> {
-  fn try_propose_activate(account_id: T::AccountId, subnet_data: RegistrationSubnetData, mut subnet_nodes: Vec<SubnetNode<T::AccountId>>) -> DispatchResult {
+  fn try_propose_activate(account_id: T::AccountId, subnet_data: RegistrationSubnetData, mut subnet_nodes: Vec<SubnetNode>) -> DispatchResult {
     // --- Ensure path doesn't already exist in Network or SubnetVoting
     // If it doesn't already exist, then it has either been not proposed or deactivated
     ensure!(
@@ -1407,7 +1407,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  fn validate_peers(subnet_nodes: Vec<SubnetNode<T::AccountId>>) -> DispatchResult {
+  fn validate_peers(subnet_nodes: Vec<SubnetNode>) -> DispatchResult {
     Ok(())
   }
 

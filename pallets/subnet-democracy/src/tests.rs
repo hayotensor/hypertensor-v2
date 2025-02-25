@@ -180,7 +180,7 @@ fn build_existing_subnet(start: u32, end: u32) {
 
 }
 
-fn build_subnet_nodes(start: u32, end: u32, deposit_amount: u128) -> Vec<SubnetNode<AccountId>> {
+fn build_subnet_nodes(start: u32, end: u32, deposit_amount: u128) -> Vec<SubnetNode> {
   let mut subnet_nodes: Vec<SubnetNode<<Test as frame_system::Config>::AccountId>> = Vec::new();
   
   for n in start..end {

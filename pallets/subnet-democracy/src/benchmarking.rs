@@ -88,8 +88,8 @@ fn funded_account<T: Config>(name: &'static str, index: u32) -> T::AccountId {
 	caller
 }
 
-fn build_subnet_nodes<T: Config>(start: u32, end: u32, deposit_amount: u128) -> Vec<SubnetNode<T::AccountId>> {
-  let mut subnet_nodes: Vec<SubnetNode<T::AccountId>> = Vec::new();
+fn build_subnet_nodes<T: Config>(start: u32, end: u32, deposit_amount: u128) -> Vec<SubnetNode> {
+  let mut subnet_nodes: Vec<SubnetNode> = Vec::new();
   
   for n in start..end {
     let _ = T::Currency::deposit_creating(&funded_account::<T>("voter", n), deposit_amount.try_into().ok().expect("REASON"));
