@@ -64,7 +64,7 @@ impl<T: Config> Pallet<T> {
   
   pub fn is_subnet_node_eligible(subnet_node: u32, subnet_node_id: u32) -> bool {
     let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get();
-    let penalties = SubnetNodePenalties2::<T>::get(subnet_node, subnet_node_id);
+    let penalties = SubnetNodePenalties::<T>::get(subnet_node, subnet_node_id);
     penalties <= max_subnet_node_penalties
   }
 
@@ -113,7 +113,7 @@ impl<T: Config> Pallet<T> {
   pub fn perform_remove_subnet_node(block: u64, subnet_id: u32, subnet_node_id: u32) {
     // Take and remove SubnetNodesData hotkey as key
     // `take()` returns and removes data
-    if let Ok(subnet_node) = SubnetNodesData2::<T>::try_get(subnet_id, subnet_node_id) {
+    if let Ok(subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, subnet_node_id) {
       let hotkey = subnet_node.hotkey;
       let peer_id = subnet_node.peer_id;
 
@@ -130,7 +130,7 @@ impl<T: Config> Pallet<T> {
           let params = if let Some(params) = params {
             // --- Remove from consensus
             let mut data = &mut params.data;
-            data.retain(|x| x.uid != subnet_node_id);
+            data.retain(|x| x.peer_id != peer_id);
             params.data = data.clone();
             
             // --- Remove from attestations
@@ -143,15 +143,14 @@ impl<T: Config> Pallet<T> {
         }
       );
     
-      let subnet_node = SubnetNodesData::<T>::take(subnet_id, hotkey.clone());
+      let subnet_node = SubnetNodesData::<T>::take(subnet_id, subnet_node_id);
 
       if subnet_node.a.is_some() {
         SubnetNodeUniqueParam::<T>::remove(subnet_id, subnet_node.a.unwrap())
       }
 
       // Remove SubnetNodeAccount peer_id as key
-      // SubnetNodeAccount::<T>::remove(subnet_id, peer_id.clone());
-      SubnetNodeAccount2::<T>::remove(subnet_id, peer_id.clone());
+      SubnetNodeAccount::<T>::remove(subnet_id, peer_id.clone());
       HotkeySubnetNodeId::<T>::remove(subnet_id, hotkey.clone());
 
       // Update total subnet peers by substracting 1
@@ -159,7 +158,7 @@ impl<T: Config> Pallet<T> {
       TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
 
       // Reset sequential absent subnet node count
-      SubnetNodePenalties2::<T>::remove(subnet_id, subnet_node_id);
+      SubnetNodePenalties::<T>::remove(subnet_id, subnet_node_id);
 
 			Self::deposit_event(Event::SubnetNodeRemoved { subnet_id: subnet_id, account_id: hotkey });
     }
@@ -420,26 +419,30 @@ impl<T: Config> Pallet<T> {
     min_subnet_delegate_stake_balance
   }
 
-  pub fn get_classified_subnet_node_ids(
-    subnet_id: u32, 
-    classification: &SubnetNodeClass, 
-    epoch: u64
-  ) -> Vec<u32> {
-    SubnetNodesData2::<T>::iter_prefix(subnet_id)
+  pub fn get_classified_subnet_node_ids<C>(
+    subnet_id: u32,
+    classification: &SubnetNodeClass,
+    epoch: u64,
+  ) -> C
+    where
+      C: FromIterator<u32>,
+  {
+    SubnetNodesData::<T>::iter_prefix(subnet_id)
       .filter(|(_, subnet_node)| subnet_node.has_classification(classification, epoch))
       .map(|(subnet_node_id, _)| subnet_node_id)
       .collect()
   }
 
+  
   /// Get subnet nodes by classification
   pub fn get_classified_subnet_nodes(subnet_id: u32, classification: &SubnetNodeClass, epoch: u64) -> Vec<SubnetNode<T::AccountId>> {
-    SubnetNodesData2::<T>::iter_prefix_values(subnet_id)
+    SubnetNodesData::<T>::iter_prefix_values(subnet_id)
       .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
       .collect()
   }
 
   pub fn get_classified_subnet_node_info(subnet_id: u32, classification: &SubnetNodeClass, epoch: u64) -> Vec<SubnetNodeInfo<T::AccountId>> {
-    SubnetNodesData2::<T>::iter_prefix(subnet_id)
+    SubnetNodesData::<T>::iter_prefix(subnet_id)
       .filter(|(subnet_node_id, subnet_node)| subnet_node.has_classification(classification, epoch))
       .map(|(subnet_node_id, subnet_node)| {
         SubnetNodeInfo {
@@ -463,12 +466,12 @@ impl<T: Config> Pallet<T> {
   {
     SubnetNodesData::<T>::iter_prefix(subnet_id)
       .filter(|(_, subnet_node)| subnet_node.has_classification(classification, epoch))
-      .map(|(hotkey, _)| hotkey)
+      .map(|(_, subnet_node)| subnet_node.hotkey)
       .collect()
   }
 
   pub fn is_subnet_node_owner(subnet_id: u32, subnet_node_id: u32, hotkey: T::AccountId) -> bool {
-    match SubnetNodesData2::<T>::try_get(subnet_id, subnet_node_id) {
+    match SubnetNodesData::<T>::try_get(subnet_id, subnet_node_id) {
       Ok(data) => {
         data.hotkey == hotkey
       },

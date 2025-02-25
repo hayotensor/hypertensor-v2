@@ -26,13 +26,13 @@ impl<T: Config> Pallet<T> {
     block: u64, 
     epoch_length: u64,
     epoch: u32,
-    mut data: Vec<SubnetNodeIncentives>,
+    mut data: Vec<SubnetNodeData>,
     args: Option<BoundedVec<u8, DefaultValidatorArgsLimit>>,
   ) -> DispatchResultWithPostInfo {
     // TODO: Add max sum to avoid overflow
 
     // --- Ensure current subnet validator by its hotkey
-    let validator_id = SubnetRewardsValidator2::<T>::get(subnet_id, epoch).ok_or(Error::<T>::InvalidValidator)?;
+    let validator_id = SubnetRewardsValidator::<T>::get(subnet_id, epoch).ok_or(Error::<T>::InvalidValidator)?;
 
     // --- If hotkey is hotkey, ensure it matches validator, otherwise if coldkey -> get hotkey
     ensure!(
@@ -47,14 +47,14 @@ impl<T: Config> Pallet<T> {
     );
 
     // Remove duplicates based on peer_id
-    data.dedup_by(|a, b| a.uid == b.uid);
+    data.dedup_by(|a, b| a.peer_id == b.peer_id);
 
     // Remove idle classified entries
     // Each peer must have an inclusion classification at minimum
     data.retain(|x| {
-      match SubnetNodesData2::<T>::try_get(
+      match SubnetNodesData::<T>::try_get(
         subnet_id, 
-        x.uid
+        SubnetNodeAccount::<T>::get(subnet_id, &x.peer_id)
       ) {
         Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Included, epoch as u64),
         Err(()) => false,
@@ -67,7 +67,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Get count of eligible nodes that can be submitted for consensus rewards
     // This is the maximum amount of nodes that can be entered
-    let included_nodes = Self::get_classified_subnet_node_ids(subnet_id, &SubnetNodeClass::Included, epoch as u64);
+    let included_nodes: Vec<u32> = Self::get_classified_subnet_node_ids(subnet_id, &SubnetNodeClass::Included, epoch as u64);
     let included_nodes_count = included_nodes.len();
 
     // --- Ensure data isn't greater than current registered subnet peers
@@ -120,7 +120,7 @@ impl<T: Config> Pallet<T> {
     };
 
     // --- Ensure node classified to attest
-    match SubnetNodesData2::<T>::try_get(
+    match SubnetNodesData::<T>::try_get(
       subnet_id, 
       subnet_node_id
     ) {
@@ -164,7 +164,7 @@ impl<T: Config> Pallet<T> {
     
     // Redundant
     // If validator already chosen, then return
-    if let Ok(validator_id) = SubnetRewardsValidator2::<T>::try_get(subnet_id, epoch) {
+    if let Ok(validator_id) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
       return
     }
 
@@ -183,7 +183,7 @@ impl<T: Config> Pallet<T> {
     let validator: &u32 = &subnet_node_ids[rand_index as usize];
 
     // --- Insert validator for next epoch
-    SubnetRewardsValidator2::<T>::insert(subnet_id, epoch, validator);
+    SubnetRewardsValidator::<T>::insert(subnet_id, epoch, validator);
   }
 
   /// Return the validators reward that submitted data on the previous epoch
@@ -230,8 +230,8 @@ impl<T: Config> Pallet<T> {
     );
 
     // --- Increase validator penalty count
-    let penalties = SubnetNodePenalties2::<T>::get(subnet_id, subnet_node_id);
-    SubnetNodePenalties2::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
+    let penalties = SubnetNodePenalties::<T>::get(subnet_id, subnet_node_id);
+    SubnetNodePenalties::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
 
     // --- Ensure maximum sequential removal consensus threshold is reached
     if penalties + 1 > MaxSubnetNodePenalties::<T>::get() {
@@ -249,26 +249,5 @@ impl<T: Config> Pallet<T> {
       }
     );
 
-  }
-
-  /// Increase a subnet nodes classification
-  // Nodes that enter before the activation of a subnet are automatically Validator, otherwise
-  // on entry they are classified as `Idle`
-  // After `x` epochs, they can increase their classification to `Inclusion`
-  //    - This is used as a way for subnets nodes to do preliminary events before they are ready to be included in
-  pub fn increase_classification(subnet_id: u32, account_id: T::AccountId) -> DispatchResult {
-    let subnet_node = match SubnetNodesData::<T>::try_get(subnet_id, account_id) {
-      Ok(subnet_node) => subnet_node,
-      Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
-    };
-
-    // --- Get classification
-
-    // --- Get `x` required epochs to increase classification
-
-    // --- Check the most recent `x` count of epochs
-
-    // -- Must be in included `x` epochs
-    Ok(())
   }
 }

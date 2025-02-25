@@ -135,7 +135,7 @@ impl<T: Config> Pallet<T> {
         let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
     
         // --- Reward validators
-        for (subnet_node_id, subnet_node) in SubnetNodesData2::<T>::iter_prefix(subnet_id) {
+        for (subnet_node_id, subnet_node) in SubnetNodesData::<T>::iter_prefix(subnet_id) {
           let hotkey: T::AccountId = SubnetNodeIdHotkey::<T>::get(subnet_id, subnet_node_id).expect("s");
 
           // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
@@ -150,7 +150,7 @@ impl<T: Config> Pallet<T> {
           } else if subnet_node.classification.class == SubnetNodeClass::Idle {
             // If not, upgrade classification and continue
             // --- Upgrade to included
-            SubnetNodesData2::<T>::mutate(
+            SubnetNodesData::<T>::mutate(
               subnet_id,
               subnet_node_id,
               |params: &mut SubnetNode<T::AccountId>| {
@@ -167,11 +167,11 @@ impl<T: Config> Pallet<T> {
 
           let peer_id: PeerId = subnet_node.peer_id;
 
-          let mut subnet_node_data: SubnetNodeIncentives = SubnetNodeIncentives::default();
+          let mut subnet_node_data: SubnetNodeData = SubnetNodeData::default();
 
           // --- Confirm if ``peer_id`` is present in validator data
-          let subnet_node_data_find: Option<(usize, &SubnetNodeIncentives)> = submission.data.iter().enumerate().find(
-            |&x| x.1.uid == subnet_node_id
+          let subnet_node_data_find: Option<(usize, &SubnetNodeData)> = submission.data.iter().enumerate().find(
+            |&x| x.1.peer_id == peer_id
           );
           
           // --- If subnet_node_id is present in validator data
@@ -182,14 +182,14 @@ impl<T: Config> Pallet<T> {
             submission.data.remove(subnet_node_data_find.unwrap().0);
           }
 
-          let penalties = SubnetNodePenalties2::<T>::get(subnet_id, subnet_node_id);
+          let penalties = SubnetNodePenalties::<T>::get(subnet_id, subnet_node_id);
 
           // --- If node not validated and consensus reached:
           //      otherwise, increment penalty score only
           //      remove them if max penalties threshold is reached
           if !validated {
             // --- Mutate nodes penalties count if not in consensus
-            SubnetNodePenalties2::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
+            SubnetNodePenalties::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
 
             // --- To be removed or increase absent count, the consensus threshold must be reached
             if attestation_percentage > node_attestation_removal_threshold {
@@ -218,7 +218,7 @@ impl<T: Config> Pallet<T> {
           let is_included = subnet_node.classification.class == SubnetNodeClass::Included;
           if is_included && penalties == 0 {
             // --- Upgrade to Validator
-            SubnetNodesData2::<T>::mutate(
+            SubnetNodesData::<T>::mutate(
               subnet_id,
               subnet_node_id,
               |params: &mut SubnetNode<T::AccountId>| {
@@ -231,7 +231,7 @@ impl<T: Config> Pallet<T> {
             continue
           } else if is_included && penalties != 0 {
             // --- Decrease subnet node penalty count by one if in consensus and attested consensus
-            SubnetNodePenalties2::<T>::mutate(subnet_id, subnet_node_id, |n: &mut u32| n.saturating_dec());
+            SubnetNodePenalties::<T>::mutate(subnet_id, subnet_node_id, |n: &mut u32| n.saturating_dec());
             continue
           }
 
@@ -248,7 +248,7 @@ impl<T: Config> Pallet<T> {
           if !submission.attests.contains_key(&subnet_node_id) {
             if attestation_percentage > min_vast_majority_attestation_percentage {
               // --- Penalize on vast majority only
-              SubnetNodePenalties2::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
+              SubnetNodePenalties::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
             }  
             continue
           }
@@ -260,7 +260,7 @@ impl<T: Config> Pallet<T> {
           // --- Decrease subnet node penalty count by one if in consensus and attested consensus
           // Don't hit the storage unless we have to
           if penalties != 0 {
-            SubnetNodePenalties2::<T>::mutate(subnet_id, subnet_node_id, |n: &mut u32| n.saturating_dec());
+            SubnetNodePenalties::<T>::mutate(subnet_id, subnet_node_id, |n: &mut u32| n.saturating_dec());
           }
 
           // --- Calculate score percentage of peer versus sum
@@ -295,7 +295,7 @@ impl<T: Config> Pallet<T> {
 
         // --- Increment down subnet penalty score on successful epochs
         SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
-      } else if let Ok(validator_id) = SubnetRewardsValidator2::<T>::try_get(subnet_id, epoch) {
+      } else if let Ok(validator_id) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
         // --- If a validator has been chosen that means they are supposed to be submitting consensus data
         // --- If there is no submission but validator chosen, increase penalty on subnet and validator
         // --- Increase the penalty count for the subnet

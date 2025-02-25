@@ -679,7 +679,7 @@ pub mod pallet {
 	pub struct RewardsData {
 		pub validator_id: u32, // Chosen validator of the epoch
 		pub attests: BTreeMap<u32, u64>, // Count of attestations of the submitted data
-		pub data: Vec<SubnetNodeIncentives>, // Data submitted by chosen validator
+		pub data: Vec<SubnetNodeData>, // Data submitted by chosen validator
 		pub args: Option<BoundedVec<u8, DefaultValidatorArgsLimit>>, // Optional arguements to pass for subnet to validate
 	}
 
@@ -734,20 +734,20 @@ pub mod pallet {
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
-	pub struct VoteParams<AccountId> {
-		pub yay: BTreeSet<AccountId>,
-		pub nay: BTreeSet<AccountId>,
+	pub struct VoteParams {
+		pub yay: BTreeSet<u32>,
+		pub nay: BTreeSet<u32>,
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
-	pub struct ProposalParams<AccountId> {
+	pub struct ProposalParams {
 		pub subnet_id: u32,
-		pub plaintiff: AccountId,
-		pub defendant: AccountId,
+		pub plaintiff_id: u32,
+		pub defendant_id: u32,
 		pub plaintiff_bond: u128,
 		pub defendant_bond: u128,
-		pub eligible_voters: BTreeSet<AccountId>, // Those eligible to vote at time of the proposal
-		pub votes: VoteParams<AccountId>,
+		pub eligible_voters: BTreeSet<u32>, // Those eligible to vote at time of the proposal
+		pub votes: VoteParams,
 		pub start_block: u64,
 		pub challenge_block: u64,
 		pub plaintiff_data: Vec<u8>,
@@ -1157,49 +1157,22 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type SubnetNodeIdHotkey<T: Config> = StorageDoubleMap<_, Identity, u32, Identity, u32, T::AccountId, OptionQuery>;
 	
-	#[pallet::storage] // subnet_id --> account_id --> data
-	#[pallet::getter(fn subnet_nodes)]
+	#[pallet::storage] // subnet_id --> uid --> data
+	#[pallet::getter(fn subnet_nodes2)]
 	pub type SubnetNodesData<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
 		Identity,
-		T::AccountId,
-		SubnetNode<T::AccountId>,
-		ValueQuery,
-		DefaultSubnetNode<T>,
-	>;
-
-	#[pallet::storage] // subnet_id --> uid --> data
-	#[pallet::getter(fn subnet_nodes2)]
-	pub type SubnetNodesData2<T: Config> = StorageDoubleMap<
-		_,
-		Blake2_128Concat,
-		u32,
-		Identity,
 		u32,
 		SubnetNode<T::AccountId>,
 		ValueQuery,
 		DefaultSubnetNode<T>,
-	>;
-
-	// Used for unique peer_ids
-	#[pallet::storage] // subnet_id --> peer_id --> account_id
-	#[pallet::getter(fn subnet_node_account)]
-	pub type SubnetNodeAccount<T: Config> = StorageDoubleMap<
-		_,
-		Blake2_128Concat,
-		u32,
-		Identity,
-		PeerId,
-		T::AccountId,
-		ValueQuery,
-		DefaultAccountId<T>,
 	>;
 
 	#[pallet::storage] // subnet_id --> peer_id --> subnet_node_id
 	#[pallet::getter(fn subnet_node_account2)]
-	pub type SubnetNodeAccount2<T: Config> = StorageDoubleMap<
+	pub type SubnetNodeAccount<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
@@ -1286,7 +1259,7 @@ pub mod pallet {
 	//
 
 	#[pallet::storage] // subnet ID => epoch  => subnet node ID
-	pub type SubnetRewardsValidator2<T: Config> = StorageDoubleMap<
+	pub type SubnetRewardsValidator<T: Config> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
@@ -1345,7 +1318,7 @@ pub mod pallet {
 	// If subnet node is absent from inclusion in consensus information or attestings, or validator data isn't attested
 	// We don't count penalties per account because a user can bypass this by having multiple accounts
 	#[pallet::storage]
-	pub type SubnetNodePenalties2<T> = StorageDoubleMap<
+	pub type SubnetNodePenalties<T> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
@@ -1501,11 +1474,11 @@ pub mod pallet {
 	// Props
 	//
 	#[pallet::type_value]
-	pub fn DefaultProposalParams<T: Config>() -> ProposalParams<T::AccountId> {
+	pub fn DefaultProposalParams<T: Config>() -> ProposalParams {
 		return ProposalParams {
 			subnet_id: 0,
-			plaintiff: T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
-			defendant: T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+			plaintiff_id: 0,
+			defendant_id: 0,
 			plaintiff_bond: 0,
 			defendant_bond: 0,
 			eligible_voters: BTreeSet::new(),
@@ -1522,13 +1495,13 @@ pub mod pallet {
 	}
 
 	#[pallet::storage] // subnet => proposal_id => proposal
-	pub type Proposals<T: Config> = StorageDoubleMap<
+	pub type Proposals<T> = StorageDoubleMap<
 		_,
 		Blake2_128Concat,
 		u32,
 		Identity,
 		u32,
-		ProposalParams<T::AccountId>,
+		ProposalParams,
 		ValueQuery,
 		DefaultProposalParams<T>,
 	>;
@@ -1802,9 +1775,14 @@ pub mod pallet {
 			subnet_id: u32, 
 			subnet_node_id: u32,
 		) -> DispatchResult {
-			let account_id: T::AccountId = ensure_signed(origin)?;
+			let hotkey: T::AccountId = ensure_signed(origin)?;
 
-			Self::do_remove_subnet_node(subnet_node_id, subnet_id)
+			ensure!(
+				HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone()) == Some(subnet_node_id),
+				Error::<T>::NotUidOwner
+			);
+
+			Self::do_remove_subnet_node(subnet_id, subnet_node_id)
 		}
 
 		/// Remove a subnet peer that has surpassed the max penalties allowed
@@ -1873,7 +1851,6 @@ pub mod pallet {
 		pub fn remove_stake(
 			origin: OriginFor<T>, 
 			subnet_id: u32, 
-			// subnet_node_id: u32,
 			hotkey: T::AccountId,
 			stake_to_be_removed: u128
 		) -> DispatchResult {
@@ -1882,7 +1859,7 @@ pub mod pallet {
 			// If account is a peer they can remove stake up to minimum required stake balance
 			// Else they can remove entire balance because they are not hosting subnets according to consensus
 			//		They are removed in `do_remove_subnet_node()` when self or consensus removed
-			// let is_subnet_node: bool = match SubnetNodesData2::<T>::try_get(subnet_id, subnet_node_id) {
+			// let is_subnet_node: bool = match SubnetNodesData::<T>::try_get(subnet_id, subnet_node_id) {
 			// 	Ok(_) => true,
 			// 	Err(()) => false,
 			// };
@@ -2061,10 +2038,10 @@ pub mod pallet {
 		pub fn validate(
 			origin: OriginFor<T>, 
 			subnet_id: u32,
-			data: Vec<SubnetNodeIncentives>,
+			data: Vec<SubnetNodeData>,
 			args: Option<BoundedVec<u8, DefaultValidatorArgsLimit>>,
 		) -> DispatchResultWithPostInfo {
-			let account_id: T::AccountId = ensure_signed(origin)?;
+			let hotkey: T::AccountId = ensure_signed(origin)?;
 
 			let block: u64 = Self::get_current_block_as_u64();
 			let epoch_length: u64 = T::EpochLength::get();
@@ -2072,7 +2049,7 @@ pub mod pallet {
 
 			Self::do_validate(
 				subnet_id, 
-				account_id,
+				hotkey,
 				block,
 				epoch_length,
 				epoch as u32,
@@ -2087,7 +2064,7 @@ pub mod pallet {
 			origin: OriginFor<T>, 
 			subnet_id: u32,
 			) -> DispatchResultWithPostInfo {
-			let account_id: T::AccountId = ensure_signed(origin)?;
+			let hotkey: T::AccountId = ensure_signed(origin)?;
 
 			let block: u64 = Self::get_current_block_as_u64();
 			let epoch_length: u64 = T::EpochLength::get();
@@ -2095,7 +2072,7 @@ pub mod pallet {
 
 			Self::do_attest(
 				subnet_id, 
-				account_id,
+				hotkey,
 				block, 
 				epoch_length,
 				epoch as u32,
@@ -2147,6 +2124,7 @@ pub mod pallet {
 		pub fn cancel_proposal(
 			origin: OriginFor<T>, 
 			subnet_id: u32,
+			subnet_node_id: u32,
 			proposal_id: u32,
 		) -> DispatchResult {
 			let account_id: T::AccountId = ensure_signed(origin)?;
@@ -2154,6 +2132,7 @@ pub mod pallet {
 			Self::do_cancel_proposal(
 				account_id,
 				subnet_id,
+				subnet_node_id,
 				proposal_id,
 			)
 		}
@@ -2232,7 +2211,7 @@ pub mod pallet {
 				Error::<T>::SubnetNodeUniqueParamTaken
 			);
 
-			SubnetNodesData2::<T>::try_mutate_exists(
+			SubnetNodesData::<T>::try_mutate_exists(
 				subnet_id,
 				subnet_node_id,
 				|maybe_params| -> DispatchResult {
@@ -2282,7 +2261,7 @@ pub mod pallet {
 				Error::<T>::SubnetNodeNonUniqueParamMustBeSome
 			);
 
-			SubnetNodesData2::<T>::try_mutate_exists(
+			SubnetNodesData::<T>::try_mutate_exists(
 				subnet_id,
 				subnet_node_id,
 				|maybe_params| -> DispatchResult {
@@ -2320,13 +2299,12 @@ pub mod pallet {
 
 						// Update SubnetStakeUnbondingLedger
 						for (subnet_id, ledger_tree) in SubnetStakeUnbondingLedger::<T>::iter_prefix(curr_coldkey.clone()) {
-							// Insert under new key1
-							SubnetStakeUnbondingLedger::<T>::insert(&new_coldkey, subnet_id, ledger_tree);
-							
 							// Remove from old key1
 							SubnetStakeUnbondingLedger::<T>::remove(&curr_coldkey, subnet_id);
-						}
 
+							// Insert under new key1
+							SubnetStakeUnbondingLedger::<T>::insert(&new_coldkey, subnet_id, ledger_tree);
+						}
 						Ok(())
 					},
 					// --- Revert from here if not exist
@@ -2375,7 +2353,7 @@ pub mod pallet {
 					SubnetNodeIdHotkey::<T>::insert(subnet_id, subnet_node_owner.1, new_hotkey.clone());
 
 					HotkeySubnetNodeId::<T>::swap(subnet_id, old_hotkey.clone(), subnet_id, new_hotkey.clone());
-					SubnetNodesData2::<T>::try_mutate_exists(
+					SubnetNodesData::<T>::try_mutate_exists(
 						subnet_id,
 						subnet_node_owner.1,
 						|maybe_params| -> DispatchResult {
@@ -2605,11 +2583,11 @@ pub mod pallet {
 
 			// Remove all peers data
 			let _ = SubnetNodesData::<T>::clear_prefix(subnet_id, u32::MAX, None);
-			let _ = SubnetNodesData2::<T>::clear_prefix(subnet_id, u32::MAX, None);
 			let _ = TotalSubnetNodes::<T>::remove(subnet_id);
 			let _ = SubnetNodeAccount::<T>::clear_prefix(subnet_id, u32::MAX, None);
-			let _ = SubnetNodeAccount2::<T>::clear_prefix(subnet_id, u32::MAX, None);
 			let _ = SubnetNodeUniqueParam::<T>::clear_prefix(subnet_id, u32::MAX, None);
+			let _ = HotkeySubnetNodeId::<T>::clear_prefix(subnet_id, u32::MAX, None);
+			let _ = SubnetNodeIdHotkey::<T>::clear_prefix(subnet_id, u32::MAX, None);
 
 			// Remove all subnet consensus data
 			let _ = SubnetPenaltyCount::<T>::remove(subnet_id);
@@ -2689,7 +2667,7 @@ pub mod pallet {
 			// Unique subnet_id -> AccountId
 			// Ensure account doesn't already have a peer within subnet
 			ensure!(
-				!SubnetNodesData::<T>::contains_key(subnet_id, hotkey.clone()),
+				!HotkeySubnetNodeId::<T>::contains_key(subnet_id, hotkey.clone()),
 				Error::<T>::SubnetNodeExist
 			);
 
@@ -2705,11 +2683,7 @@ pub mod pallet {
 
 			// Unique subnet_id -> PeerId
 			// Ensure peer ID doesn't already exist within subnet regardless of coldkey
-			// match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
-			// 	Ok(_) => return Err(Error::<T>::PeerIdExist.into()),
-			// 	Err(()) => (),
-			// };
-			match SubnetNodeAccount2::<T>::try_get(subnet_id, peer_id.clone()) {
+			match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
 				Ok(_) => return Err(Error::<T>::PeerIdExist.into()),
 				Err(()) => (),
 			};
@@ -2761,24 +2735,24 @@ pub mod pallet {
 				c: c,
 			};
 
-			let last_uid = TotalSubnetNodeUids::<T>::get(subnet_id);
-			let subnet_node_id = last_uid + 1;
-			TotalSubnetNodeUids::<T>::insert(subnet_id, subnet_node_id);
+			let uid = TotalSubnetNodeUids::<T>::get(subnet_id);
 
-			HotkeySubnetNodeId::<T>::insert(subnet_id, hotkey.clone(), subnet_node_id);
+			HotkeySubnetNodeId::<T>::insert(subnet_id, hotkey.clone(), uid);
 
 			// Insert subnet node ID -> hotkey
-			SubnetNodeIdHotkey::<T>::insert(subnet_id, subnet_node_id, hotkey.clone());
+			SubnetNodeIdHotkey::<T>::insert(subnet_id, uid, hotkey.clone());
 
 			// Insert hotkey -> coldkey
 			HotkeyOwner::<T>::insert(hotkey.clone(), coldkey.clone());
 			
 			// Insert SubnetNodesData with hotkey as key
-			SubnetNodesData2::<T>::insert(subnet_id, subnet_node_id, subnet_node);
+			SubnetNodesData::<T>::insert(subnet_id, uid, subnet_node);
 
 			// Insert subnet peer account to keep peer_ids unique within subnets
-			// SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), hotkey.clone());
-			SubnetNodeAccount2::<T>::insert(subnet_id, peer_id.clone(), subnet_node_id);
+			SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), uid);
+
+			let next_uid = uid + 1;
+			TotalSubnetNodeUids::<T>::insert(subnet_id, next_uid);
 
 			// Increase total subnet peers
 			TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
@@ -2823,7 +2797,7 @@ pub mod pallet {
 				Error::<T>::SubnetMustBeRegisteringOrActivated
 			);
 
-			SubnetNodesData2::<T>::try_mutate_exists(
+			SubnetNodesData::<T>::try_mutate_exists(
 				subnet_id,
 				subnet_node_id,
 				|maybe_params| -> DispatchResult {
@@ -2891,7 +2865,7 @@ pub mod pallet {
 			let block: u64 = Self::get_current_block_as_u64();
 			let epoch: u64 = block / epoch_length;
 
-			let subnet_node = match SubnetNodesData2::<T>::try_get(subnet_id, subnet_node_id) {
+			let subnet_node = match SubnetNodesData::<T>::try_get(subnet_id, subnet_node_id) {
 				Ok(subnet_node) => {
 					ensure!(
 						subnet_node.classification.class >= SubnetNodeClass::Validator,
@@ -2916,7 +2890,7 @@ pub mod pallet {
 					is_attestor
 				},
         Err(()) => {
-					let is_validator: bool = match SubnetRewardsValidator2::<T>::try_get(subnet_id, epoch as u32) {
+					let is_validator: bool = match SubnetRewardsValidator::<T>::try_get(subnet_id, epoch as u32) {
 						Ok(validator_id) => {
 							let mut is_validator = false;
 							if subnet_node_id == validator_id {
@@ -2952,7 +2926,7 @@ pub mod pallet {
 				return Ok(())
 			}
 
-			SubnetNodesData2::<T>::try_mutate_exists(
+			SubnetNodesData::<T>::try_mutate_exists(
 				subnet_id,
 				subnet_node_id,
 				|maybe_params| -> DispatchResult {
@@ -3011,7 +2985,7 @@ pub mod pallet {
 				// --- If subnet and subnet node exists, otherwise pass and remove set
 				if subnet_ids.get(&subnet_id) != None {
 					let subnet_node_id = data.subnet_node_id;
-					SubnetNodesData2::<T>::try_mutate_exists(
+					SubnetNodesData::<T>::try_mutate_exists(
 						subnet_id,
 						subnet_node_id,
 						|maybe_params| -> DispatchResult {
@@ -3268,7 +3242,6 @@ pub mod pallet {
 			// 	};
 
 			// 	let subnet_node: SubnetNode<T::AccountId> = SubnetNode {
-			// 		coldkey: account_id.clone(),
 			// 		hotkey: account_id.clone(),
 			// 		peer_id: peer_id.clone(),
 			// 		initialized: 0,
@@ -3282,7 +3255,7 @@ pub mod pallet {
 			// 	SubnetNodesData::<T>::insert(subnet_id, account_id.clone(), subnet_node);
 
 			// 	// Insert subnet peer account to keep peer_ids unique within subnets
-			// 	SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), account_id.clone());
+			// 	SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), 1);
 
 			// 	// Increase total subnet peers
 			// 	TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);

@@ -67,7 +67,7 @@ impl<T: Config> Pallet<T> {
       return None
     }
 
-    SubnetNodesData2::<T>::iter_prefix_values(subnet_id)
+    SubnetNodesData::<T>::iter_prefix_values(subnet_id)
       .find(|x| {
         // Find by ``a``, a unique parameter
         x.a == Some(a.clone())
@@ -83,6 +83,14 @@ impl<T: Config> Pallet<T> {
     Some(data?)
   }
 
+  // pub fn get_incentives_data(
+  //   subnet_id: u32,
+  //   epoch: u32
+  // ) -> Option<RewardsData> {
+  //   let data = SubnetRewardsSubmission::<T>::get(subnet_id, epoch);
+  //   Some(data?)
+  // }
+
   pub fn get_minimum_subnet_nodes(memory_mb: u128) -> u32 {
     Self::get_min_subnet_nodes(BaseSubnetNodeMemoryMB::<T>::get(), memory_mb)
   }
@@ -94,7 +102,8 @@ impl<T: Config> Pallet<T> {
 
   pub fn get_subnet_node_stake_by_peer_id(subnet_id: u32, peer_id: PeerId) -> u128 {
     match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
-      Ok(hotkey) => {
+      Ok(subnet_node_id) => {
+        let hotkey = SubnetNodeIdHotkey::<T>::get(subnet_id, subnet_node_id).unwrap(); // TODO: error fallback
         AccountSubnetStake::<T>::get(hotkey, subnet_id)
       },
       Err(()) => 0,
