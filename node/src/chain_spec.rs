@@ -1,5 +1,5 @@
 use sc_service::ChainType;
-use solochain_template_runtime::{AccountId, Signature, WASM_BINARY};
+use solochain_template_runtime::{AccountId, Signature, WASM_BINARY, NodeAuthorizationConfig};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
@@ -249,6 +249,18 @@ fn local_genesis(
 			// Assign network admin rights.
 			"key": Some(root_key),
 		},
+		"node_authorization": NodeAuthorizationConfig {
+			nodes: vec![
+				(
+					peer(0),
+					endowed_accounts[0].clone()
+				),
+				(
+					peer(1),
+					endowed_accounts[1].clone()
+				),
+			],
+		},	
 		"network": {
 			"subnetPath": subnet_path,
 			"memoryMb": 500,
@@ -286,6 +298,18 @@ fn testnet_gavin_genesis(
 			// Assign network admin rights.
 			"key": Some(root_key),
 		},
+		"node_authorization": NodeAuthorizationConfig {
+			nodes: vec![
+				(
+					peer(0),
+					endowed_accounts[0].clone()
+				),
+				(
+					peer(1),
+					endowed_accounts[1].clone()
+				),
+			],
+		},	
 		"network": {
 			"subnetPath": subnet_path,
 			"memoryMb": 2000,
@@ -323,6 +347,18 @@ fn testnet_tensor_genesis(
 			// Assign network admin rights.
 			"key": Some(root_key),
 		},
+		"node_authorization": NodeAuthorizationConfig {
+			nodes: vec![
+				(
+					peer(0),
+					endowed_accounts[0].clone()
+				),
+				(
+					peer(1),
+					endowed_accounts[1].clone()
+				),
+			],
+		},	
 		"network": {
 			"subnetPath": subnet_path,
 			"memoryMb": 2000,

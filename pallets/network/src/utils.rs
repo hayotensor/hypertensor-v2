@@ -159,7 +159,7 @@ impl<T: Config> Pallet<T> {
       // Reset sequential absent subnet node count
       SubnetNodePenalties::<T>::remove(subnet_id, subnet_node_id);
 
-			Self::deposit_event(Event::SubnetNodeRemoved { subnet_id: subnet_id, account_id: hotkey });
+			Self::deposit_event(Event::SubnetNodeRemoved { subnet_id: subnet_id, subnet_node_id: subnet_node_id });
     }
   }
 

@@ -184,40 +184,31 @@ pub mod pallet {
 		SubnetDeactivated { subnet_id: u32, reason: SubnetRemovalReason },
 
 		// Subnet Nodes
-		SubnetNodeRegistered { subnet_id: u32, account_id: T::AccountId, peer_id: PeerId, block: u64 },
-		SubnetNodeActivated { subnet_id: u32, account_id: T::AccountId },
-		SubnetNodeDeactivated { subnet_id: u32, account_id: T::AccountId },
-		SubnetNodeRemoved { subnet_id: u32, account_id: T::AccountId },
+		SubnetNodeRegistered { 
+			subnet_id: u32, 
+			subnet_node_id: u32, 
+			coldkey: T::AccountId, 
+			hotkey: T::AccountId, 
+			peer_id: PeerId, 
+		},
+		SubnetNodeActivated { subnet_id: u32, subnet_node_id: u32 },
+		SubnetNodeDeactivated { subnet_id: u32, subnet_node_id: u32 },
+		SubnetNodeRemoved { subnet_id: u32, subnet_node_id: u32 },
 
 		// Stake
-		StakeAdded(u32, T::AccountId, u128),
-		StakeRemoved(u32, T::AccountId, u128),
+		StakeAdded(u32, T::AccountId, T::AccountId, u128),
+		StakeRemoved(u32, T::AccountId, T::AccountId, u128),
 
 		DelegateStakeAdded(u32, T::AccountId, u128),
 		DelegateStakeRemoved(u32, T::AccountId, u128),
 		DelegateStakeSwitched(u32, u32, T::AccountId, u128),
 
 		// Admin 
-		SetVoteSubnetIn(Vec<u8>),
-    SetVoteSubnetOut(Vec<u8>),
     SetMaxSubnets(u32),
     SetMinSubnetNodes(u32),
     SetMaxSubnetNodes(u32),
     SetMinStakeBalance(u128),
     SetTxRateLimit(u64),
-    SetMaxZeroConsensusEpochs(u32),
-    SetMinRequiredNodeConsensusSubmitEpochs(u64),
-    SetMinRequiredNodeConsensusEpochs(u64),
-		SetMinRequiredNodeAccountantEpochs(u64),
-    SetMaximumOutlierDeltaPercent(u8),
-    SetSubnetNodeConsensusSubmitPercentRequirement(u128),
-    SetEpochLengthsInterval(u64),
-    SetNodeRemovalThreshold(u128),
-    SetMaxSubnetRewardsWeight(u128),
-		SetStakeRewardWeight(u128),
-		SetSubnetPerNodeInitCost(u128),
-		SetSubnetConsensusUnconfirmedThreshold(u128),
-		SetRemoveSubnetNodeEpochPercentage(u128),
 
 		// Proposals
 		Proposal { subnet_id: u32, proposal_id: u32, epoch: u32, plaintiff: T::AccountId, defendant: T::AccountId, plaintiff_data: Vec<u8> },
@@ -251,8 +242,6 @@ pub mod pallet {
 
 		/// Subnet must be registering or activated, this error usually occurs during the enactment period
 		SubnetMustBeRegisteringOrActivated,
-		/// Node hasn't been initialized for required epochs to submit consensus
-		NodeConsensusSubmitEpochNotReached,
 		/// Node hasn't been initialized for required epochs to be an accountant
 		NodeAccountantEpochNotReached,
 		/// Maximum subnets reached
@@ -287,27 +276,12 @@ pub mod pallet {
 		SubnetNodesMin,
 		/// Maximum allowed subnet peers reached
 		SubnetNodesMax,
-		/// Subnet has not been voted in
-		SubnetNotVotedIn,
-		/// Subnet not validated to be removed
-		SubnetCantBeRemoved,
-		/// Account is eligible
-		AccountEligible,
-		/// Account is ineligible
-		AccountIneligible,
-		// invalid submit consensus block
-		/// Cannot submit consensus during invalid blocks
-		InvalidSubmitEpochLength,
-		/// Cannot remove subnet peer during invalid blocks
-		InvalidRemoveOrUpdateSubnetNodeBlock,
 		/// Transaction rate limiter exceeded
 		TxRateLimitExceeded,
 		/// PeerId format invalid
 		InvalidPeerId,
 		/// The provided signature is incorrect.
 		WrongSignature,
-		InvalidEpoch,
-		SubnetRewardsSubmissionComplete,
 		InvalidSubnetId,
 
 		DelegateStakeTransferPeriodExceeded,
@@ -325,31 +299,8 @@ pub mod pallet {
 		InvalidMinStakeBalance,
 		/// Invalid percent number, must be in 1e4 format. Used for elements that only require correct format
 		InvalidPercent,
-		/// Invalid subnet peer consensus submit percent requirement
-		InvalidSubnetNodeConsensusSubmitPercentRequirement,
-		/// Invalid percent number based on MinSubnetNodes as `min_value = 1 / MinSubnetNodes`
-		// This ensures it's possible to form consensus to remove peers
-		InvalidNodeRemovalThreshold,
-		/// Invalid maximimum zero consensus epochs, must not exceed maximum allowable
-		InvalidMaxZeroConsensusEpochs,
-		/// Invalid subnet consensus `submit` epochs, must be greater than 2 and greater than MinRequiredNodeConsensusSubmitEpochs
-		InvalidSubnetConsensusSubmitEpochs,
-		/// Invalid peer consensus `inclusion` epochs, must be greater than 0 and less than MinRequiredNodeConsensusSubmitEpochs
-		InvalidNodeConsensusInclusionEpochs,
-		/// Invalid peer consensus `submit` epochs, must be greater than 1 and greater than MinRequiredNodeConsensusInclusionEpochs
-		InvalidNodeConsensusSubmitEpochs,
-		/// Invalid peer consensus `dishonesty` epochs, must be greater than 2 and greater than MinRequiredNodeConsensusSubmitEpochs
-		InvalidNodeConsensusDishonestyEpochs,
-		/// Invalid max outlier delta percentage, must be in format convertible to f64
-		InvalidMaxOutlierDeltaPercent,
-		/// Invalid subnet per peer init cost, must be greater than 0 and less than 1000
-		InvalidSubnetPerNodeInitCost,
-		/// Invalid subnet consensus uncunfirmed threshold, must be in 1e4 format
-		InvalidSubnetConsensusUnconfirmedThreshold,
-		/// Invalid remove subnet peer epoch percentage, must be in 1e4 format and greater than 20.00
-		InvalidRemoveSubnetNodeEpochPercentage,
-		InvalidMaxSubnetMemoryMB,
-		// staking
+
+		// Staking
 		/// u128 -> BalanceOf conversion error
 		CouldNotConvertToBalance,
 		/// Not enough balance on Account to stake and keep alive
@@ -379,40 +330,8 @@ pub mod pallet {
 		//
 		NoDelegateStakeUnbondingsOrCooldownNotMet,
 		NoStakeUnbondingsOrCooldownNotMet,
-		//
-		RequiredDelegateUnstakeEpochsNotMet,
 		// Conversion to balance was zero
 		InsufficientBalanceToSharesConversion,
-		// consensus
-		SubnetInitializeRequirement,
-		ConsensusDataInvalidLen,
-		/// Invalid consensus score, must be in 1e4 format and greater than 0
-		InvalidScore,
-		/// Consensus data already submitted
-		ConsensusDataAlreadySubmitted,
-		/// Consensus data already unconfirmed
-		ConsensusDataAlreadyUnconfirmed,
-
-		/// Math multiplication overflow
-		MathMultiplicationOverflow,
-
-		/// Dishonesty on subnet and account proposed
-		DishonestyVoteAlreadyProposed,
-
-		/// Dishonesty vote period already completed
-		DishonestyVotePeriodCompleted,
-		
-		/// Dishonesty vote not proposed
-		DishonestyVoteNotProposed,
-
-		/// Dishonesty voting either not exists or voting period is over
-		DishonestyVotingPeriodOver,
-
-		/// Dishonesty voting not over
-		DishonestyVotingPeriodNotOver,
-
-		/// Dishonesty voting either not exists or voting period is over
-		DishonestyVotingDuplicate,
 
 		/// Not enough balance to withdraw bid for proposal
 		NotEnoughBalanceToBid,
@@ -435,16 +354,12 @@ pub mod pallet {
 		VotingPeriodInvalid,
 		ChallengePeriodPassed,
 		DuplicateVote,
-		NotAccountant,
-		DataEmpty,
 		PlaintiffIsDefendant,
 
 		InvalidSubnetRewardsSubmission,
 		SubnetInitializing,
 		SubnetActivatedAlready,
 		InvalidSubnetRemoval,
-		SubnetNodeNotSubmittable,
-
 
 		// Validation and Attestation
 		/// Subnet rewards data already submitted by validator
@@ -455,8 +370,6 @@ pub mod pallet {
 		AlreadyAttested,
 		/// Invalid rewards data length
 		InvalidRewardsDataLength,
-		/// Invalid block for submitting data
-		InvalidBlock,
 
 
 		ProposalInvalid,
@@ -1220,7 +1133,7 @@ pub mod pallet {
 	// >;
 	
 	#[pallet::storage]
-	pub type SubnetNodeNonUniqueParamLastSet2<T: Config> = StorageDoubleMap<
+	pub type SubnetNodeNonUniqueParamLastSet<T: Config> = StorageDoubleMap<
 		_,
 		Identity,
 		u32,
@@ -2068,7 +1981,19 @@ pub mod pallet {
 			Ok(())
 		}
 		
-		/// Allows anyone to increase a subnets delegate stake pool
+		/// Increase the delegate stake pool balance of a subnet
+		/// Anyone can perform this action as a donation
+		///
+		/// # Notes
+		///
+		/// *** THIS DOES ''NOT'' INCREASE A USERS BALANCE ***
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
+		/// * `amount` - Amount TENSOR to add to pool
+		///
+		/// 
 		#[pallet::call_index(16)]
 		#[pallet::weight({0})]
 		pub fn increase_delegate_stake(
@@ -2111,7 +2036,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Delete proposals that are no longer live
+		/// Validator extrinsic for submitting incentives protocol data of the validators view of of the subnet
+		/// This is used t oscore each subnet node for allocation of emissions
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
+		/// * `data` - Vector of SubnetNodeData on each subnet node for scoring each
+		/// * `args` (Optional) - Data that can be used by the subnet 
+		/// 
 		#[pallet::call_index(17)]
 		#[pallet::weight({0})]
 		pub fn validate(
@@ -2137,6 +2070,12 @@ pub mod pallet {
 			)
 		}
 
+		/// Attest validators view of the subnet
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
+		/// 
 		#[pallet::call_index(18)]
 		#[pallet::weight({0})]
 		pub fn attest(
@@ -2158,6 +2097,19 @@ pub mod pallet {
 			)
 		}
 
+		/// Propose to remove someone from subnet
+		///
+		/// This acts as a governance system for each subnet
+		///
+		/// Each proposal requires a bond of TENSOR
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - The proposers subnet node ID
+		/// * `peer_id` - The defendants subnet node peer ID
+		/// * `data` - Data used to justify dispute for subnet use
+		/// 
 		#[pallet::call_index(19)]
 		#[pallet::weight({0})]
 		pub fn propose(
@@ -2178,6 +2130,20 @@ pub mod pallet {
 			)
 		}
 
+		/// * INCOMPLETE *
+		/// Attest a proposal
+		///
+		/// This acts as a governance system for each subnet
+		///
+		/// Attest requires a bond of TENSOR
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - The proposers subnet node ID
+		/// * `peer_id` - The defendants subnet node peer ID
+		/// * `data` - Data used to justify dispute for subnet use
+		/// 
 		#[pallet::call_index(20)]
 		#[pallet::weight({0})]
 		pub fn attest_proposal(
@@ -2198,6 +2164,14 @@ pub mod pallet {
 			)
 		}
 
+		/// Cancel proposal
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - The proposers subnet node ID
+		/// * `proposal_id` - The proposal ID
+		/// 
 		#[pallet::call_index(21)]
 		#[pallet::weight({0})]
 		pub fn cancel_proposal(
@@ -2216,6 +2190,14 @@ pub mod pallet {
 			)
 		}
 
+		/// Challenge proposal as the defendant
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `proposal_id` - The proposers subnet node ID
+		/// * `data` - Data used to justify challenge for subnet use
+		/// 
 		#[pallet::call_index(22)]
 		#[pallet::weight({0})]
 		pub fn challenge_proposal(
@@ -2234,6 +2216,15 @@ pub mod pallet {
 			)
 		}
 
+		/// Challenge proposal as the defendant
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - The voter subnet node ID
+		/// * `proposal_id` - The proposal ID
+		/// * `vote` - YAY or NAY
+		/// 
 		#[pallet::call_index(23)]
 		#[pallet::weight({0})]
 		pub fn vote(
@@ -2254,6 +2245,15 @@ pub mod pallet {
 			)
 		}
 
+		/// Finalize and compute votes to complete the proposal
+		///
+		/// If quorum and consensus is reached, bonded TENSOR is distributed to participants in favor
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `proposal_id` - The proposal ID
+		/// 
 		#[pallet::call_index(24)]
 		#[pallet::weight({0})]
 		pub fn finalize_proposal(
@@ -2270,6 +2270,14 @@ pub mod pallet {
 			)
 		}
 
+		/// Register unique subnet node parameter if not already added
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - Callers subnet node ID
+		/// * `a` - The unique parameter
+		/// 
 		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
 		pub fn register_subnet_node_a_parameter(
@@ -2311,6 +2319,15 @@ pub mod pallet {
 			)
 		}
 
+		/// Register non-unique subnet node parameter `b` or `c`
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - Callers subnet node ID
+		/// * `b` (Optional) - The non-unique parameter
+		/// * `c` (Optional) - The non-unique parameter
+		/// 
 		#[pallet::call_index(26)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_node_non_unique_parameter(
@@ -2335,7 +2352,7 @@ pub mod pallet {
 			let epoch_length: u64 = T::EpochLength::get();
 			let epoch: u64 = block / epoch_length;
 
-			let last_update_epoch = SubnetNodeNonUniqueParamLastSet2::<T>::get(subnet_id, subnet_node_id);
+			let last_update_epoch = SubnetNodeNonUniqueParamLastSet::<T>::get(subnet_id, subnet_node_id);
 			let interval = SubnetNodeNonUniqueParamUpdateInterval::<T>::get();
 
 			ensure!(
@@ -2362,13 +2379,20 @@ pub mod pallet {
 						params.c = Some(c.clone().unwrap());
 					}
 
-					SubnetNodeNonUniqueParamLastSet2::<T>::insert(subnet_id, subnet_node_id, epoch as u32);
+					SubnetNodeNonUniqueParamLastSet::<T>::insert(subnet_id, subnet_node_id, epoch as u32);
 
 					Ok(())
 				}
 			)
 		}
 
+		/// Update coldkey
+		///
+		/// # Arguments
+		///
+		/// * `hotkey` - Current hotkey.
+		/// * `new_coldkey` - New coldkey
+		/// 
 		#[pallet::call_index(27)]
 		#[pallet::weight({0})]
 		pub fn update_coldkey(
@@ -2405,6 +2429,13 @@ pub mod pallet {
 			})
 		}
 
+		/// Update hotkey
+		///
+		/// # Arguments
+		///
+		/// * `old_hotkey` - Old hotkey to be replaced.
+		/// * `new_hotkey` - New hotkey to replace the old hotkey.
+		/// 
 		#[pallet::call_index(28)]
 		#[pallet::weight({0})]
 		pub fn update_hotkey(
@@ -2880,9 +2911,10 @@ pub mod pallet {
 			Self::deposit_event(
 				Event::SubnetNodeRegistered { 
 					subnet_id: subnet_id, 
-					account_id: coldkey.clone(), 
+					subnet_node_id: uid,
+					coldkey: coldkey.clone(),
+					hotkey: hotkey.clone(), 
 					peer_id: peer_id.clone(),
-					block: block
 				}
 			);
 
@@ -2961,14 +2993,13 @@ pub mod pallet {
 			Self::deposit_event(
 				Event::SubnetNodeActivated { 
 					subnet_id: subnet_id, 
-					account_id: hotkey, 
+					subnet_node_id: subnet_node_id, 
 				}
 			);
 
 			Ok(())
 		}
 
-		/// This should be called by a user facing extrinsic
 		pub fn do_deactivate_subnet_node(
 			origin: OriginFor<T>, 
 			subnet_id: u32, 
@@ -3048,7 +3079,7 @@ pub mod pallet {
 				Self::deposit_event(
 					Event::SubnetNodeDeactivated { 
 						subnet_id: subnet_id, 
-						account_id: key, 
+						subnet_node_id: subnet_node_id, 
 					}
 				);
 	
@@ -3077,13 +3108,20 @@ pub mod pallet {
 			Self::deposit_event(
 				Event::SubnetNodeDeactivated { 
 					subnet_id: subnet_id, 
-					account_id: hotkey, 
+					subnet_node_id: subnet_node_id, 
 				}
 			);
 
 			Ok(())
 		}
 
+		/// Run deactivation ledger
+		///
+		/// * This is called by blockchain validator nodes.
+		/// * This updates a subnet node class from Validator to Deactivated.
+		/// * This iterates deactivations up to the `MaxDeactivations`. Any nodes remaining will be delayed
+		///	  until the following epochs until their turn is met.
+		/// 
 		pub fn do_deactivation_ledger() -> Weight {
 			let mut deactivation_ledger = DeactivationLedger::<T>::get();
 
@@ -3142,16 +3180,27 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		/// Run block functions
+		///
+		/// # Flow
+		///
+		/// At the start of each epoch
+		///
+		/// 1. Reward subnet nodes from the previous epochs validators data
+		/// 2. Run deactivation ledger
+		/// 3. Do epoch preliminaries
+		///		* Remove subnets if needed
+		/// 	* Randomly choose subnet validators
+		///
+		/// # Arguments
+		///
+		/// * `block_number` - Current block number.
+		/// 
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			// 1. Reward subnets that successfully attested validator data
-			// 2. Choose validators per subnet for next epoch
-			//			- If subnet is under any of the following conditions they are removed:
-			//						- Passed max penalties
-			//						- Under minimum delegate stake threshold
 			let block: u64 = Self::convert_block_as_u64(block_number);
 			let epoch_length: u64 = T::EpochLength::get();
 
-			// Reward validators and attestors... Shift node classes
+			// Reward subnet nodes
 			if block >= epoch_length && block % epoch_length == 0 {
 				let epoch: u64 = block / epoch_length;
 

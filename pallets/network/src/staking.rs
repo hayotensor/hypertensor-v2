@@ -73,7 +73,7 @@ impl<T: Config> Pallet<T> {
     // Set last block for rate limiting
     Self::set_last_tx_block(&coldkey, block);
 
-    Self::deposit_event(Event::StakeAdded(subnet_id, coldkey, stake_to_be_added));
+    Self::deposit_event(Event::StakeAdded(subnet_id, coldkey, hotkey, stake_to_be_added));
 
     Ok(())
   }
@@ -131,7 +131,7 @@ impl<T: Config> Pallet<T> {
     // Set last block for rate limiting
     Self::set_last_tx_block(&coldkey, block);
 
-    Self::deposit_event(Event::StakeRemoved(subnet_id, coldkey, stake_to_be_removed));
+    Self::deposit_event(Event::StakeRemoved(subnet_id, coldkey, hotkey, stake_to_be_removed));
 
     Ok(())
   }
