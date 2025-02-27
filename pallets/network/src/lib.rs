@@ -299,6 +299,7 @@ pub mod pallet {
 		InvalidMinStakeBalance,
 		/// Invalid percent number, must be in 1e4 format. Used for elements that only require correct format
 		InvalidPercent,
+		InvalidMaxSubnetMemoryMB,
 
 		// Staking
 		/// u128 -> BalanceOf conversion error

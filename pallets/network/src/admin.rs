@@ -192,7 +192,7 @@ impl<T: Config> Pallet<T> {
 
   pub fn set_min_subnet_nodes(value: u32) -> DispatchResult {
 
-    Self::deposit_event(Event::SetMinStakeBalance(value));
+    Self::deposit_event(Event::SetMinSubnetNodes(value));
     Ok(())
   }
 
