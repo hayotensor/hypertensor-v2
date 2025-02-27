@@ -1455,6 +1455,118 @@ fn test_update_coldkey() {
 
     let key_owner = HotkeyOwner::<Test>::get(account(0));
     assert_eq!(key_owner, account(total_subnet_nodes+1));
+
+    // Cold key is updated, shouldn't be able to make changes anywhere using coldkey
+
+    let add_stake_amount: u128 = 1000000000000000000000;
+    let _ = Balances::deposit_creating(&account(0), add_stake_amount);
+
+    assert_err!(
+      Network::add_to_stake(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        hotkey_subnet_node_id,
+        account(0),
+        add_stake_amount,
+      ),
+      Error::<Test>::NotKeyOwner,
+    );
+
+    assert_err!(
+      Network::remove_stake(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        account(0),
+        1000,
+      ),
+      Error::<Test>::NotKeyOwner
+    );    
+    
+    // `do_deactivate_subnet_node` allows both hotkey and coldkey
+    assert_err!(
+      Network::do_deactivate_subnet_node(
+        RuntimeOrigin::signed(account(1)),
+        subnet_id,
+        hotkey_subnet_node_id
+      ),
+      Error::<Test>::NotKeyOwner
+    );
+
+    assert_err!(
+      Network::update_coldkey(
+        RuntimeOrigin::signed(account(0)),
+        account(0),
+        account(total_subnet_nodes+1),
+      ),
+      Error::<Test>::NotKeyOwner
+    );
+
+    assert_err!(
+      Network::update_hotkey(
+        RuntimeOrigin::signed(account(0)),
+        account(0),
+        account(total_subnet_nodes+1),
+      ),
+      Error::<Test>::NotKeyOwner
+    );
+
+
+    // Use new coldkey
+    let add_stake_amount: u128 = 1000000000000000000000;
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), add_stake_amount + 500);
+
+    assert_ok!(
+      Network::add_to_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        hotkey_subnet_node_id,
+        account(0),
+        add_stake_amount,
+      )
+    );
+
+    assert_ok!(
+      Network::remove_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(0),
+        add_stake_amount,
+      )
+    );
+
+    // `do_deactivate_subnet_node` allows both hotkey and coldkey
+    assert_ok!(
+      Network::do_deactivate_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        hotkey_subnet_node_id
+      )
+    );
+
+    assert_ok!(
+      Network::update_hotkey(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        account(0),
+        account(total_subnet_nodes+15),
+      )
+    );
+
+    assert_ok!(
+      Network::update_coldkey(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        account(total_subnet_nodes+15),
+        account(total_subnet_nodes+2),
+      )
+    );
+
+    assert_err!(
+      Network::update_coldkey(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        account(total_subnet_nodes+15),
+        account(total_subnet_nodes+2),
+      ),
+      Error::<Test>::NotKeyOwner
+    );    
   })
 }
 

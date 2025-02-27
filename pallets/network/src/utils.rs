@@ -111,8 +111,6 @@ impl<T: Config> Pallet<T> {
   /// Remove subnet peer from subnet
   // to-do: Add slashing to subnet peers stake balance
   pub fn perform_remove_subnet_node(block: u64, subnet_id: u32, subnet_node_id: u32) {
-    // Take and remove SubnetNodesData hotkey as key
-    // `take()` returns and removes data
     if let Ok(subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, subnet_node_id) {
       let hotkey = subnet_node.hotkey;
       let peer_id = subnet_node.peer_id;
@@ -149,9 +147,10 @@ impl<T: Config> Pallet<T> {
         SubnetNodeUniqueParam::<T>::remove(subnet_id, subnet_node.a.unwrap())
       }
 
-      // Remove SubnetNodeAccount peer_id as key
+      // Remove all subnet node elements
       SubnetNodeAccount::<T>::remove(subnet_id, peer_id.clone());
       HotkeySubnetNodeId::<T>::remove(subnet_id, hotkey.clone());
+      SubnetNodeIdHotkey::<T>::remove(subnet_id, subnet_node_id);
 
       // Update total subnet peers by substracting 1
       TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
@@ -450,6 +449,10 @@ impl<T: Config> Pallet<T> {
           coldkey: HotkeyOwner::<T>::get(subnet_node.hotkey.clone()),
           hotkey: subnet_node.hotkey,
           peer_id: subnet_node.peer_id,
+          classification: subnet_node.classification,
+          a: subnet_node.a,
+          b: subnet_node.b,
+          c: subnet_node.c,
         }
       })
       .collect()
@@ -478,4 +481,48 @@ impl<T: Config> Pallet<T> {
       Err(()) => false,
     }
   }
+
+  /// Is hotkey or coldkey owner for functions that allow both
+  pub fn get_hotkey_coldkey(
+    subnet_id: u32, 
+    subnet_node_id: u32, 
+  ) -> Option<(T::AccountId, T::AccountId)> {
+    let hotkey = SubnetNodeIdHotkey::<T>::try_get(subnet_id, subnet_node_id).ok()?;
+    let coldkey = HotkeyOwner::<T>::try_get(hotkey.clone()).ok()?;
+
+    Some((hotkey, coldkey))
+  }
+
+  pub fn is_keys_owner(
+    subnet_id: u32, 
+    subnet_node_id: u32, 
+    key: T::AccountId, 
+  ) -> bool {
+    let (hotkey, coldkey) = match Self::get_hotkey_coldkey(subnet_id, subnet_node_id) {
+      Some((hotkey, coldkey)) => {
+        (hotkey, coldkey)
+      }
+      None => {
+        return false
+      }
+    };
+
+    key == hotkey || key == coldkey
+  }
+
+  pub fn is_subnet_node_coldkey(
+    subnet_id: u32, 
+    subnet_node_id: u32, 
+    coldkey: T::AccountId, 
+  ) -> bool {
+    let hotkey = match SubnetNodeIdHotkey::<T>::try_get(subnet_id, subnet_node_id) {
+      Ok(hotkey) => hotkey,
+      Err(()) => return false
+    };
+    match HotkeyOwner::<T>::try_get(hotkey) {
+      Ok(subnet_node_coldkey) => return subnet_node_coldkey == coldkey,
+      Err(()) => return false
+    }
+  }
+
 }
