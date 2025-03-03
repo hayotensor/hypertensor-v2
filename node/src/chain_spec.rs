@@ -252,11 +252,11 @@ fn local_genesis(
 		"node_authorization": NodeAuthorizationConfig {
 			nodes: vec![
 				(
-					peer(0),
+					OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
 					endowed_accounts[0].clone()
 				),
 				(
-					peer(1),
+					OpaquePeerId(bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust").into_vec().unwrap()),
 					endowed_accounts[1].clone()
 				),
 			],

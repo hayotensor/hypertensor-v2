@@ -8498,6 +8498,7 @@ dependencies = [
 name = "solochain-template-node"
 version = "0.1.0"
 dependencies = [
+ "bs58 0.4.0",
  "clap",
  "frame-benchmarking-cli",
  "frame-system",

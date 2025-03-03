@@ -809,6 +809,15 @@ pub mod pallet {
 		BTreeMap::new()
 	}
 	#[pallet::type_value]
+	pub fn DefaultStakeUnbondingLedger() -> BTreeMap<u64, u128> {
+		// We use epochs because cooldowns are based on epochs
+		// {
+		// 	epoch_start: u64, // cooldown begin epoch (+ cooldown duration for unlock)
+		// 	balance: u128,
+		// }
+		BTreeMap::new()
+	}
+	#[pallet::type_value]
 	pub fn DefaultBaseRewardPerMB() -> u128 {
 		1e+18 as u128
 	}
@@ -1302,7 +1311,11 @@ pub mod pallet {
 		ValueQuery,
 		DefaultSubnetStakeUnbondingLedger,
 	>;
-		
+	
+	#[pallet::storage]
+	pub type StakeUnbondingLedger<T: Config> = 
+		StorageMap<_, Blake2_128Concat, T::AccountId, BTreeMap<u64, u128>, ValueQuery, DefaultStakeUnbondingLedger>;
+
 	// Maximum stake balance per subnet
 	// Only checked on `do_add_stake` and ``
 	// A subnet staker can have greater than the max stake balance although any rewards
@@ -1889,7 +1902,7 @@ pub mod pallet {
 			subnet_id: u32, 
 		) -> DispatchResult {
 			let coldkey: T::AccountId = ensure_signed(origin)?;
-			let successful_unbondings: u32 = Self::do_claim_stake_unbondings(&coldkey, subnet_id);
+			let successful_unbondings: u32 = Self::do_claim_stake_unbondings(&coldkey);
 			ensure!(
 				successful_unbondings > 0,
         Error::<T>::NoStakeUnbondingsOrCooldownNotMet
@@ -1974,11 +1987,6 @@ pub mod pallet {
 			subnet_id: u32, 
 		) -> DispatchResult {
 			let coldkey: T::AccountId = ensure_signed(origin)?;
-			let successful_unbondings: u32 = Self::do_claim_delegate_stake_unbondings(&coldkey, subnet_id);
-			ensure!(
-				successful_unbondings > 0,
-        Error::<T>::NoDelegateStakeUnbondingsOrCooldownNotMet
-			);
 			Ok(())
 		}
 		
@@ -2409,14 +2417,14 @@ pub mod pallet {
 						// Condition met, update or remove
 						*maybe_coldkey = Some(new_coldkey.clone());
 
-						// Update SubnetStakeUnbondingLedger
-						for (subnet_id, ledger_tree) in SubnetStakeUnbondingLedger::<T>::iter_prefix(curr_coldkey.clone()) {
-							// Remove from old key1
-							SubnetStakeUnbondingLedger::<T>::remove(&curr_coldkey, subnet_id);
+						// Update StakeUnbondingLedger
+						// for (subnet_id, ledger_tree) in StakeUnbondingLedger::<T>::iter_prefix(curr_coldkey.clone()) {
+						// 	// Remove from old key1
+						// 	StakeUnbondingLedger::<T>::remove(&curr_coldkey, subnet_id);
 
-							// Insert under new key1
-							SubnetStakeUnbondingLedger::<T>::insert(&new_coldkey, subnet_id, ledger_tree);
-						}
+						// 	// Insert under new key1
+						// 	StakeUnbondingLedger::<T>::insert(&new_coldkey, subnet_id, ledger_tree);
+						// }
 						Ok(())
 					},
 					// --- Revert from here if not exist

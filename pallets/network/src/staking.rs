@@ -73,6 +73,7 @@ impl<T: Config> Pallet<T> {
     // Set last block for rate limiting
     Self::set_last_tx_block(&coldkey, block);
 
+    // Self::deposit_event(Event::StakeAdded(subnet_id, coldkey, stake_to_be_added));
     Self::deposit_event(Event::StakeAdded(subnet_id, coldkey, hotkey, stake_to_be_added));
 
     Ok(())
@@ -131,6 +132,7 @@ impl<T: Config> Pallet<T> {
     // Set last block for rate limiting
     Self::set_last_tx_block(&coldkey, block);
 
+    // Self::deposit_event(Event::StakeRemoved(subnet_id, coldkey, stake_to_be_removed));
     Self::deposit_event(Event::StakeRemoved(subnet_id, coldkey, hotkey, stake_to_be_removed));
 
     Ok(())
@@ -158,7 +160,7 @@ impl<T: Config> Pallet<T> {
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;
 
-    let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
     // One unlocking per epoch
     ensure!(
@@ -168,11 +170,11 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure we don't surpass max unlockings by attempting to unlock unbondings
     if unbondings.len() as u32 == T::MaxStakeUnlockings::get() {
-      Self::do_claim_stake_unbondings(&coldkey, subnet_id);
+      Self::do_claim_stake_unbondings(&coldkey);
     }
 
     // --- Get updated unbondings after claiming unbondings
-    let mut unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    let mut unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
     // We're about to add another unbonding to the ledger - it must be n-1
     ensure!(
@@ -181,17 +183,18 @@ impl<T: Config> Pallet<T> {
     );
 
     unbondings.insert(epoch, amount);
-    SubnetStakeUnbondingLedger::<T>::insert(coldkey.clone(), subnet_id, unbondings);
+    StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings);
 
     Ok(())
   }
 
   // Infallible
-  pub fn do_claim_stake_unbondings(coldkey: &T::AccountId, subnet_id: u32) -> u32 {
+  pub fn do_claim_stake_unbondings(coldkey: &T::AccountId) -> u32 {
     let block: u64 = Self::get_current_block_as_u64();
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;
-    let unbondings = SubnetStakeUnbondingLedger::<T>::get(coldkey.clone(), subnet_id);
+    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
+
     let mut unbondings_copy = unbondings.clone();
 
     let mut successful_unbondings = 0;
@@ -214,7 +217,7 @@ impl<T: Config> Pallet<T> {
     }
 
     if unbondings.len() != unbondings_copy.len() {
-      SubnetStakeUnbondingLedger::<T>::insert(coldkey.clone(), subnet_id, unbondings_copy);
+      StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings_copy);
     }
     successful_unbondings
   }
