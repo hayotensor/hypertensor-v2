@@ -163,10 +163,10 @@ impl<T: Config> Pallet<T> {
     let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
     // One unlocking per epoch
-    ensure!(
-      unbondings.get(&epoch) == None,
-      Error::<T>::MaxUnlockingsPerEpochReached
-    );
+    // ensure!(
+    //   unbondings.get(&epoch) == None,
+    //   Error::<T>::MaxUnlockingsPerEpochReached
+    // );
 
     // --- Ensure we don't surpass max unlockings by attempting to unlock unbondings
     if unbondings.len() as u32 == T::MaxStakeUnlockings::get() {
@@ -182,8 +182,11 @@ impl<T: Config> Pallet<T> {
       Error::<T>::MaxUnlockingsReached
     );
 
-    unbondings.insert(epoch, amount);
-    StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings);
+    // unbondings.insert(epoch, amount);
+    // StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings);
+    StakeUnbondingLedger::<T>::mutate(&coldkey, |ledger| {
+      ledger.entry(epoch).and_modify(|v| *v += amount).or_insert(amount);
+    });
 
     Ok(())
   }

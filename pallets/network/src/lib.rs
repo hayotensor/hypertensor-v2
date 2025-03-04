@@ -800,15 +800,6 @@ pub mod pallet {
 		BTreeMap::new()
 	}
 	#[pallet::type_value]
-	pub fn DefaultSubnetStakeUnbondingLedger() -> BTreeMap<u64, u128> {
-		// We use epochs because cooldowns are based on epochs
-		// {
-		// 	epoch_start: u64, // cooldown begin epoch (+ cooldown duration for unlock)
-		// 	balance: u128,
-		// }
-		BTreeMap::new()
-	}
-	#[pallet::type_value]
 	pub fn DefaultStakeUnbondingLedger() -> BTreeMap<u64, u128> {
 		// We use epochs because cooldowns are based on epochs
 		// {
@@ -1298,18 +1289,6 @@ pub mod pallet {
 		u128,
 		ValueQuery,
 		DefaultAccountTake,
-	>;
-
-	#[pallet::storage]
-	pub type SubnetStakeUnbondingLedger<T: Config> = StorageDoubleMap<
-		_,
-		Blake2_128Concat,
-		T::AccountId,
-		Identity,
-		u32,
-		BTreeMap<u64, u128>,
-		ValueQuery,
-		DefaultSubnetStakeUnbondingLedger,
 	>;
 	
 	#[pallet::storage]
@@ -1978,17 +1957,6 @@ pub mod pallet {
 				shares_to_be_removed,
 			)
 		}
-
-		#[pallet::call_index(15)]
-		// #[pallet::weight(T::WeightInfo::claim_delegate_stake_unbondings())]
-		#[pallet::weight({0})]
-		pub fn claim_delegate_stake_unbondings(
-			origin: OriginFor<T>, 
-			subnet_id: u32, 
-		) -> DispatchResult {
-			let coldkey: T::AccountId = ensure_signed(origin)?;
-			Ok(())
-		}
 		
 		/// Increase the delegate stake pool balance of a subnet
 		/// Anyone can perform this action as a donation
@@ -2003,7 +1971,7 @@ pub mod pallet {
 		/// * `amount` - Amount TENSOR to add to pool
 		///
 		/// 
-		#[pallet::call_index(16)]
+		#[pallet::call_index(15)]
 		#[pallet::weight({0})]
 		pub fn increase_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2054,7 +2022,7 @@ pub mod pallet {
 		/// * `data` - Vector of SubnetNodeData on each subnet node for scoring each
 		/// * `args` (Optional) - Data that can be used by the subnet 
 		/// 
-		#[pallet::call_index(17)]
+		#[pallet::call_index(16)]
 		#[pallet::weight({0})]
 		pub fn validate(
 			origin: OriginFor<T>, 
@@ -2085,7 +2053,7 @@ pub mod pallet {
 		///
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// 
-		#[pallet::call_index(18)]
+		#[pallet::call_index(17)]
 		#[pallet::weight({0})]
 		pub fn attest(
 			origin: OriginFor<T>, 
@@ -2119,7 +2087,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(19)]
+		#[pallet::call_index(18)]
 		#[pallet::weight({0})]
 		pub fn propose(
 			origin: OriginFor<T>, 
@@ -2153,7 +2121,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(20)]
+		#[pallet::call_index(19)]
 		#[pallet::weight({0})]
 		pub fn attest_proposal(
 			origin: OriginFor<T>, 
@@ -2181,7 +2149,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - The proposers subnet node ID
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(21)]
+		#[pallet::call_index(20)]
 		#[pallet::weight({0})]
 		pub fn cancel_proposal(
 			origin: OriginFor<T>, 
@@ -2207,7 +2175,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposers subnet node ID
 		/// * `data` - Data used to justify challenge for subnet use
 		/// 
-		#[pallet::call_index(22)]
+		#[pallet::call_index(21)]
 		#[pallet::weight({0})]
 		pub fn challenge_proposal(
 			origin: OriginFor<T>, 
@@ -2234,7 +2202,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposal ID
 		/// * `vote` - YAY or NAY
 		/// 
-		#[pallet::call_index(23)]
+		#[pallet::call_index(22)]
 		#[pallet::weight({0})]
 		pub fn vote(
 			origin: OriginFor<T>, 
@@ -2263,7 +2231,7 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID.
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(24)]
+		#[pallet::call_index(23)]
 		#[pallet::weight({0})]
 		pub fn finalize_proposal(
 			origin: OriginFor<T>, 
@@ -2287,7 +2255,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - Callers subnet node ID
 		/// * `a` - The unique parameter
 		/// 
-		#[pallet::call_index(25)]
+		#[pallet::call_index(24)]
 		#[pallet::weight({0})]
 		pub fn register_subnet_node_a_parameter(
 			origin: OriginFor<T>, 
@@ -2337,7 +2305,7 @@ pub mod pallet {
 		/// * `b` (Optional) - The non-unique parameter
 		/// * `c` (Optional) - The non-unique parameter
 		/// 
-		#[pallet::call_index(26)]
+		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_node_non_unique_parameter(
 			origin: OriginFor<T>, 
@@ -2402,7 +2370,7 @@ pub mod pallet {
 		/// * `hotkey` - Current hotkey.
 		/// * `new_coldkey` - New coldkey
 		/// 
-		#[pallet::call_index(27)]
+		#[pallet::call_index(26)]
 		#[pallet::weight({0})]
 		pub fn update_coldkey(
 			origin: OriginFor<T>, 
@@ -2416,15 +2384,8 @@ pub mod pallet {
 					Some(status) if *status == curr_coldkey => {
 						// Condition met, update or remove
 						*maybe_coldkey = Some(new_coldkey.clone());
-
 						// Update StakeUnbondingLedger
-						// for (subnet_id, ledger_tree) in StakeUnbondingLedger::<T>::iter_prefix(curr_coldkey.clone()) {
-						// 	// Remove from old key1
-						// 	StakeUnbondingLedger::<T>::remove(&curr_coldkey, subnet_id);
-
-						// 	// Insert under new key1
-						// 	StakeUnbondingLedger::<T>::insert(&new_coldkey, subnet_id, ledger_tree);
-						// }
+						StakeUnbondingLedger::<T>::swap(curr_coldkey, new_coldkey);
 						Ok(())
 					},
 					// --- Revert from here if not exist
@@ -2445,7 +2406,7 @@ pub mod pallet {
 		/// * `old_hotkey` - Old hotkey to be replaced.
 		/// * `new_hotkey` - New hotkey to replace the old hotkey.
 		/// 
-		#[pallet::call_index(28)]
+		#[pallet::call_index(27)]
 		#[pallet::weight({0})]
 		pub fn update_hotkey(
 			origin: OriginFor<T>, 
@@ -2506,7 +2467,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(29)]
+		#[pallet::call_index(28)]
 		#[pallet::weight({0})]
 		pub fn update_peer_id(
 			origin: OriginFor<T>, 

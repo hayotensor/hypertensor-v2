@@ -357,7 +357,6 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 				RuntimeCall::Network(pallet_network::Call::add_to_delegate_stake { .. })
 				| RuntimeCall::Network(pallet_network::Call::transfer_delegate_stake { .. })
 				| RuntimeCall::Network(pallet_network::Call::remove_delegate_stake { .. })
-				| RuntimeCall::Network(pallet_network::Call::claim_delegate_stake_unbondings { .. })
 			),
 			// ProxyType::NonTransfer => !matches!(
 			// 	c,

@@ -1179,6 +1179,64 @@ fn test_activate_subnet_initializing_error() {
 }
 
 #[test]
+fn test_not_subnet_node_owner() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 1000000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), deposit_amount);
+
+    let starting_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+    assert_eq!(starting_balance, deposit_amount);
+
+    assert_ok!(
+      Network::add_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
+        amount,
+        None,
+        None,
+        None,
+      ) 
+    );
+
+    let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(total_subnet_nodes+1)).unwrap();
+    
+    assert_err!(
+      Network::add_to_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        subnet_node_id,
+        account(1),
+        amount,
+      ),
+      Error::<Test>::NotKeyOwner,
+    );
+
+    assert_err!(
+      Network::add_to_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        1,
+        account(total_subnet_nodes+1),
+        amount,
+      ),
+      Error::<Test>::NotSubnetNodeOwner,
+    );
+
+
+  });
+}
+
+#[test]
 fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
   new_test_ext().execute_with(|| {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
@@ -1444,6 +1502,37 @@ fn test_update_coldkey() {
     let hotkey_subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(0)).unwrap();
     let starting_account_subnet_stake = AccountSubnetStake::<Test>::get(account(0), subnet_id);
 
+    // add extra stake and then add to ledger to check if it swapped
+    let add_stake_amount = 1000000000000000000000;
+    let _ = Balances::deposit_creating(&account(0), deposit_amount);
+
+    assert_ok!(
+      Network::add_to_stake(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        hotkey_subnet_node_id,
+        account(0),
+        add_stake_amount,
+      )
+    );
+
+    let stake_balance = AccountSubnetStake::<Test>::get(&account(0), subnet_id);
+    assert_eq!(stake_balance, starting_account_subnet_stake + add_stake_amount);
+
+    assert_ok!(
+      Network::remove_stake(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        account(0),
+        amount,
+      )
+    );
+
+    let original_unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(0));
+    let original_ledger_balance: u128 = original_unbondings.values().copied().sum();
+    assert_eq!(original_unbondings.len() as u32, 1);  
+    assert_eq!(original_ledger_balance, amount);  
+
     assert_ok!(
       Network::update_coldkey(
         RuntimeOrigin::signed(account(0)),
@@ -1451,6 +1540,18 @@ fn test_update_coldkey() {
         account(total_subnet_nodes+1),
       )
     );
+
+    // check old coldkey balance is now removed because it was swapped to the new one
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(0));
+    let ledger_balance: u128 = unbondings.values().copied().sum();
+    assert_eq!(unbondings.len() as u32, 0);  
+    assert_eq!(ledger_balance, 0);  
+
+    // check new coldkey balance matches original
+    let new_unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let new_ledger_balance: u128 = new_unbondings.values().copied().sum();
+    assert_eq!(new_unbondings.len() as u32, original_unbondings.len() as u32);  
+    assert_eq!(new_ledger_balance, original_ledger_balance);  
 
     let subnet_node_id_hotkey = SubnetNodeIdHotkey::<Test>::get(subnet_id, hotkey_subnet_node_id).unwrap();
     assert_eq!(subnet_node_id_hotkey, account(0));
@@ -2313,6 +2414,49 @@ fn test_add_subnet_node_remove_readd() {
 }
 
 #[test]
+fn test_add_subnet_node_not_key_owner() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let deposit_amount: u128 = 1000000000000000000000000;
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), deposit_amount);
+
+    assert_ok!(
+      Network::add_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
+        amount,
+        None,
+        None,
+        None,
+      )
+    );
+
+    let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(total_subnet_nodes+1)).unwrap();
+
+    assert_err!(
+      Network::remove_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        1,
+      ),
+      Error::<Test>::NotKeyOwner
+    );
+
+  });
+}
+
+#[test]
 fn test_add_subnet_node_remove_readd_must_unstake_error() {
   new_test_ext().execute_with(|| {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
@@ -3013,7 +3157,6 @@ fn test_claim_stake_unbondings() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    // let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
 
     assert_eq!(unbondings.len(), 1);
@@ -3036,12 +3179,125 @@ fn test_claim_stake_unbondings() {
 
     assert_eq!(post_balance, starting_balance);
 
-    // let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
 
     assert_eq!(unbondings.len(), 0);
   });
 }
+
+#[test]
+fn test_remove_stake_twice_in_epoch() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 1000000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), deposit_amount);
+
+    let starting_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+    assert_eq!(starting_balance, deposit_amount);
+
+    assert_ok!(
+      Network::add_subnet_node(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
+        amount,
+        None,
+        None,
+        None,
+      ) 
+    );
+
+    let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(total_subnet_nodes+1)).unwrap();
+
+    let stake_balance = AccountSubnetStake::<Test>::get(&account(total_subnet_nodes+1), subnet_id);
+    assert_eq!(stake_balance, amount);
+
+    let after_stake_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+    assert_eq!(after_stake_balance, starting_balance - amount);
+
+    let _ = Balances::deposit_creating(&account(0), amount*2);
+
+    assert_ok!(
+      Network::add_to_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        subnet_node_id,
+        account(total_subnet_nodes+1),
+        amount*3,
+      ) 
+    );
+
+    let stake_balance = AccountSubnetStake::<Test>::get(&account(total_subnet_nodes+1), subnet_id);
+    assert_eq!(stake_balance, amount + amount*3);
+
+    assert_ok!(
+      Network::remove_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        amount,
+      )
+    );
+
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let ledger_balance: u128 = unbondings.values().copied().sum();
+    assert_eq!(unbondings.len() as u32, 1);  
+    assert_eq!(ledger_balance, amount);  
+
+    assert_ok!(
+      Network::remove_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        amount,
+      )
+    );
+
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let ledger_balance: u128 = unbondings.values().copied().sum();
+    assert_eq!(unbondings.len() as u32, 1);  
+    assert_eq!(ledger_balance, amount*2);
+
+    increase_epochs(1);
+
+    assert_ok!(
+      Network::remove_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        account(total_subnet_nodes+1),
+        amount,
+      )
+    );
+
+    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let ledger_balance: u128 = unbondings.values().copied().sum();
+    assert_eq!(unbondings.len() as u32, 2);  
+    assert_eq!(ledger_balance, amount*3);
+
+    System::set_block_number(System::block_number() + ((EpochLength::get()  + 1) * DelegateStakeCooldownEpochs::get()));
+    let starting_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+
+    assert_ok!(
+      Network::claim_stake_unbondings(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+      )
+    );
+
+    let ending_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+    assert_eq!(starting_balance + ledger_balance, ending_balance);
+
+  });
+}
+
 
 #[test]
 fn test_claim_stake_unbondings_no_unbondings_err() {
@@ -3140,7 +3396,7 @@ fn test_remove_to_stake_max_unlockings_reached_err() {
             1000,
           )
         );
-        // let unbondings: BTreeMap<u64, u128> = SubnetStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+
         let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
 
         assert_eq!(unbondings.len() as u32, n+1);  
@@ -3835,73 +4091,73 @@ fn test_claim_removal_of_delegate_stake() {
   });
 }
 
-#[test]
-fn test_remove_to_delegate_stake_max_unlockings_per_epoch_err() {
-  new_test_ext().execute_with(|| {
-    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-    let deposit_amount: u128 = 10000000000000000000000;
-    let amount: u128 = 1000000000000000000000;
+// #[test]
+// fn test_remove_to_delegate_stake_max_unlockings_per_epoch_err() {
+//   new_test_ext().execute_with(|| {
+//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+//     let deposit_amount: u128 = 10000000000000000000000;
+//     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+//     build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
 
-    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
-    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+//     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
 
-    let n_account = total_subnet_nodes + 1;
+//     let n_account = total_subnet_nodes + 1;
 
-    let _ = Balances::deposit_creating(&account(n_account), deposit_amount);
+//     let _ = Balances::deposit_creating(&account(n_account), deposit_amount);
 
-    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 
-    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
-    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+//     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+//     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
 
-    let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
-      amount,
-      total_subnet_delegated_stake_shares,
-      total_subnet_delegated_stake_balance
-    );
+//     let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
+//       amount,
+//       total_subnet_delegated_stake_shares,
+//       total_subnet_delegated_stake_balance
+//     );
 
-    if total_subnet_delegated_stake_shares == 0 {
-      delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
-    }
+//     if total_subnet_delegated_stake_shares == 0 {
+//       delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
+//     }
 
-    System::set_block_number(System::block_number() + DelegateStakeCooldownEpochs::get() * EpochLength::get());
+//     System::set_block_number(System::block_number() + DelegateStakeCooldownEpochs::get() * EpochLength::get());
 
-    let starting_delegator_balance = Balances::free_balance(&account(n_account));
+//     let starting_delegator_balance = Balances::free_balance(&account(n_account));
 
-    assert_ok!(
-      Network::add_to_delegate_stake(
-        RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
-        amount,
-      ) 
-    );
+//     assert_ok!(
+//       Network::add_to_delegate_stake(
+//         RuntimeOrigin::signed(account(n_account)),
+//         subnet_id,
+//         amount,
+//       ) 
+//     );
 
-    let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(n_account), subnet_id);
+//     let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(n_account), subnet_id);
 
-    assert_ok!(
-      Network::remove_delegate_stake(
-        RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
-        delegate_shares/2,
-      )
-    );
-    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
-    // assert_eq!(unbondings.len(), 1);
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
-    assert_eq!(unbondings.len(), 1);
+//     assert_ok!(
+//       Network::remove_delegate_stake(
+//         RuntimeOrigin::signed(account(n_account)),
+//         subnet_id,
+//         delegate_shares/2,
+//       )
+//     );
+//     // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
+//     // assert_eq!(unbondings.len(), 1);
+//     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
+//     assert_eq!(unbondings.len(), 1);
 
-    assert_err!(
-      Network::remove_delegate_stake(
-        RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
-        delegate_shares/2,
-      ),
-      Error::<Test>::MaxUnlockingsPerEpochReached
-    );
-  });
-}
+//     assert_err!(
+//       Network::remove_delegate_stake(
+//         RuntimeOrigin::signed(account(n_account)),
+//         subnet_id,
+//         delegate_shares/2,
+//       ),
+//       Error::<Test>::MaxUnlockingsPerEpochReached
+//     );
+//   });
+// }
 
 #[test]
 fn test_remove_to_delegate_stake_max_unlockings_reached_err() {
