@@ -39,6 +39,8 @@
 // We make sure this pallet uses `no_std` for compiling to Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
 
+// extern crate alloc;
+
 // Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 use codec::{Decode, Encode};
@@ -82,6 +84,8 @@ pub use weights::*;
 
 mod utils;
 mod staking;
+// pub mod stake;
+// pub use stake::staking;
 mod delegate_staking;
 mod subnet_validator;
 mod math;
@@ -262,6 +266,8 @@ pub mod pallet {
 		SubnetNodeNotExist,
 		/// Subnet already exists
 		SubnetExist,
+		/// Subnet registration cooldown period not met
+		SubnetRegistrationCooldown,
 		/// Max total subnet memory exceeded
 		MaxTotalSubnetMemory,
 		/// Max subnet memory size exceeded
@@ -426,46 +432,46 @@ pub mod pallet {
 		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 	}
 
-	#[derive(Encode, Decode, scale_info::TypeInfo, Clone, PartialEq, Eq)]
-	pub enum ActionType {
-		Deregister,
-		Deactivate,
-	}
+	// #[derive(Encode, Decode, scale_info::TypeInfo, Clone, PartialEq, Eq)]
+	// pub enum ActionType {
+	// 	Deregister,
+	// 	Deactivate,
+	// }
 
-	#[derive(Encode, Decode, Default, scale_info::TypeInfo, Clone, PartialEq, Eq)]
-	pub struct PendingActions<AccountId> {
-		pub actions: BTreeMap<AccountId, (ActionType, u64)>, // AccountId -> (ActionType, Target Epoch)
-	}
+	// #[derive(Encode, Decode, Default, scale_info::TypeInfo, Clone, PartialEq, Eq)]
+	// pub struct PendingActions<AccountId> {
+	// 	pub actions: BTreeMap<AccountId, (ActionType, u64)>, // AccountId -> (ActionType, Target Epoch)
+	// }
 
-	impl<AccountId> PendingActions<AccountId>
-	where
-		AccountId: Ord,
-	{
-    /// Add a new action for an account.
-    pub fn add_action(&mut self, account: AccountId, action: ActionType, target_epoch: u64) {
-			self.actions.insert(account, (action, target_epoch));
-    }
+	// impl<AccountId> PendingActions<AccountId>
+	// where
+	// 	AccountId: Ord,
+	// {
+  //   /// Add a new action for an account.
+  //   pub fn add_action(&mut self, account: AccountId, action: ActionType, target_epoch: u64) {
+	// 		self.actions.insert(account, (action, target_epoch));
+  //   }
 
-    /// Remove an action for a specific account.
-    pub fn remove_action(&mut self, account: &AccountId) -> Option<(ActionType, u64)> {
-			self.actions.remove(account)
-    }
+  //   /// Remove an action for a specific account.
+  //   pub fn remove_action(&mut self, account: &AccountId) -> Option<(ActionType, u64)> {
+	// 		self.actions.remove(account)
+  //   }
 
-    /// Check if an account has a pending action.
-    pub fn has_action(&self, account: &AccountId) -> bool {
-			self.actions.contains_key(account)
-    }
+  //   /// Check if an account has a pending action.
+  //   pub fn has_action(&self, account: &AccountId) -> bool {
+	// 		self.actions.contains_key(account)
+  //   }
 
-    /// Retrieve the pending action for a specific account.
-    pub fn get_action(&self, account: &AccountId) -> Option<&(ActionType, u64)> {
-			self.actions.get(account)
-    }
+  //   /// Retrieve the pending action for a specific account.
+  //   pub fn get_action(&self, account: &AccountId) -> Option<&(ActionType, u64)> {
+	// 		self.actions.get(account)
+  //   }
 
-    /// Clear all pending actions (use with caution).
-    pub fn clear_actions(&mut self) {
-			self.actions.clear();
-    }
-	}
+  //   /// Clear all pending actions (use with caution).
+  //   pub fn clear_actions(&mut self) {
+	// 		self.actions.clear();
+  //   }
+	// }
 
 	// #[derive(EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	// pub enum SubnetNodeActionType {
@@ -619,6 +625,12 @@ pub mod pallet {
   }
 
 	/// Subnet data used before activation
+	///
+	/// # Arguments
+	///
+	/// * `path` - Path to download the model, this can be HuggingFace, IPFS, anything.
+	/// * `memory_mb` - The memory requirement to serve the entirety of the model
+	/// * `registration_blocks` - Registration blocks the subnet registerer wants to use
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct RegistrationSubnetData {
 		pub path: Vec<u8>,
@@ -927,6 +939,22 @@ pub mod pallet {
 	pub fn DefaultValidatorArgsLimit() -> u32 {
 		4096
 	}
+	#[pallet::type_value]
+	pub fn DefaultMinSubnetRegistrationFee() -> u128 {
+		100e+18 as u128
+	}
+	#[pallet::type_value]
+	pub fn DefaultMaxSubnetRegistrationFee() -> u128 {
+		1000e+18 as u128
+	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetRegistrationFeePeriod() -> u32 {
+		100
+	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetRegistrationInterval() -> u32 {
+		100
+	}
 
 	/// Count of subnets
 	#[pallet::storage]
@@ -974,10 +1002,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type SubnetActivationEnactmentPeriod<T> = StorageValue<_, u64, ValueQuery, DefaultSubnetActivationEnactmentPeriod>;
 
-	/// Maximum epochs a subnet node can stay in registration period before being removed
-	#[pallet::storage]
-	pub type MaxSubnetNodeRegistrationEpochs<T> = StorageValue<_, u32, ValueQuery, DefaultMaxSubnetNodeRegistrationEpochs>;
-
 	// Minimum amount of peers required per subnet
 	// required for subnet activity
 	#[pallet::storage]
@@ -986,9 +1010,6 @@ pub mod pallet {
 
 	#[pallet::storage]
 	pub type MinNodesCurveParameters<T> = StorageValue<_, CurveParametersSet, ValueQuery, DefaultMinNodesCurveParameters>;
-
-	#[pallet::storage]
-	pub type RewardCurveParameters<T> = StorageValue<_, CurveParametersSet, ValueQuery, DefaultMinNodesCurveParameters>;
 
 	// Maximim peers in a subnet at any given time
 	#[pallet::storage]
@@ -1013,15 +1034,10 @@ pub mod pallet {
 	#[pallet::getter(fn total_subnet_nodes)]
 	pub type TotalSubnetNodes<T: Config> =
 		StorageMap<_, Blake2_128Concat, u32, u32, ValueQuery>;
-
-	#[pallet::storage] // subnet_uid --> u32
-	#[pallet::getter(fn total_active_subnet_nodes)]
-	pub type TotalActiveSubnetNodes<T: Config> =
-		StorageMap<_, Blake2_128Concat, u32, u32, ValueQuery>;
 	
-	#[pallet::storage]
-	#[pallet::getter(fn pending_actions)]
-	pub type PendingActionsStorage<T: Config> = StorageValue<_, Option<PendingActions<T::AccountId>>, ValueQuery>;
+	// #[pallet::storage]
+	// #[pallet::getter(fn pending_actions)]
+	// pub type PendingActionsStorage<T: Config> = StorageValue<_, Option<PendingActions<T::AccountId>>, ValueQuery>;
 
 	#[pallet::type_value]
 	pub fn DefaultDeactivationLedger<T: Config>() -> BTreeSet<SubnetNodeDeactivation> {
@@ -1483,6 +1499,23 @@ pub mod pallet {
 	// Consensus required to pass proposal
 	#[pallet::storage]
 	pub type ProposalConsensusThreshold<T> = StorageValue<_, u128, ValueQuery, DefaultProposalConsensusThreshold>;
+
+	#[pallet::storage]
+	pub type MinSubnetRegistrationFee<T> = StorageValue<_, u128, ValueQuery, DefaultMinSubnetRegistrationFee>;
+
+	#[pallet::storage]
+	pub type MaxSubnetRegistrationFee<T> = StorageValue<_, u128, ValueQuery, DefaultMaxSubnetRegistrationFee>;
+
+	#[pallet::storage]
+	pub type SubnetRegistrationFeePeriod<T> = StorageValue<_, u32, ValueQuery, DefaultSubnetRegistrationFeePeriod>;
+
+	#[pallet::storage]
+	pub type LastSubnetRegistrationEpoch<T> = StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
+
+	// Epochs per subnet registration
+	// e.g. Amount of epochs required to go by after a subnet registers before another can
+	#[pallet::storage]
+	pub type SubnetRegistrationInterval<T> = StorageValue<_, u32, ValueQuery, DefaultSubnetRegistrationInterval>;
 
 	/// The pallet's dispatchable functions ([`Call`]s).
 	///
@@ -2513,6 +2546,13 @@ pub mod pallet {
 				Error::<T>::SubnetExist
 			);
 
+			let epoch = Self::get_current_epoch_as_u32();
+
+			ensure!(
+				Self::can_subnet_register(epoch),
+				Error::<T>::SubnetRegistrationCooldown
+			);
+
 			// --- Ensure total network memory isn't exceeded
 			ensure!(
 				TotalSubnetMemoryMB::<T>::get() + subnet_data.memory_mb <= MaxTotalSubnetMemoryMB::<T>::get(),
@@ -2542,32 +2582,31 @@ pub mod pallet {
 			);
 
 			let block: u64 = Self::get_current_block_as_u64();
-			let subnet_cost: u128 = Self::get_subnet_initialization_cost(block);
+			// let subnet_cost: u128 = Self::get_subnet_initialization_cost(block);
+			let subnet_fee: u128 = Self::registration_cost(epoch);
 
-			if subnet_cost > 0 {
+			if subnet_fee > 0 {
 				// unreserve from activator
-				let subnet_cost_as_balance = Self::u128_to_balance(subnet_cost);
+				let subnet_fee_as_balance = Self::u128_to_balance(subnet_fee);
 
 				ensure!(
-					Self::can_remove_balance_from_coldkey_account(&activator, subnet_cost_as_balance.unwrap()),
+					Self::can_remove_balance_from_coldkey_account(&activator, subnet_fee_as_balance.unwrap()),
 					Error::<T>::NotEnoughBalanceToStake
 				);
-		
+				
+				// --- Burn fee
 				ensure!(
-					Self::remove_balance_from_coldkey_account(&activator, subnet_cost_as_balance.unwrap()) == true,
+					Self::remove_balance_from_coldkey_account(&activator, subnet_fee_as_balance.unwrap()) == true,
 					Error::<T>::BalanceWithdrawalError
 				);
 
 				// TODO
-				// Send portion to stake rewards vault
 				// Send portion to treasury
-
-				// increase stake balance with subnet initialization cost
-				StakeVaultBalance::<T>::mutate(|n: &mut u128| *n += subnet_cost);
 			}
 
 			// Get total subnets ever
 			let subnet_len: u32 = TotalSubnets::<T>::get();
+
 			// Start the subnet_ids at 1
 			let subnet_id = subnet_len + 1;
 			
@@ -2595,6 +2634,8 @@ pub mod pallet {
 			SubnetsData::<T>::insert(subnet_id, subnet_data.clone());
 			// Increase total subnets. This is used for unique Subnet IDs
 			TotalSubnets::<T>::mutate(|n: &mut u32| *n += 1);
+			// Update latest registration epoch
+			LastSubnetRegistrationEpoch::<T>::set(epoch);
 
 			Self::deposit_event(Event::SubnetRegistered { 
 				account_id: activator, 
@@ -2957,8 +2998,6 @@ pub mod pallet {
 					Ok(())
 				}
 			)?;
-
-			TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
 	
 			Self::deposit_event(
 				Event::SubnetNodeActivated { 
@@ -3072,8 +3111,6 @@ pub mod pallet {
 					Ok(())
 				}
 			)?;
-
-			TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
 
 			Self::deposit_event(
 				Event::SubnetNodeDeactivated { 

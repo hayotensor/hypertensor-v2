@@ -30,9 +30,10 @@ impl<T: Config> Pallet<T> {
       .expect("blockchain will not exceed 2^64 blocks; QED.")
   }
   
-  pub fn get_eligible_epoch_block(epoch_length: u64, initialized: u64, epochs: u64) -> u64 {
-    let eligible_block: u64 = initialized - (initialized % epoch_length) + epoch_length * epochs;
-    eligible_block
+  pub fn get_current_epoch_as_u32() -> u32 {
+    let current_block = Self::get_current_block_as_u64();
+    let epoch_length: u64 = T::EpochLength::get();
+    (current_block / epoch_length) as u32
   }
 
   // Loosely validates Node ID
@@ -62,12 +63,6 @@ impl<T: Config> Pallet<T> {
     false
   }
   
-  pub fn is_subnet_node_eligible(subnet_node: u32, subnet_node_id: u32) -> bool {
-    let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get();
-    let penalties = SubnetNodePenalties::<T>::get(subnet_node, subnet_node_id);
-    penalties <= max_subnet_node_penalties
-  }
-
   pub fn get_tx_rate_limit() -> u64 {
     TxRateLimit::<T>::get()
   }
@@ -87,25 +82,6 @@ impl<T: Config> Pallet<T> {
     }
 
     return current_block - prev_tx_block <= rate_limit;
-  }
-
-  // If a subnet or subnet peer is able to be included or submit consensus
-  //
-  // This checks if the block is equal to or greater than therefor shouldn't 
-  // be used while checking if a subnet or subnet peer was able to accept or be 
-  // included in consensus during the forming of consensus since it checks for
-  // the previous epochs eligibility
-  pub fn is_epoch_block_eligible(
-    block: u64, 
-    epoch_length: u64, 
-    epochs: u64, 
-    initialized: u64
-  ) -> bool {
-    block >= Self::get_eligible_epoch_block(
-      epoch_length, 
-      initialized, 
-      epochs
-    )
   }
 
   /// Remove subnet peer from subnet
@@ -154,7 +130,6 @@ impl<T: Config> Pallet<T> {
 
       // Update total subnet peers by substracting 1
       TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
-      TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
 
       // Reset sequential absent subnet node count
       SubnetNodePenalties::<T>::remove(subnet_id, subnet_node_id);
@@ -163,19 +138,12 @@ impl<T: Config> Pallet<T> {
     }
   }
 
-
-  pub fn do_clear_subnet(
-    subnet_id: u32,
-  ) {
-
-  }
-
   pub fn get_min_subnet_nodes(base_node_memory: u128, memory_mb: u128) -> u32 {
     // TODO: Needs to be updated for smoother curve
-
-    // log::error!(" ");
-    // log::error!("get_min_subnet_nodes base_node_memory {:?}", base_node_memory);
-    // log::error!("get_min_subnet_nodes memory_mb {:?}", memory_mb);
+    //
+    //
+    //
+    //
 
     // --- DEFAULT
     // --- Get min nodes based on default memory settings
@@ -277,15 +245,47 @@ impl<T: Config> Pallet<T> {
     ) as u32 + min_subnet_nodes
   }
 
-  pub fn get_subnet_rewards(memory_mb: u128, base_reward_per_mb: u128) -> u128 {
-    Self::percent_mul(
-      Self::percent_mul(base_reward_per_mb, memory_mb), 
-      TargetSubnetNodesMultiplier::<T>::get()
-    )
-  }
-
   pub fn get_subnet_initialization_cost(block: u64) -> u128 {
     T::SubnetInitializationCost::get()
+  }
+
+  pub fn registration_cost(epoch: u32) -> u128 {
+    let period: u32 = SubnetRegistrationFeePeriod::<T>::get();
+    let last_registration_epoch = LastSubnetRegistrationEpoch::<T>::get();
+    let next_registration_epoch = Self::get_next_registration_epoch(last_registration_epoch);
+    let fee_min: u128 = MinSubnetRegistrationFee::<T>::get();
+
+    // If no registration within period, keep at `fee_min`
+    if epoch >= next_registration_epoch + period {
+      return fee_min
+    }
+
+    let fee_max: u128 = MaxSubnetRegistrationFee::<T>::get();
+
+    // Epoch within the cycle
+    let cycle_epoch = epoch % period;
+    let decrease_per_epoch = (fee_max.saturating_sub(fee_min)).saturating_div(period as u128);
+    
+    let cost = fee_max.saturating_sub(decrease_per_epoch.saturating_mul(cycle_epoch as u128));
+    // Ensures cost doesn't go below min
+    cost.max(fee_min)
+  }
+
+  pub fn can_subnet_register(current_epoch: u32) -> bool {
+    current_epoch >= Self::get_next_registration_epoch(current_epoch)
+  }
+
+  pub fn get_next_registration_epoch(current_epoch: u32) -> u32 {
+    let last_registration_epoch: u32 = LastSubnetRegistrationEpoch::<T>::get();
+    let subnet_registration_fee_period: u32 = SubnetRegistrationFeePeriod::<T>::get();
+    // // --- Genesis handling
+    // if last_registration_epoch < subnet_registration_fee_period {
+    //   return 0
+    // }
+    let next_valid_epoch = last_registration_epoch + (
+      subnet_registration_fee_period - (last_registration_epoch % subnet_registration_fee_period)
+    );
+    next_valid_epoch
   }
 
   pub fn do_epoch_preliminaries(block: u64, epoch: u32, epoch_length: u64) {
@@ -373,29 +373,6 @@ impl<T: Config> Pallet<T> {
       );
     }
   }
-
-  // pub fn validate_signature(
-  //   data: &Vec<u8>,
-  //   signature: &T::OffchainSignature,
-  //   signer: &T::AccountId,
-  // ) -> DispatchResult {
-  //   if signature.verify(&**data, &signer) {
-  //     return Ok(())
-  //   }
-
-  //   // NOTE: for security reasons modern UIs implicitly wrap the data requested to sign into
-  //   // <Bytes></Bytes>, that's why we support both wrapped and raw versions.
-  //   let prefix = b"<Bytes>";
-  //   let suffix = b"</Bytes>";
-  //   let mut wrapped: Vec<u8> = Vec::with_capacity(data.len() + prefix.len() + suffix.len());
-  //   wrapped.extend(prefix);
-  //   wrapped.extend(data);
-  //   wrapped.extend(suffix);
-
-  //   ensure!(signature.verify(&*wrapped, &signer), Error::<T>::WrongSignature);
-
-  //   Ok(())
-  // }
   
   /// The minimum delegate stake balance for a subnet to stay live
   pub fn get_min_subnet_delegate_stake_balance(min_subnet_nodes: u32) -> u128 {

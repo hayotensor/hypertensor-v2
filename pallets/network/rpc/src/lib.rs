@@ -1,7 +1,6 @@
 use jsonrpsee::{
 	core::{RpcResult},
 	proc_macros::rpc,
-	// types::error::{CallError, ErrorObject},
 	types::{error::ErrorObject, ErrorObjectOwned},
 };
 
@@ -14,12 +13,6 @@ use sp_api::ProvideRuntimeApi;
 pub use network_custom_rpc_runtime_api::NetworkRuntimeApi;
 use frame_support::storage::bounded_vec::BoundedVec;
 use pallet_network::DefaultSubnetNodeUniqueParamLimit;
-
-// #[derive(serde::Deserialize, serde::Serialize)]
-// pub struct Custom {
-// 	code: u32,
-// 	sum: u32,
-// }
 
 #[rpc(client, server)]
 pub trait NetworkCustomApi<BlockHash> {
@@ -65,20 +58,6 @@ impl<C, Block> NetworkCustom<C, Block> {
 	}
 }
 
-// /// Error type of this RPC api.
-// pub enum Error {
-//   /// The call to runtime failed.
-//   RuntimeError,
-// }
-
-// impl From<Error> for i32 {
-//   fn from(e: Error) -> i32 {
-//       match e {
-//           Error::RuntimeError => 1,
-//       }
-//   }
-// }
-
 /// Error type of this RPC api.
 pub enum Error {
 	/// The call to runtime failed.
@@ -95,9 +74,9 @@ impl From<Error> for ErrorObjectOwned {
 
 impl From<Error> for i32 {
 	fn from(e: Error) -> i32 {
-			match e {
-					Error::RuntimeError(_) => 1,
-			}
+		match e {
+			Error::RuntimeError(_) => 1,
+		}
 	}
 }
 
@@ -185,23 +164,3 @@ where
 		})
 	}
 }
-
-// const RUNTIME_ERROR: i32 = 1;
-
-// // Converts a runtime trap into an RPC error.
-// fn runtime_error_into_rpc_err(err: impl std::fmt::Debug) -> Error::RuntimeError {
-//   CallError::Custom(ErrorObject::owned(
-//     Error::RuntimeError.into(),
-//     "Runtime error",
-//     Some(format!("{:?}", err)),
-//   ))
-//   .into()
-// }
-// fn runtime_error_into_rpc_err(err: impl std::fmt::Debug) -> JsonRpseeError {
-//   CallError::Custom(ErrorObject::owned(
-//     Error::RuntimeError.into(),
-//     "Runtime error",
-//     Some(format!("{:?}", err)),
-//   ))
-//   .into()
-// }

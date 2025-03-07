@@ -502,7 +502,6 @@ mod benchmarks {
 	// // 	deactivate_subnet_node(RawOrigin::Signed(subnet_node_account.clone()), subnet_id);
 
 	// // 	assert_eq!(TotalSubnetNodes::<T>::get(subnet_id), end+1);
-	// // 	assert_eq!(TotalActiveSubnetNodes::<T>::get(subnet_id), end);
 	// // }
 
 	// #[benchmark]

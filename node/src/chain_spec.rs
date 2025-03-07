@@ -249,8 +249,8 @@ fn local_genesis(
 			// Assign network admin rights.
 			"key": Some(root_key),
 		},
-		"node_authorization": NodeAuthorizationConfig {
-			nodes: vec![
+		"nodeAuthorization": {
+			"nodes": vec![
 				(
 					OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
 					endowed_accounts[0].clone()
@@ -298,14 +298,14 @@ fn testnet_gavin_genesis(
 			// Assign network admin rights.
 			"key": Some(root_key),
 		},
-		"node_authorization": NodeAuthorizationConfig {
-			nodes: vec![
+		"nodeAuthorization": {
+			"nodes": vec![
 				(
-					peer(0),
+					OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
 					endowed_accounts[0].clone()
 				),
 				(
-					peer(1),
+					OpaquePeerId(bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust").into_vec().unwrap()),
 					endowed_accounts[1].clone()
 				),
 			],
@@ -347,14 +347,14 @@ fn testnet_tensor_genesis(
 			// Assign network admin rights.
 			"key": Some(root_key),
 		},
-		"node_authorization": NodeAuthorizationConfig {
-			nodes: vec![
+		"nodeAuthorization": {
+			"nodes": vec![
 				(
-					peer(0),
+					OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
 					endowed_accounts[0].clone()
 				),
 				(
-					peer(1),
+					OpaquePeerId(bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust").into_vec().unwrap()),
 					endowed_accounts[1].clone()
 				),
 			],
