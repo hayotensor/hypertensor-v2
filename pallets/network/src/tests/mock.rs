@@ -13,13 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::*;
+use crate::*;
 use crate as pallet_network;
 use frame_support::{
   parameter_types,
   traits::Everything,
   PalletId,
-  // sp_tracing,
   derive_impl
 };
 use frame_system as system;
@@ -31,8 +30,6 @@ use sp_runtime::{
 	},
 	MultiSignature
 };
-// use pallet_balances::AccountData;
-// use frame_support::traits::StoredMap;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;

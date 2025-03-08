@@ -66,13 +66,14 @@ use sp_runtime::Saturating;
 
 // FRAME pallets require their own "mock runtimes" to be able to run unit tests. This module
 // contains a mock runtime specific for testing this pallet's functionality.
-#[cfg(test)]
-mod mock;
+// #[cfg(test)]
+// mod mock;
 
 // This module contains the unit tests for this pallet.
 // Learn about pallet unit testing here: https://docs.substrate.io/test/unit-testing/
 #[cfg(test)]
 mod tests;
+
 // ./target/release/solochain-template-node --dev
 // Every callable function or "dispatchable" a pallet exposes must have weight values that correctly
 // estimate a dispatchable's execution time. The benchmarking module is used to calculate weights
@@ -83,10 +84,8 @@ pub mod weights;
 pub use weights::*;
 
 mod utils;
-mod staking;
-// pub mod stake;
-// pub use stake::staking;
-mod delegate_staking;
+pub mod stake;
+pub use stake::{staking, delegate_staking};
 mod subnet_validator;
 mod math;
 mod randomness;
@@ -1060,10 +1059,6 @@ pub mod pallet {
 		pub subnet_id: u32,
 		pub subnet_node_id: u32,
 	}
-
-	// #[pallet::storage]
-	// pub type DeactivationLedger<T: Config> = 
-	// 	StorageValue<_, BTreeSet<T>, ValueQuery, DefaultDeactivationLedger<T>>;
 
 	#[pallet::storage]
 	pub type MaxDeactivations<T: Config> = 
@@ -2758,9 +2753,6 @@ pub mod pallet {
 
 			// Remove proposals
 			let _ = Proposals::<T>::clear_prefix(subnet_id, u32::MAX, None);
-
-			// Remove deactivation ledger
-			// let _ = DeactivationLedger2::<T>::remove(subnet_id);
 	
 			Self::deposit_event(Event::SubnetDeactivated { subnet_id: subnet_id, reason: reason });
 
@@ -3175,6 +3167,7 @@ pub mod pallet {
 				}
 
 				// --- Remove from ledger
+				// Removes item from ledger if succeeded or not (even if subnet was previously removed)
 				deactivation_ledger.remove(data);
 
 				i+=1;
