@@ -357,7 +357,6 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
@@ -368,6 +367,7 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -423,7 +423,6 @@ fn test_register_subnet_node_then_activate() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+deposit_amount);
   
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
@@ -434,6 +433,7 @@ fn test_register_subnet_node_then_activate() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -532,7 +532,6 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000+deposit_amount);
   
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
@@ -543,6 +542,7 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();

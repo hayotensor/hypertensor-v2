@@ -990,7 +990,6 @@ fn test_do_epoch_preliminaries_deactivate_subnet_enactment_period() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -999,6 +998,7 @@ fn test_do_epoch_preliminaries_deactivate_subnet_enactment_period() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();

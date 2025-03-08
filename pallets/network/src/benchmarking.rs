@@ -75,7 +75,7 @@ fn funded_initializer<T: Config>(name: &'static str, index: u32) -> T::AccountId
 	let caller: T::AccountId = account(name, index, SEED);
 	// Give the account half of the maximum value of the `Balance` type.
 	// Otherwise some transfers will fail with an overflow error.
-	let deposit_amount: u128 = Network::<T>::get_subnet_initialization_cost(0) + 1000000;
+	let deposit_amount: u128 = Network::<T>::registration_cost(0) + 1000000;
 	T::Currency::deposit_creating(&caller, deposit_amount.try_into().ok().expect("REASON"));
 	caller
 }

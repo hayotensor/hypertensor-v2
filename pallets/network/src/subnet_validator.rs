@@ -178,7 +178,7 @@ impl<T: Config> Pallet<T> {
     }
 
     // --- n-1 to get 0 index in the randomization
-    let rand_index = Self::get_random_number((subnet_nodes_len - 1) as u32, block as u32);
+    let rand_index = Self::get_random_number(subnet_nodes_len as u32, block as u32);
 
     // --- Choose random accountant from eligible accounts
     let validator: &u32 = &subnet_node_ids[rand_index as usize];

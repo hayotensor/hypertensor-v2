@@ -67,6 +67,7 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
     path: subnet_path.clone().into(),
     memory_mb: DEFAULT_MEM_MB,
     registration_blocks: registration_blocks,
+    entry_interval: 0,
   };
 
   // --- Register subnet for activation

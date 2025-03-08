@@ -22,7 +22,7 @@ impl<T: Config> Pallet<T> {
 		if max == 0 {
 			return 0
 		}
-		max = max + 1;
+		// max = max + 1;
 		
 		let mut random_number = Self::generate_random_number(seed);
 

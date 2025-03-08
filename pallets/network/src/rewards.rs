@@ -80,8 +80,8 @@ impl<T: Config> Pallet<T> {
         if attestation_percentage > Self::PERCENTAGE_FACTOR {
           attestation_percentage = Self::PERCENTAGE_FACTOR;
         }
+        
         let validator_subnet_node_id: u32 = submission.validator_id;
-        // let validator_subnet_node_id: u32 = HotkeySubnetNodeId::<T>::get(subnet_id, validator.clone()).expect("REASON");
 
         let data_len = submission.data.len();
 
@@ -136,8 +136,11 @@ impl<T: Config> Pallet<T> {
     
         // --- Reward validators
         for (subnet_node_id, subnet_node) in SubnetNodesData::<T>::iter_prefix(subnet_id) {
-          let hotkey: T::AccountId = SubnetNodeIdHotkey::<T>::get(subnet_id, subnet_node_id).expect("s");
-
+          let hotkey: T::AccountId = match SubnetNodeIdHotkey::<T>::try_get(subnet_id, subnet_node_id) {
+            Ok(hotkey) => hotkey,
+            Err(()) => continue,
+          };
+      
           // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
           // --- (else if) Check if past Idle and can be included in validation data
           // Always continue if any of these are true

@@ -83,16 +83,18 @@ mod benchmarking;
 pub mod weights;
 pub use weights::*;
 
-mod utils;
+pub mod utilities;
+pub use utilities::*;
 pub mod stake;
-pub use stake::{staking, delegate_staking};
+pub use stake::*;
+pub mod rpc_info;
+pub use rpc_info::*;
+pub mod admin;
+pub use admin::*;
+
 mod subnet_validator;
-mod math;
-mod randomness;
 mod rewards;
-mod info;
 mod proposal;
-mod admin;
 
 // All pallet logic is defined in its own module and must be annotated by the `pallet` attribute.
 #[frame_support::pallet]
@@ -288,6 +290,9 @@ pub mod pallet {
 		/// The provided signature is incorrect.
 		WrongSignature,
 		InvalidSubnetId,
+
+		/// Maximum amount of subnet entries surpassed, see subnet `entry_interval` for more information
+		MaxSubnetEntryInterval,
 
 		DelegateStakeTransferPeriodExceeded,
 		MustUnstakeToRegister,
@@ -635,6 +640,7 @@ pub mod pallet {
 		pub path: Vec<u8>,
 		pub memory_mb: u128,
 		pub registration_blocks: u64,
+		pub entry_interval: u64,
 	}
 	
 	/// Subnet data used before activation
@@ -662,6 +668,7 @@ pub mod pallet {
 		pub initialized: u64,
 		pub registration_blocks: u64,
 		pub activated: u64,
+		pub entry_interval: u64,
 	}
 
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
@@ -954,6 +961,11 @@ pub mod pallet {
 	pub fn DefaultSubnetRegistrationInterval() -> u32 {
 		100
 	}
+	#[pallet::type_value]
+	pub fn DefaultMaxLastSubnetEntry() -> u64 {
+		// 1 week based on 6s blocks
+		100800
+	}
 
 	/// Count of subnets
 	#[pallet::storage]
@@ -968,6 +980,13 @@ pub mod pallet {
 	// Stores subnet data by a unique id
 	#[pallet::storage] // subnet_id => data struct
 	pub type SubnetsData<T: Config> = StorageMap<_, Blake2_128Concat, u32, SubnetData>;
+
+	#[pallet::storage] // subnet_id => block_interval
+	pub type MaxLastSubnetEntry<T: Config> = StorageValue<_, u64, ValueQuery, DefaultMaxLastSubnetEntry>;
+
+	/// The maximum a single node can enter a subnet per blocks interval
+	#[pallet::storage] // subnet_id => block
+	pub type LastSubnetEntry<T: Config> = StorageMap<_, Blake2_128Concat, u32, u64, ValueQuery, DefaultZeroU64>;
 
 	/// Maximum subnet memory per subnet
 	#[pallet::storage]
@@ -2517,8 +2536,6 @@ pub mod pallet {
 			// Must be deactivated to update peer_id
 
 
-			// SubnetNodeIdHotkey::<T>::
-
 			// let subnet_node = match SubnetNodesData::<T>::try_get(subnet_id) {
       //   Ok(subnet_node) => subnet_node,
       //   Err(()) => return Err(Error::<T>::SubnetNodeNotExist.into()),
@@ -2577,7 +2594,6 @@ pub mod pallet {
 			);
 
 			let block: u64 = Self::get_current_block_as_u64();
-			// let subnet_cost: u128 = Self::get_subnet_initialization_cost(block);
 			let subnet_fee: u128 = Self::registration_cost(epoch);
 
 			if subnet_fee > 0 {
@@ -2619,6 +2635,7 @@ pub mod pallet {
 				registration_blocks: subnet_data.clone().registration_blocks,
 				initialized: block,
 				activated: 0,
+				entry_interval: 0,
 			};
 
 			// Increase total subnet memory
@@ -2734,6 +2751,8 @@ pub mod pallet {
 			SubnetsData::<T>::remove(subnet_id);
 			// Decrease total subnet memory
 			TotalSubnetMemoryMB::<T>::mutate(|n: &mut u128| n.saturating_reduce(subnet.memory_mb));
+			// Remove subnet entry ledger
+			LastSubnetEntry::<T>::remove(subnet_id);
 
 			// We don't subtract TotalSubnets since it's used for ids
 
@@ -2788,6 +2807,12 @@ pub mod pallet {
         Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
 			};
 
+			let block: u64 = Self::get_current_block_as_u64();
+			ensure!(
+				block >= LastSubnetEntry::<T>::get(subnet_id) + subnet.entry_interval,
+				Error::<T>::MaxSubnetEntryInterval
+			);
+
 			// Ensure hotkey either has no owner or is the origins hotkey
 			match HotkeyOwner::<T>::try_get(hotkey.clone()) {
 				Ok(coldkey_owner) => {
@@ -2799,8 +2824,6 @@ pub mod pallet {
 				// Has no owner
 				Err(()) => (),
 			};
-			
-			let block: u64 = Self::get_current_block_as_u64();
 
 			// --- Subnet nodes can only register if within registration period or if it's activated
 			// --- Ensure the subnet outside of the enactment period or still registering
@@ -2910,6 +2933,8 @@ pub mod pallet {
 
 			// Increase total subnet peers
 			TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+
+			LastSubnetEntry::<T>::insert(subnet_id, block);
 
 			Self::deposit_event(
 				Event::SubnetNodeRegistered { 
@@ -3296,6 +3321,7 @@ pub mod pallet {
 				registration_blocks: MinSubnetRegistrationBlocks::<T>::get(),
 				initialized: 1,
 				activated: 0,
+				entry_interval: 0,
 			};
 
 			// Increase total subnet memory

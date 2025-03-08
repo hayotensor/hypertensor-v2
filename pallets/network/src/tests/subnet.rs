@@ -46,7 +46,6 @@ fn test_register_subnet() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -55,6 +54,7 @@ fn test_register_subnet() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -89,7 +89,6 @@ fn test_register_subnet_subnet_registration_cooldown() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -98,6 +97,7 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -123,6 +123,7 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
 
     // --- Register subnet for activation
@@ -146,7 +147,6 @@ fn test_register_subnet_subnet_registration_cooldown() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
 
     // --- Register after cooldown
@@ -170,7 +170,6 @@ fn test_register_subnet_exists_error() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -179,6 +178,7 @@ fn test_register_subnet_exists_error() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -217,13 +217,13 @@ fn test_register_subnet_registration_blocks_err() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: MinSubnetRegistrationBlocks::<Test>::get() - 1,
+      entry_interval: 0,
     };
     
     let epoch_length = EpochLength::get();
@@ -244,6 +244,7 @@ fn test_register_subnet_registration_blocks_err() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: MaxSubnetRegistrationBlocks::<Test>::get() + 1,
+      entry_interval: 0,
     };
 
     assert_err!(
@@ -265,7 +266,6 @@ fn test_register_subnet_max_subnet_mem_err() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
 
     let max_subnet_mem = MaxSubnetMemoryMB::<Test>::get();
@@ -277,6 +277,7 @@ fn test_register_subnet_max_subnet_mem_err() {
       path: subnet_path.into(),
       memory_mb: max_subnet_mem+1,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
 
     let epoch_length = EpochLength::get();
@@ -303,9 +304,7 @@ fn test_register_subnet_max_total_subnet_mem_err() {
     let epoch = System::block_number().saturating_div(epoch_length);
   
     let cost = Network::registration_cost(epoch as u32);
-  
-    // let cost = Network::get_subnet_initialization_cost(0);
-  
+    
     let max_total_subnet_memory_mb = MaxTotalSubnetMemoryMB::<Test>::get();
     let total_subnet_memory_mb = TotalSubnetMemoryMB::<Test>::get();
 
@@ -333,6 +332,7 @@ fn test_register_subnet_max_total_subnet_mem_err() {
         path: path,
         memory_mb: subnet_mem_mb,
         registration_blocks: registration_blocks,
+        entry_interval: 0,
       };
 
       let next_subnet_total_memory_mb = TotalSubnetMemoryMB::<Test>::get() + subnet_mem_mb;
@@ -360,7 +360,6 @@ fn test_register_subnet_max_total_subnet_mem_err() {
 #[test]
 fn test_register_subnet_not_enough_balance_err() {
   new_test_ext().execute_with(|| {
-    // let cost = Network::get_subnet_initialization_cost(0);
     // let _ = Balances::deposit_creating(&account(0), cost+1000);  
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -369,6 +368,7 @@ fn test_register_subnet_not_enough_balance_err() {
       path: subnet_path.into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
 
     let epoch_length = EpochLength::get();
@@ -398,7 +398,6 @@ fn test_activate_subnet() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -407,6 +406,7 @@ fn test_activate_subnet() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -503,7 +503,6 @@ fn test_activate_subnet_invalid_subnet_id_error() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -512,6 +511,7 @@ fn test_activate_subnet_invalid_subnet_id_error() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -580,7 +580,6 @@ fn test_activate_subnet_already_activated_err() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -589,6 +588,7 @@ fn test_activate_subnet_already_activated_err() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -678,7 +678,6 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -687,6 +686,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -787,7 +787,6 @@ fn test_activate_subnet_initializing_error() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -796,6 +795,7 @@ fn test_activate_subnet_initializing_error() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -936,7 +936,6 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -945,6 +944,7 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -1010,7 +1010,6 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
   
     let cost = Network::registration_cost(epoch as u32);
   
-    // let cost = Network::get_subnet_initialization_cost(0);
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
@@ -1019,6 +1018,7 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
       path: subnet_path.clone().into(),
       memory_mb: DEFAULT_MEM_MB,
       registration_blocks: registration_blocks,
+      entry_interval: 0,
     };
   
     let epoch_length = EpochLength::get();
@@ -1096,13 +1096,14 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
 // fn test_get_min_subnet_delegate_stake_balance() {
 //   new_test_ext().execute_with(|| {
 //     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-//     let cost = Network::get_subnet_initialization_cost(0);
+//     let cost = Network::registration_cost(0);
 //     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
 //     let add_subnet_data = RegistrationSubnetData {
 //       path: subnet_path.clone().into(),
 //       memory_mb: 500_000,
 //       registration_blocks: DEFAULT_REGISTRATION_BLOCKS,
+//       entry_interval: 0,
 //     };
 //     assert_ok!(
 //       Network::activate_subnet(
