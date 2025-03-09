@@ -4,6 +4,7 @@ mod subnet;
 mod subnet_node;
 mod staking;
 mod delegate_staking;
+mod node_delegate_staking;
 mod incentives_protocol;
 mod proposals;
 mod math;

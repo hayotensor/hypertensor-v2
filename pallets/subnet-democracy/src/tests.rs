@@ -157,8 +157,7 @@ fn build_existing_subnet(start: u32, end: u32) {
         RuntimeOrigin::signed(account(n)),
         subnet_id,
         peer(n),
-        // "172.20.54.234".into(),
-        // 8888,
+        0,
         min_stake,
       ) 
     );

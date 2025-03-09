@@ -208,6 +208,17 @@ pub mod pallet {
 		DelegateStakeRemoved(u32, T::AccountId, u128),
 		DelegateStakeSwitched(u32, u32, T::AccountId, u128),
 
+		DelegateNodeStakeAdded { account_id: T::AccountId, subnet_id: u32, subnet_node_id: u32, amount: u128 },
+		DelegateNodeStakeRemoved { account_id: T::AccountId, subnet_id: u32, subnet_node_id: u32, amount: u128 },
+		DelegateNodeStakeSwitched { 
+			account_id: T::AccountId, 
+			from_subnet_id: u32, 
+			from_subnet_node_id: u32, 
+			to_subnet_id: u32, 
+			to_subnet_node_id: u32, 
+			amount: u128 
+		},
+
 		// Admin 
     SetMaxSubnets(u32),
     SetMinSubnetNodes(u32),
@@ -419,6 +430,8 @@ pub mod pallet {
 		pub peer_id: PeerId,
 		pub initialized: u64,
 		pub classification: SubnetNodeClassification,
+		pub delegate_reward_rate: u128,
+		pub last_delegate_reward_rate_update: u64,
 		pub a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 		pub b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -436,123 +449,15 @@ pub mod pallet {
 		pub c: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 	}
 
-	// #[derive(Encode, Decode, scale_info::TypeInfo, Clone, PartialEq, Eq)]
-	// pub enum ActionType {
-	// 	Deregister,
-	// 	Deactivate,
-	// }
-
-	// #[derive(Encode, Decode, Default, scale_info::TypeInfo, Clone, PartialEq, Eq)]
-	// pub struct PendingActions<AccountId> {
-	// 	pub actions: BTreeMap<AccountId, (ActionType, u64)>, // AccountId -> (ActionType, Target Epoch)
-	// }
-
-	// impl<AccountId> PendingActions<AccountId>
-	// where
-	// 	AccountId: Ord,
-	// {
-  //   /// Add a new action for an account.
-  //   pub fn add_action(&mut self, account: AccountId, action: ActionType, target_epoch: u64) {
-	// 		self.actions.insert(account, (action, target_epoch));
-  //   }
-
-  //   /// Remove an action for a specific account.
-  //   pub fn remove_action(&mut self, account: &AccountId) -> Option<(ActionType, u64)> {
-	// 		self.actions.remove(account)
-  //   }
-
-  //   /// Check if an account has a pending action.
-  //   pub fn has_action(&self, account: &AccountId) -> bool {
-	// 		self.actions.contains_key(account)
-  //   }
-
-  //   /// Retrieve the pending action for a specific account.
-  //   pub fn get_action(&self, account: &AccountId) -> Option<&(ActionType, u64)> {
-	// 		self.actions.get(account)
-  //   }
-
-  //   /// Clear all pending actions (use with caution).
-  //   pub fn clear_actions(&mut self) {
-	// 		self.actions.clear();
-  //   }
-	// }
-
-	// #[derive(EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
-	// pub enum SubnetNodeActionType {
-	// 	Deregister,
-	// 	Deactivate,
-	// }
-
-	// #[derive(Default, Encode, Decode, Clone, PartialEq, Eq, scale_info::TypeInfo)]
-	// pub struct SubnetNodePendingActions<AccountId> {
-  //   actions: BTreeMap<AccountId, (SubnetNodeActionType, u64)>,
-	// }
-
-	// impl<T: Config> SubnetNodePendingActions<T> {
-	// 	// fn default() -> Self {
-	// 	// 	SubnetNodePendingActions {
-	// 	// 		actions: BTreeMap::new(),
-	// 	// 	}
-	// 	// }
-
-  //   /// Adds a pending action for a node.
-  //   pub fn add_action(&mut self, account_id: T::AccountId, action: SubnetNodeActionType, target_epoch: u64) {
-	// 		self.actions.insert(account_id, (action, target_epoch));
-  //   }
-
-  //   /// Removes a pending action for a node.
-  //   pub fn remove_action(&mut self, account_id: T::AccountId) {
-	// 		self.actions.remove(&account_id);
-  //   }
-
-  //   /// Checks for actions to be executed at the current epoch.
-  //   pub fn process_actions(&mut self, current_epoch: u64) -> Vec<(T::AccountId, SubnetNodeActionType)> {
-	// 		let mut to_process = vec![];
-
-	// 		for (account_id, (action, target_epoch)) in self.actions.iter() {
-	// 			if *target_epoch <= current_epoch {
-	// 				to_process.push((account_id.clone(), action.clone()));
-	// 			}
-	// 		}
-
-	// 		// Remove processed actions.
-	// 		for (account_id, _) in &to_process {
-	// 			self.actions.remove(account_id);
-	// 		}
-
-	// 		to_process
-  //   }
-
-	// 	pub fn execute_actions(
-	// 		&mut self,
-	// 		current_epoch: u64,
-	// 		nodes: &mut BTreeMap<T::AccountId, SubnetNode>,
-	// ) {
-	// 		let actions = self.process_actions(current_epoch);
-
-	// 		for (node_id, action) in actions {
-	// 			if let Some(node) = nodes.get_mut(&node_id) {
-	// 				match action {
-	// 					SubnetNodeActionType::Deregister => {
-	// 						// Remove node if not activated.
-	// 						nodes.remove(&node_id);
-	// 					}
-	// 					SubnetNodeActionType::Deactivate => {
-	// 						// Set node classification to Registered.
-	// 						node.classification.class = SubnetNodeClass::Registered;
-	// 						node.classification.start_epoch = current_epoch;
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	/// Registered: Subnet node registered, not included in consensus
-	/// Idle: Subnet node is activated as idle, unless subnet is registering, and automatically updates on the first successful consensus epoch
-	/// Included: Subnet node automatically updates to Included from Idle on the first successful consensus epoch after being Idle
-	/// Validator: Subnet node updates to Submittble from Included on the first successful consensus epoch they are included in consensus data
-	/// Accountant:  Subnet node updates to Accountant after multiple successful validations
+	/// Subnet node classes
+	/// 
+	/// # Arguments
+	///
+	/// *Deactivated: Subnet node is temporarily activated (done manually). Available to Validator class only.
+	/// *Registered: Subnet node registered, not included in consensus
+	/// *Idle: Subnet node is activated as idle, unless subnet is registering, and automatically updates on the first successful consensus epoch
+	/// *Included: Subnet node automatically updates to Included from Idle on the first successful consensus epoch after being Idle
+	/// *Validator: Subnet node updates to Submittble from Included on the first successful consensus epoch they are included in consensus data
 	#[derive(Default, EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, Ord, scale_info::TypeInfo)]
   pub enum SubnetNodeClass {
 		Deactivated,
@@ -575,23 +480,36 @@ pub mod pallet {
 	}
 
 
-	// The submit consensus data format
-	// Scoring is calculated off-chain between subnet peers hosting AI subnets together
+	/// Incentives protocol format
+	///
+	/// Scoring is calculated off-chain between subnet peers hosting AI subnets together
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct SubnetNodeData {
 		pub peer_id: PeerId,
 		pub score: u128,
 	}
 
+	/// Incentives protocol format V2 (not in use)
+	///
+	/// Scoring is calculated off-chain between subnet peers hosting AI subnets together
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct SubnetNodeIncentives {
 		pub uid: u32,
 		pub score: u128,
 	}
 
+	/// Reasons for a subnets removal
+	///
+	/// # Enums
+	///
+	/// *MaxPenalties: Subnet has surpasses the maximum penalties.
+	/// *MinSubnetNodes: Subnet has went under the minumum subnet nodes required.
+	/// *MinSubnetDelegateStake: Subnet delegate stake balance went under minimum required supply.
+	/// *Council: Removed by council.
+	/// *EnactmentPeriod: Subnet registered but never activated within the enactment period.
+	/// *MaxSubnets: Lowest rated subnet removed if there are maximum subnets
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
   pub enum SubnetRemovalReason {
-    SubnetDemocracy,
     MaxPenalties,
 		MinSubnetNodes,
 		MinSubnetDelegateStake,
@@ -622,6 +540,12 @@ pub mod pallet {
 		pub max_x: u128,
 	}
 
+	/// Vote types
+	///
+	/// # Enums
+	///
+	/// *Yay: Vote yay.
+	/// *Nay: Vote nay.
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
   pub enum VoteType {
     Yay,
@@ -658,6 +582,19 @@ pub mod pallet {
 		pub active: bool,
 	}
 
+	/// Subnet data
+	///
+	/// # Arguments
+	///
+	/// * `id` - Unique identifier.
+	/// * `path` - Path to download the model, this can be HuggingFace, IPFS, anything.
+	/// * `min_nodes` - Minimum required nodes for subnet.
+	/// * `target_nodes` - Target nodes of subnet based on minimum nodes.
+	/// * `memory_mb` - Memory requirements of subnet.
+	/// * `initialized` - Block subnet registered.
+	/// * `registration_blocks` - Registration blocks the subnet registerer wants to use.
+	/// * `activated` - Block subnet activated.
+	/// * `entry_interval` - Blocks between each node entry into the subnet.
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct SubnetData {
 		pub id: u32,
@@ -671,12 +608,34 @@ pub mod pallet {
 		pub entry_interval: u64,
 	}
 
+	/// Mapping of votes of a subnet proposal
+	///
+	/// # Arguments
+	///
+	/// * `yay` - Mapping of subnet node IDs voted yay.
+	/// * `nay` - Mapping of subnet node IDs voted nay.
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct VoteParams {
 		pub yay: BTreeSet<u32>,
 		pub nay: BTreeSet<u32>,
 	}
 
+	/// Proposal parameters
+	///
+	/// # Arguments
+	///
+	/// * `subnet_id` - Subnet ID.
+	/// * `plaintiff_id` - Proposers subnet node ID.
+	/// * `defendant_id` - Defendants subnet node ID.
+	/// * `plaintiff_bond` - Plaintiffs bond to create proposal (minimum proposal bond at time of proposal).
+	/// * `defendant_bond` - Defendants bond to create proposal (matches plaintiffs bond).
+	/// * `eligible_voters` - Mapping of subnet node IDs eligible to vote at time of proposal.
+	/// * `votes` - Mapping of votes (`yay` and `nay`).
+	/// * `start_block` - Block when proposer proposes proposal.
+	/// * `challenge_block` - Block when defendant disputes proposal.
+	/// * `plaintiff_data` - Proposers data to prove removal. Data is based on subnet removal reasons off-chain.
+	/// * `defendant_data` - Defedants data to prove dispute.
+	/// * `complete` - If proposal is complete.
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct ProposalParams {
 		pub subnet_id: u32,
@@ -725,21 +684,6 @@ pub mod pallet {
 	pub fn DefaultSubnetNodeRegistrationEpochs() -> u64 {
 		16
 	}
-	// #[pallet::type_value]
-	// pub fn DefaultSubnetNodePendingActionsLedger<T: Config>() -> SubnetNodePendingActions<T> {
-	// 	// SubnetNodePendingActions::default()
-	// 	// return SubnetNodePendingActions {
-	// 	// 	actions: BTreeMap::new(),
-	// 	// }
-	// 	SubnetNodePendingActions::<T>::default()
-	// }
-
-
-	
-	// #[pallet::type_value]
-	// pub fn DefaultRegisteredSubnetNodeLedger() -> BTreeSet {
-	// 	BTreeSet::new()
-	// }
 	#[pallet::type_value]
 	pub fn DefaultSubnetNodesClasses<T: Config>() -> BTreeMap<T::AccountId, u64> {
 		BTreeMap::new()
@@ -754,6 +698,8 @@ pub mod pallet {
 				class: SubnetNodeClass::Registered,
 				start_epoch: 0,
 			},
+			delegate_reward_rate: 0,
+			last_delegate_reward_rate_update: 0,
 			a: Some(BoundedVec::new()),
 			b: Some(BoundedVec::new()),
       c: Some(BoundedVec::new()),
@@ -800,10 +746,6 @@ pub mod pallet {
 		// 1100
 		110000000
 	}
-	// #[pallet::type_value]
-	// pub fn DefaultMinRequiredDelegateUnstakeEpochs() -> u64 {
-	// 	21
-	// }
 	#[pallet::type_value]
 	pub fn DefaultDelegateStakeCooldown() -> u64 {
 		0
@@ -858,11 +800,6 @@ pub mod pallet {
 	}
 	#[pallet::type_value]
 	pub fn DefaultMinVastMajorityAttestationPercentage() -> u128 {
-		// 7/8
-		875000000
-	}
-	#[pallet::type_value]
-	pub fn DefaultMinSuperMajorityAttestationPercentage() -> u128 {
 		// 7/8
 		875000000
 	}
@@ -1070,6 +1007,16 @@ pub mod pallet {
 	pub fn DefaultSubnetNodeNonUniqueParamUpdateInterval() -> u32 {
 		1
 	}
+	#[pallet::type_value]
+	pub fn DefaultRewardRateUpdatePeriod() -> u64 {
+		// 1 day at 6 seconds a block (86,000s per day)
+		14400
+	}
+	#[pallet::type_value]
+	pub fn DefaultMaxRewardRateDecrease() -> u128 {
+		// 1%
+		1000000000
+	}
 
 	
 
@@ -1175,18 +1122,6 @@ pub mod pallet {
 		DefaultZeroU32,
 	>;
 
-	// #[pallet::storage] // subnet_id -> class_id -> BTreeMap(account_id, block)
-	// pub type SubnetNodesClasses<T: Config> = StorageDoubleMap<
-	// 	_,
-	// 	Blake2_128Concat,
-	// 	u32,
-	// 	Identity,
-	// 	SubnetNodeClass,
-	// 	BTreeMap<T::AccountId, u64>,
-	// 	ValueQuery,
-	// 	DefaultSubnetNodesClasses<T>,
-	// >;
-
 	/// Base subnet node memory used for calculating minimum and target nodes for a subnet
 	#[pallet::storage]
 	pub type BaseSubnetNodeMemoryMB<T> = StorageValue<_, u128, ValueQuery, DefaultBaseSubnetNodeMemoryMB>;
@@ -1234,8 +1169,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type MinVastMajorityAttestationPercentage<T> = StorageValue<_, u128, ValueQuery, DefaultMinVastMajorityAttestationPercentage>;
 
+	//
 	// Rewards (validator, scoring consensus)
-	
+	//
+
 	// Base reward per epoch for validators
 	// This is the base reward to subnet validators on successful attestation
 	#[pallet::storage]
@@ -1293,6 +1230,7 @@ pub mod pallet {
 	//
 	// Staking
 	// 
+
 	#[pallet::storage] // stores epoch balance of rewards from block rewards to be distributed to peers/stakers
 	#[pallet::getter(fn stake_vault_balance)]
 	pub type StakeVaultBalance<T> = StorageValue<_, u128, ValueQuery>;
@@ -1412,6 +1350,55 @@ pub mod pallet {
 		DefaultDelegateStakeUnbondingLedger,
 	>;
 	
+	//
+	// Node Delegate Stake
+	//
+
+	#[pallet::storage]
+	pub type RewardRateUpdatePeriod<T: Config> = StorageValue<_, u64, ValueQuery, DefaultRewardRateUpdatePeriod>;
+
+	#[pallet::storage]
+	pub type MaxRewardRateDecrease<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMaxRewardRateDecrease>;
+
+	// Total stake sum of shares in specified subnet node
+	#[pallet::storage]
+	pub type TotalNodeDelegateStakeShares<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		u32,
+		u128,
+		ValueQuery,
+		DefaultAccountTake,
+	>;
+
+	// Total stake sum of balance in specified subnet node
+	#[pallet::storage]
+	pub type TotalNodeDelegateStakeBalance<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		u32,
+		Identity,
+		u32,
+		u128,
+		ValueQuery,
+		DefaultAccountTake,
+	>;
+	
+	// account_id -> subnet_id -> subnet_node_id -> shares
+	#[pallet::storage] 
+	pub type AccountNodeDelegateStakeShares<T: Config> = StorageNMap<
+		_,
+		(
+			NMapKey<Blake2_128Concat, T::AccountId>,
+			NMapKey<Identity, u32>,
+			NMapKey<Identity, u32>,
+		),
+		u128,
+		ValueQuery,
+	>;
+
 	//
 	// Props
 	//
@@ -1664,6 +1651,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			hotkey: T::AccountId,
 			peer_id: PeerId, 
+			delegate_reward_rate: u128,
 			stake_to_be_added: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -1674,6 +1662,7 @@ pub mod pallet {
 				subnet_id,
 				hotkey.clone(),
 				peer_id,
+				delegate_reward_rate,
 				stake_to_be_added,
 				a,
 				b,
@@ -1682,16 +1671,15 @@ pub mod pallet {
 
 			let subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone());
 
-			ensure!(
-				subnet_node_id.is_some(),
-				Error::<T>::NotUidOwner
-			);
-
-			Self::do_activate_subnet_node(
-				origin.clone(),
-				subnet_id,
-				subnet_node_id.expect("REASON")
-			)
+			// This is redundant to check, but check we do
+			match HotkeySubnetNodeId::<T>::try_get(subnet_id, hotkey.clone()) {
+				Ok(subnet_node_id) => Self::do_activate_subnet_node(
+					origin.clone(),
+					subnet_id,
+					subnet_node_id
+				),
+				Err(()) => return Err(Error::<T>::NotUidOwner.into()),
+			}
 		}
 
 		/// Register a subnet node to the subnet
@@ -1723,6 +1711,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			hotkey: T::AccountId,
 			peer_id: PeerId, 
+			delegate_reward_rate: u128,
 			stake_to_be_added: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -1733,6 +1722,7 @@ pub mod pallet {
 				subnet_id,
 				hotkey,
 				peer_id,
+				delegate_reward_rate,
 				stake_to_be_added,
 				a,
 				b,
@@ -1799,9 +1789,19 @@ pub mod pallet {
 			)
 		}
 		
-		/// Remove your subnet peer
-		/// Unstaking must be done seperately
-		/// Infallible
+		/// Remove subnet node of caller
+		///
+		/// * Can be called by coldkey or hotkey
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - Subnet node ID assigned during registration
+		///
+		/// # Requirements
+		///
+		/// * Caller must be owner of subnet node, hotkey or coldkey
+		///
 		#[pallet::call_index(7)]
 		// #[pallet::weight(T::WeightInfo::remove_subnet_node())]
 		#[pallet::weight({0})]
@@ -1837,8 +1837,21 @@ pub mod pallet {
 			Ok(())
 		}
 
-		
-		/// Increase stake towards the specified subnet ID
+		/// Add to subnet node stake
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `subnet_node_id` - Subnet node ID assigned during registration
+		/// * `hotkey` - Hotkey of subnet node
+		/// * `stake_to_be_added` - Amount to add to stake
+		///
+		/// # Requirements
+		///
+		/// * Coldkey caller only
+		/// * Subnet must exist
+		/// * Must have amount free in wallet
+		///
 		#[pallet::call_index(9)]
 		// #[pallet::weight(T::WeightInfo::add_to_stake())]
 		#[pallet::weight({0})]
@@ -1880,11 +1893,19 @@ pub mod pallet {
 			)
 		}
 
-		/// Remove stake balance
-		/// If account is a current subnet peer on the subnet ID they can only remove up to minimum required balance
-		// Decrease stake on accounts peer if minimum required isn't surpassed
-		// to-do: if removed through consensus, add removed_block to storage and require time 
-		//				to pass until they can remove their stake
+		/// Remove from subnet node stake and add to unstaking ledger
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `hotkey` - Hotkey of subnet node
+		/// * `stake_to_be_removed` - Amount to remove from stake
+		///
+		/// # Requirements
+		///
+		/// * Coldkey caller only
+		/// * If subnet node, must have available staked balance greater than minimum required stake balance
+		///
 		#[pallet::call_index(10)]
 		#[pallet::weight({0})]
 		pub fn remove_stake(
@@ -1921,14 +1942,22 @@ pub mod pallet {
 			)
 		}
 
+		/// Transfer unstaking ledger balance to coldkey
+		///
+		/// # Requirements
+		///
+		/// * Coldkey caller only
+		/// * Must be owner of stake balance
+		///
 		#[pallet::call_index(11)]
 		#[pallet::weight({0})]
 		pub fn claim_stake_unbondings(
 			origin: OriginFor<T>, 
-			subnet_id: u32, 
 		) -> DispatchResult {
 			let coldkey: T::AccountId = ensure_signed(origin)?;
 			let successful_unbondings: u32 = Self::do_claim_stake_unbondings(&coldkey);
+			// Give error if there is no unbondings
+			// TODO: Give more info
 			ensure!(
 				successful_unbondings > 0,
         Error::<T>::NoStakeUnbondingsOrCooldownNotMet
@@ -1936,7 +1965,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Increase stake towards subnet ID
+		/// Increase subnet delegate stake
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `stake_to_be_added` - Amount of add to delegate stake
+		///
+		/// # Requirements
+		///
+		/// * Subnet must exist
+		///
 		#[pallet::call_index(12)]
 		// #[pallet::weight(T::WeightInfo::add_to_delegate_stake())]
 		#[pallet::weight({0})]
@@ -1960,7 +1999,20 @@ pub mod pallet {
 			)
 		}
 		
-		/// Swaps the balance of the ``from_subnet_id`` shares to ``to_subnet_id``
+		/// Increase subnet delegate stake
+		///
+		/// * Swaps delegate stake from one subnet to another subnet in one call
+		///
+		/// # Arguments
+		///
+		/// * `from_subnet_id` - from subnet ID.
+		/// * `to_subnet_id` - To subnet ID
+		/// * `delegate_stake_shares_to_be_switched` - Shares of `from_subnet_id` to swap to `to_subnet_id`
+		///
+		/// # Requirements
+		///
+		/// * `to_subnet_id` subnet must exist
+		///
 		#[pallet::call_index(13)]
 		#[pallet::weight({0})]
 		pub fn transfer_delegate_stake(
@@ -1988,8 +2040,17 @@ pub mod pallet {
 			)
 		}
 
-		/// Remove delegate stake and add to delegate stake unboding ledger
-		/// Enter shares and will convert to balance automatically
+		/// Remove subnet delegate stake balance and add to unstaking ledger.
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID.
+		/// * `shares_to_be_removed` - Shares to remove
+		///
+		/// # Requirements
+		///
+		/// * Must have balance
+		///
 		#[pallet::call_index(14)]
 		// #[pallet::weight(T::WeightInfo::remove_delegate_stake())]
 		#[pallet::weight({0})]
@@ -2006,7 +2067,8 @@ pub mod pallet {
 		}
 		
 		/// Increase the delegate stake pool balance of a subnet
-		/// Anyone can perform this action as a donation
+		///
+		/// * Anyone can perform this action as a donation
 		///
 		/// # Notes
 		///
@@ -2017,7 +2079,6 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// * `amount` - Amount TENSOR to add to pool
 		///
-		/// 
 		#[pallet::call_index(15)]
 		#[pallet::weight({0})]
 		pub fn increase_delegate_stake(
@@ -2060,6 +2121,54 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Delegate stake to a subnet node
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID
+		/// * `node_account_id` - Subnet node ID
+		/// * `node_delegate_stake_to_be_added` - Amount TENSOR to delegate stake
+		///
+		#[pallet::call_index(16)]
+		#[pallet::weight({0})]
+		pub fn add_to_node_delegate_stake(
+			origin: OriginFor<T>, 
+			subnet_id: u32,
+			subnet_node_id: u32,
+			node_delegate_stake_to_be_added: u128
+		) -> DispatchResult {
+			Self::do_add_node_delegate_stake(
+				origin,
+				subnet_id,
+				subnet_node_id,
+				node_delegate_stake_to_be_added,
+			)
+		}
+
+		/// Remove delegate stake from a subnet node and add to unbonding ledger.
+		///
+		/// # Arguments
+		///
+		/// * `subnet_id` - Subnet ID
+		/// * `node_account_id` - Subnet node ID
+		/// * `node_delegate_stake_shares_to_be_removed` - Pool shares to remove
+		///
+		#[pallet::call_index(17)]
+		#[pallet::weight({0})]
+		pub fn remove_node_delegate_stake(
+			origin: OriginFor<T>, 
+			subnet_id: u32,
+			subnet_node_id: u32,
+			node_delegate_stake_shares_to_be_removed: u128
+		) -> DispatchResult {
+			Self::do_remove_node_delegate_stake(
+				origin,
+				subnet_id,
+				subnet_node_id,
+				node_delegate_stake_shares_to_be_removed,
+			)
+		}
+
 		/// Validator extrinsic for submitting incentives protocol data of the validators view of of the subnet
 		/// This is used t oscore each subnet node for allocation of emissions
 		///
@@ -2069,7 +2178,7 @@ pub mod pallet {
 		/// * `data` - Vector of SubnetNodeData on each subnet node for scoring each
 		/// * `args` (Optional) - Data that can be used by the subnet 
 		/// 
-		#[pallet::call_index(16)]
+		#[pallet::call_index(18)]
 		#[pallet::weight({0})]
 		pub fn validate(
 			origin: OriginFor<T>, 
@@ -2100,7 +2209,7 @@ pub mod pallet {
 		///
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// 
-		#[pallet::call_index(17)]
+		#[pallet::call_index(19)]
 		#[pallet::weight({0})]
 		pub fn attest(
 			origin: OriginFor<T>, 
@@ -2134,7 +2243,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(18)]
+		#[pallet::call_index(20)]
 		#[pallet::weight({0})]
 		pub fn propose(
 			origin: OriginFor<T>, 
@@ -2168,7 +2277,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(19)]
+		#[pallet::call_index(21)]
 		#[pallet::weight({0})]
 		pub fn attest_proposal(
 			origin: OriginFor<T>, 
@@ -2196,7 +2305,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - The proposers subnet node ID
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(20)]
+		#[pallet::call_index(22)]
 		#[pallet::weight({0})]
 		pub fn cancel_proposal(
 			origin: OriginFor<T>, 
@@ -2222,7 +2331,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposers subnet node ID
 		/// * `data` - Data used to justify challenge for subnet use
 		/// 
-		#[pallet::call_index(21)]
+		#[pallet::call_index(23)]
 		#[pallet::weight({0})]
 		pub fn challenge_proposal(
 			origin: OriginFor<T>, 
@@ -2249,7 +2358,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposal ID
 		/// * `vote` - YAY or NAY
 		/// 
-		#[pallet::call_index(22)]
+		#[pallet::call_index(24)]
 		#[pallet::weight({0})]
 		pub fn vote(
 			origin: OriginFor<T>, 
@@ -2278,7 +2387,7 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID.
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(23)]
+		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
 		pub fn finalize_proposal(
 			origin: OriginFor<T>, 
@@ -2302,7 +2411,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - Callers subnet node ID
 		/// * `a` - The unique parameter
 		/// 
-		#[pallet::call_index(24)]
+		#[pallet::call_index(26)]
 		#[pallet::weight({0})]
 		pub fn register_subnet_node_a_parameter(
 			origin: OriginFor<T>, 
@@ -2352,7 +2461,7 @@ pub mod pallet {
 		/// * `b` (Optional) - The non-unique parameter
 		/// * `c` (Optional) - The non-unique parameter
 		/// 
-		#[pallet::call_index(25)]
+		#[pallet::call_index(27)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_node_non_unique_parameter(
 			origin: OriginFor<T>, 
@@ -2417,7 +2526,7 @@ pub mod pallet {
 		/// * `hotkey` - Current hotkey.
 		/// * `new_coldkey` - New coldkey
 		/// 
-		#[pallet::call_index(26)]
+		#[pallet::call_index(28)]
 		#[pallet::weight({0})]
 		pub fn update_coldkey(
 			origin: OriginFor<T>, 
@@ -2453,7 +2562,7 @@ pub mod pallet {
 		/// * `old_hotkey` - Old hotkey to be replaced.
 		/// * `new_hotkey` - New hotkey to replace the old hotkey.
 		/// 
-		#[pallet::call_index(27)]
+		#[pallet::call_index(29)]
 		#[pallet::weight({0})]
 		pub fn update_hotkey(
 			origin: OriginFor<T>, 
@@ -2514,7 +2623,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(28)]
+		#[pallet::call_index(30)]
 		#[pallet::weight({0})]
 		pub fn update_peer_id(
 			origin: OriginFor<T>, 
@@ -2795,6 +2904,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			hotkey: T::AccountId,
 			peer_id: PeerId, 
+			delegate_reward_rate: u128,
 			stake_to_be_added: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
 			b: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -2906,6 +3016,8 @@ pub mod pallet {
 				peer_id: peer_id.clone(),
 				initialized: 0,
 				classification: classification,
+				delegate_reward_rate: delegate_reward_rate,
+				last_delegate_reward_rate_update: block,
 				a: a,
 				b: b,
 				c: c,

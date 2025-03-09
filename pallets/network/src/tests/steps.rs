@@ -107,6 +107,7 @@ fn test_epoch_steps() {
             subnet_id,
             account(n_peers),
             peer(n_peers),
+            0,
             amount,
             None,
             None,

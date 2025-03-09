@@ -100,7 +100,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     assert_ok!(
       Network::deactivate_subnet(
         subnet_path.clone().into(),
-        SubnetRemovalReason::SubnetDemocracy,
+        SubnetRemovalReason::MinSubnetDelegateStake,
       )
     );
 
@@ -117,7 +117,6 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     assert_ok!(
       Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
-        subnet_id,
       )
     );
 
@@ -381,7 +380,6 @@ fn test_claim_removal_of_delegate_stake() {
     assert_err!(
       Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
       ),
       Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
     );
@@ -393,7 +391,6 @@ fn test_claim_removal_of_delegate_stake() {
     assert_ok!(
       Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
       )
     );
 
@@ -822,7 +819,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     assert_ok!(
       Network::deactivate_subnet( 
         subnet_path.clone().into(),
-        SubnetRemovalReason::SubnetDemocracy,
+        SubnetRemovalReason::MinSubnetDelegateStake,
       )
     );
 
@@ -856,7 +853,6 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     assert_err!(
       Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
       ),
       Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
     );
@@ -866,7 +862,6 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     assert_ok!(
       Network::claim_stake_unbondings(
         RuntimeOrigin::signed(account(n_account)),
-        subnet_id,
       )
     );
 

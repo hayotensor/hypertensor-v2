@@ -282,6 +282,20 @@ impl<T: Config> Pallet<T> {
             continue
           }
 
+          let mut node_delegate_reward = 0;
+          if subnet_node.delegate_reward_rate != 0 {
+            let total_node_delegated_stake_shares = TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id);
+            if total_node_delegated_stake_shares != 0 {
+              node_delegate_reward = Self::percent_mul(account_reward, subnet_node.delegate_reward_rate);
+              account_reward = account_reward - node_delegate_reward;
+              Self::do_increase_node_delegate_stake(
+                subnet_id,
+                subnet_node_id,
+                node_delegate_reward,
+              );  
+            }
+          }
+
           // --- Increase account stake and emit event
           Self::increase_account_stake(
             &hotkey,

@@ -127,12 +127,16 @@ impl<T: Config> Pallet<T> {
     Self::decrease_account_stake(&hotkey, subnet_id, stake_to_be_removed);
 
     // --- 9. We add the balancer to the coldkey.  If the above fails we will not credit this coldkey.
-    Self::add_balance_to_stake_unbonding_ledger(&coldkey, subnet_id, stake_to_be_removed, block).map_err(|e| e)?;
+    Self::add_balance_to_stake_unbonding_ledger(
+      &coldkey, 
+      stake_to_be_removed, 
+      T::StakeCooldownEpochs::get(),
+      block
+    ).map_err(|e| e)?;
 
     // Set last block for rate limiting
     Self::set_last_tx_block(&coldkey, block);
 
-    // Self::deposit_event(Event::StakeRemoved(subnet_id, coldkey, stake_to_be_removed));
     Self::deposit_event(Event::StakeRemoved(subnet_id, coldkey, hotkey, stake_to_be_removed));
 
     Ok(())
@@ -149,80 +153,6 @@ impl<T: Config> Pallet<T> {
       new_hotkey,
       subnet_id, 
     )
-  }
-
-  pub fn add_balance_to_stake_unbonding_ledger(
-    coldkey: &T::AccountId,
-    subnet_id: u32, 
-    amount: u128,
-    block: u64,
-  ) -> DispatchResult {
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
-
-    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
-
-    // One unlocking per epoch
-    // ensure!(
-    //   unbondings.get(&epoch) == None,
-    //   Error::<T>::MaxUnlockingsPerEpochReached
-    // );
-
-    // --- Ensure we don't surpass max unlockings by attempting to unlock unbondings
-    if unbondings.len() as u32 == T::MaxStakeUnlockings::get() {
-      Self::do_claim_stake_unbondings(&coldkey);
-    }
-
-    // --- Get updated unbondings after claiming unbondings
-    let mut unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
-
-    // We're about to add another unbonding to the ledger - it must be n-1
-    ensure!(
-      unbondings.len() < T::MaxStakeUnlockings::get() as usize,
-      Error::<T>::MaxUnlockingsReached
-    );
-
-    // unbondings.insert(epoch, amount);
-    // StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings);
-    StakeUnbondingLedger::<T>::mutate(&coldkey, |ledger| {
-      ledger.entry(epoch).and_modify(|v| *v += amount).or_insert(amount);
-    });
-
-    Ok(())
-  }
-
-  // Infallible
-  pub fn do_claim_stake_unbondings(coldkey: &T::AccountId) -> u32 {
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
-    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
-
-    let mut unbondings_copy = unbondings.clone();
-
-    let mut successful_unbondings = 0;
-
-    for (unbonding_epoch, amount) in unbondings.iter() {
-      if epoch <= unbonding_epoch + T::StakeCooldownEpochs::get() {
-        continue
-      }
-
-      let stake_to_be_added_as_currency = Self::u128_to_balance(*amount);
-      if !stake_to_be_added_as_currency.is_some() {
-        // Redundant
-        unbondings_copy.remove(&unbonding_epoch);
-        continue
-      }
-      
-      unbondings_copy.remove(&unbonding_epoch);
-      Self::add_balance_to_coldkey_account(&coldkey, stake_to_be_added_as_currency.unwrap());
-      successful_unbondings += 1;
-    }
-
-    if unbondings.len() != unbondings_copy.len() {
-      StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings_copy);
-    }
-    successful_unbondings
   }
 
   pub fn increase_account_stake(
@@ -270,70 +200,5 @@ impl<T: Config> Pallet<T> {
       subnet_id, 
       old_hotkey_stake_balance.saturating_add(new_hotkey_stake_balance)
     );
-  }
-
-  pub fn can_remove_balance_from_coldkey_account(
-    coldkey: &T::AccountId,
-    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  ) -> bool {
-    let current_balance = Self::get_coldkey_balance(coldkey);
-    if amount > current_balance {
-      return false;
-    }
-
-    // This bit is currently untested. @todo
-    let new_potential_balance = current_balance - amount;
-    let can_withdraw = T::Currency::ensure_can_withdraw(
-      &coldkey,
-      amount,
-      WithdrawReasons::except(WithdrawReasons::TIP),
-      new_potential_balance,
-    )
-    .is_ok();
-    can_withdraw
-  }
-
-  pub fn remove_balance_from_coldkey_account(
-    coldkey: &T::AccountId,
-    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  ) -> bool {
-    return match T::Currency::withdraw(
-      &coldkey,
-      amount,
-      WithdrawReasons::except(WithdrawReasons::TIP),
-      ExistenceRequirement::KeepAlive,
-    ) {
-      Ok(_result) => true,
-      Err(_error) => false,
-    };
-  }
-
-  pub fn add_balance_to_coldkey_account(
-    coldkey: &T::AccountId,
-    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  ) {
-    T::Currency::deposit_creating(&coldkey, amount);
-  }
-
-  pub fn get_coldkey_balance(
-    coldkey: &T::AccountId,
-  ) -> <<T as pallet::Config>::Currency as Currency<<T as system::Config>::AccountId>>::Balance {
-    return T::Currency::free_balance(&coldkey);
-  }
-
-  // pub fn u64_to_balance(
-  //   input: u64,
-  // ) -> Option<
-  //   <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  // > {
-  //   input.try_into().ok()
-  // }
-
-  pub fn u128_to_balance(
-    input: u128,
-  ) -> Option<
-    <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-  > {
-    input.try_into().ok()
   }
 }
