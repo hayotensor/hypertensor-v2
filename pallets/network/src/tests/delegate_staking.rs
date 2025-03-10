@@ -57,6 +57,69 @@ fn test_delegate_math() {
 }
 
 #[test]
+fn test_delegate_math_with_storage() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 1000000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), amount + 500);
+    let starting_delegator_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+
+    assert_ok!(
+      Network::add_to_delegate_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        amount,
+      ) 
+    );
+
+    let post_delegator_balance = Balances::free_balance(&account(total_subnet_nodes+1));
+    assert_eq!(post_delegator_balance, starting_delegator_balance - amount);
+
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    let delegate_balance = Network::convert_to_balance(
+      delegate_shares,
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+
+    // assert_eq!(amount, delegate_balance);
+    assert!(
+      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance <= amount)
+    );
+
+    let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+
+    assert_ok!(
+      Network::remove_delegate_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)),
+        subnet_id,
+        delegate_shares / 2,
+      )
+    );
+
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(total_subnet_nodes+1), subnet_id);
+    let delegate_balance = Network::convert_to_balance(
+      delegate_shares,
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+
+  });
+}
+
+#[test]
 fn test_remove_claim_delegate_stake_after_remove_subnet() {
   new_test_ext().execute_with(|| {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();

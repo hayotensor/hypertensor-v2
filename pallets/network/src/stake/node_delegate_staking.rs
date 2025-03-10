@@ -137,10 +137,12 @@ impl<T: Config> Pallet<T> {
 
     // --- Get accounts current balance
     let delegate_stake_to_be_removed = Self::convert_to_balance(
-      account_node_delegate_stake_shares,
+      node_delegate_stake_shares_to_be_removed,
       total_node_delegated_stake_shares,
       total_node_delegated_stake_balance
     );
+
+    log::error!("delegate_stake_to_be_removed {:?}", delegate_stake_to_be_removed);
 
     // --- Ensure that we can convert this u128 to a balance.
     // Redunant
