@@ -10,17 +10,29 @@ use sp_std::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
 use frame_support::BoundedVec;
 use sp_core::OpaquePeerId as PeerId;
 use crate::{
-  Error, SubnetNodeData, TotalStake, SubnetRewardsValidator,
-  SubnetPaths, TotalSubnetNodes,
+  Error, 
+  TotalStake, 
+  SubnetRewardsValidator,
+  SubnetPaths, 
+  TotalSubnetNodes,
   SubnetNodeClass,
   SubnetsData,
   AccountSubnetStake,
   RegistrationSubnetData,
   StakeUnbondingLedger, 
-  TotalSubnetStake, MinSubnetRegistrationBlocks,
+  TotalSubnetStake, 
+  MinSubnetRegistrationBlocks,
   DefaultSubnetNodeUniqueParamLimit,
-  HotkeyOwner, TotalSubnetNodeUids, HotkeySubnetNodeId, SubnetNodeIdHotkey, SubnetNodesData, SubnetNodeAccount,
-  DeactivationLedger, SubnetNodeDeactivation
+  HotkeyOwner, 
+  TotalSubnetNodeUids, 
+  HotkeySubnetNodeId, 
+  SubnetNodeIdHotkey, 
+  SubnetNodesData, 
+  SubnetNodeAccount,
+  DeactivationLedger, 
+  SubnetNodeDeactivation, 
+  MaxRewardRateDecrease,
+  RewardRateUpdatePeriod
 };
 
 ///
@@ -1817,7 +1829,7 @@ fn test_claim_stake_unbondings() {
     System::set_block_number(System::block_number() + ((epoch_length  + 1) * stake_cooldown_epochs));
 
     assert_ok!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
       )
     );
@@ -1934,7 +1946,7 @@ fn test_remove_stake_twice_in_epoch() {
     let starting_balance = Balances::free_balance(&account(total_subnet_nodes+1));
 
     assert_ok!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
       )
     );
@@ -1984,7 +1996,7 @@ fn test_claim_stake_unbondings_no_unbondings_err() {
     assert_eq!(after_stake_balance, starting_balance - amount);
 
     assert_err!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
       ),
       Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
@@ -2323,6 +2335,97 @@ fn test_deactivation_ledger_as_chosen_validator() {
     // );
 
     // DeactivationLedger::<Test>::set(ledger);
+
+  });
+}
+
+#[test]
+fn test_update_delegate_reward_rate() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let n_peers = 8;
+    build_activated_subnet(subnet_path.clone(), 0, n_peers, deposit_amount, amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+    let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(0)).unwrap();
+
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, subnet_node_id);
+    assert_eq!(subnet_node.delegate_reward_rate, 0);
+    // build_activated_subnet increases blocks by 10,000
+    assert_eq!(subnet_node.last_delegate_reward_rate_update, 10000);
+
+
+    let max_reward_rate_decrease = MaxRewardRateDecrease::<Test>::get();
+    let reward_rate_update_period = RewardRateUpdatePeriod::<Test>::get();
+    let new_delegate_reward_rate = 50_000_000;
+
+    System::set_block_number(System::block_number() + reward_rate_update_period);
+
+    let block_number = System::block_number();
+
+    // Increase reward rate to 5% then test decreasing
+    assert_ok!(
+      Network::update_delegate_reward_rate(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        subnet_node_id,
+        new_delegate_reward_rate
+      )
+    );
+  
+    let subnet_node = SubnetNodesData::<Test>::get(subnet_id, subnet_node_id);
+    assert_eq!(subnet_node.delegate_reward_rate, new_delegate_reward_rate);
+    assert_eq!(subnet_node.last_delegate_reward_rate_update, block_number);
+
+    System::set_block_number(System::block_number() + reward_rate_update_period);
+
+    let new_delegate_reward_rate = new_delegate_reward_rate - max_reward_rate_decrease;
+
+    // allow decreasing by 1%
+    assert_ok!(
+      Network::update_delegate_reward_rate(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        subnet_node_id,
+        new_delegate_reward_rate
+      )
+    );
+
+    assert_err!(
+      Network::update_delegate_reward_rate(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        subnet_node_id,
+        1000000001
+      ),
+      Error::<Test>::InvalidDelegateRewardRate
+    );
+
+    assert_err!(
+      Network::update_delegate_reward_rate(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        subnet_node_id,
+        new_delegate_reward_rate+1
+      ),
+      Error::<Test>::MaxRewardRateUpdates
+    );
+
+    System::set_block_number(System::block_number() + reward_rate_update_period);
+
+    assert_err!(
+      Network::update_delegate_reward_rate(
+        RuntimeOrigin::signed(account(0)),
+        subnet_id,
+        subnet_node_id,
+        new_delegate_reward_rate
+      ),
+      Error::<Test>::NoDelegateRewardRateChange
+    );
 
   });
 }

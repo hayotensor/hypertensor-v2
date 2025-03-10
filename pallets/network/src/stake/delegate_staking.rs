@@ -158,7 +158,7 @@ impl<T: Config> Pallet<T> {
     Self::decrease_account_delegate_stake_shares(&account_id, subnet_id, delegate_stake_to_be_removed, delegate_stake_shares_to_be_removed);
     
     // --- We add the balancer to the account_id.  If the above fails we will not credit this account_id.
-    Self::add_balance_to_stake_unbonding_ledger(
+    Self::add_balance_to_unbonding_ledger(
       &account_id, 
       delegate_stake_to_be_removed, 
       T::DelegateStakeCooldownEpochs::get(),

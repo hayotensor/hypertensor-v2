@@ -186,8 +186,8 @@ pub fn testnet_tensor_config() -> Result<ChainSpec, String> {
 		WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
 		None,
 	)
-	.with_name("Gavin Testnet")
-	.with_id("gavin_testnet")
+	.with_name("Testnet Tensor")
+	.with_id("testnet_tensor")
 	.with_chain_type(ChainType::Development)
 	.with_genesis_config_patch(testnet_tensor_genesis(
 		// Initial PoA authorities
@@ -350,12 +350,12 @@ fn testnet_tensor_genesis(
 		"nodeAuthorization": {
 			"nodes": vec![
 				(
-					OpaquePeerId(bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap()),
-					endowed_accounts[0].clone()
+					OpaquePeerId(bs58::decode("12D3KooWJwKCnTerejvaSQP79QzKvanYNJb7HsHREjbywHknduzT").into_vec().unwrap()),
+					"5FtAdTm1ZFuyxuz39mWFZaaDF8925Pu62SvuF7svMQMSCcPF"
 				),
 				(
-					OpaquePeerId(bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust").into_vec().unwrap()),
-					endowed_accounts[1].clone()
+					OpaquePeerId(bs58::decode("12D3KooWRGWycb9eSvyLfbF9bNKjyBhRezSzAmBJB36gheZK9tuc").into_vec().unwrap()),
+					"5EX5TgeLSf55eZZrfG1GDPba6b3YXJvc4CoqzBkQoiX6KVKn"
 				),
 			],
 		},	

@@ -376,7 +376,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
     // let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
     let ledger_balance: u128 = unbondings.values().copied().sum();
     assert_ok!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(n)),
       )
     );
@@ -388,8 +388,6 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
   // for n in start..end {
   //   System::set_block_number(System::block_number() + ((epoch_length  + 1) * DelegateStakeCooldownEpochs::get()));
   //   let starting_balance = Balances::free_balance(&account(n));
-
-  //   // let unbondings = DelegateStakeUnbondingLedger::<Test>::get(account(n), subnet_id);
   //   let unbondings = StakeUnbondingLedger::<Test>::get(account(n));
   //   if unbondings.len() == 0 {
   //     continue
@@ -398,7 +396,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
   //   let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
 
   //   assert_ok!(
-  //     Network::claim_stake_unbondings(
+  //     Network::claim_unbondings(
   //       RuntimeOrigin::signed(account(n)),
   //     )
   //   );

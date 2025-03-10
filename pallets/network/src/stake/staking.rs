@@ -127,7 +127,7 @@ impl<T: Config> Pallet<T> {
     Self::decrease_account_stake(&hotkey, subnet_id, stake_to_be_removed);
 
     // --- 9. We add the balancer to the coldkey.  If the above fails we will not credit this coldkey.
-    Self::add_balance_to_stake_unbonding_ledger(
+    Self::add_balance_to_unbonding_ledger(
       &coldkey, 
       stake_to_be_removed, 
       T::StakeCooldownEpochs::get(),

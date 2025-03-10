@@ -18,7 +18,7 @@
 use super::*;
 
 impl<T: Config> Pallet<T> {
-  pub fn add_balance_to_stake_unbonding_ledger(
+  pub fn add_balance_to_unbonding_ledger(
     coldkey: &T::AccountId,
     amount: u128,
     cooldown_epoch_length: u64,
@@ -31,7 +31,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Ensure we don't surpass max unlockings by attempting to unlock unbondings
     if unbondings.len() as u32 == T::MaxStakeUnlockings::get() {
-      Self::do_claim_stake_unbondings(&coldkey);
+      Self::do_claim_unbondings(&coldkey);
     }
 
     // --- Get updated unbondings after claiming unbondings
@@ -51,7 +51,7 @@ impl<T: Config> Pallet<T> {
   }
 
   // Infallible
-  pub fn do_claim_stake_unbondings(coldkey: &T::AccountId) -> u32 {
+  pub fn do_claim_unbondings(coldkey: &T::AccountId) -> u32 {
     let block: u64 = Self::get_current_block_as_u64();
     let epoch_length: u64 = T::EpochLength::get();
     let epoch: u64 = block / epoch_length;

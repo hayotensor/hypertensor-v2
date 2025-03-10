@@ -38,6 +38,11 @@ fn test_percent_mul() {
 
     // assert_ne!(value, 0, "percent_mul_round_up didn't round down");
     // assert_ne!(value, u128::MAX, "percent_mul_round_up didn't round down");
+
+
+    let value = Network::percent_mul(1000e+18 as u128, 500_000_000);
+    assert_eq!(value, 500e+18 as u128, "percent_mul_round_up didn't round up");
+
   });
 }
 

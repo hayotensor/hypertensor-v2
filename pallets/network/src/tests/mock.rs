@@ -19,7 +19,11 @@ use frame_support::{
   parameter_types,
   traits::Everything,
   PalletId,
-  derive_impl
+  derive_impl,
+  weights::{
+		constants::WEIGHT_REF_TIME_PER_SECOND,
+		Weight,
+	},
 };
 use frame_system as system;
 use sp_core::{ConstU128, ConstU32, ConstU64, H256, U256};
@@ -30,6 +34,8 @@ use sp_runtime::{
 	},
 	MultiSignature
 };
+use sp_runtime::Perbill;
+use frame_system::EnsureRoot;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -41,6 +47,7 @@ frame_support::construct_runtime!(
     InsecureRandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
     Balances: pallet_balances,
     Network: pallet_network,
+    Collective: pallet_collective::<Instance1>,
 	}
 );
 
@@ -181,10 +188,37 @@ impl frame_system::Config for Test {
   type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
+
+parameter_types! {
+	pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
+	pub const CouncilMaxProposals: u32 = 100;
+	pub const CouncilMaxMembers: u32 = 100;
+  pub BlockWeights: frame_system::limits::BlockWeights =
+    frame_system::limits::BlockWeights::with_sensible_defaults(
+      Weight::from_parts(2u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
+      NORMAL_DISPATCH_RATIO,
+    );
+	pub MaxCollectivesProposalWeight: Weight = Perbill::from_percent(50) * BlockWeights::get().max_block;
+}
+
+type CouncilCollective = pallet_collective::Instance1;
+impl pallet_collective::Config<CouncilCollective> for Test {
+	type RuntimeOrigin = RuntimeOrigin;
+	type Proposal = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type MotionDuration = CouncilMotionDuration;
+	type MaxProposals = CouncilMaxProposals;
+	type MaxMembers = CouncilMaxMembers;
+	type DefaultVote = pallet_collective::PrimeDefaultVote;
+	type WeightInfo = ();
+	type SetMembersOrigin = EnsureRoot<AccountId>;
+	type MaxProposalWeight = MaxCollectivesProposalWeight;
+}
+
 parameter_types! {
 	pub const EpochLength: u64 = 100;
   pub const NetworkPalletId: PalletId = PalletId(*b"/network");
-  pub const SubnetInitializationCost: u128 = 100_000_000_000_000_000_000;
   pub const MinProposalStake: u128 = 1_000_000_000_000_000_000;
   pub const DelegateStakeCooldownEpochs: u64 = 100;
   pub const StakeCooldownEpochs: u64 = 100;
@@ -197,16 +231,15 @@ impl Config for Test {
   type WeightInfo = ();
 	type RuntimeEvent = RuntimeEvent;
   type Currency = Balances;
+  type MajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
+  type SuperMajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 4, 5>;
   type EpochLength = EpochLength;
   type StringLimit = ConstU32<100>;
 	type InitialTxRateLimit = ConstU64<0>;
-  // type SecsPerBlock = ConstU64<{ SECS_PER_BLOCK as u64 }>;
-	// type Year = ConstU64<{ YEAR as u64 }>;
   // type OffchainSignature = Signature;
 	// type OffchainPublic = AccountPublic;
   type Randomness = InsecureRandomnessCollectiveFlip;
 	type PalletId = NetworkPalletId;
-  type SubnetInitializationCost = SubnetInitializationCost;
   type DelegateStakeCooldownEpochs = DelegateStakeCooldownEpochs;
   type StakeCooldownEpochs = DelegateStakeCooldownEpochs;
 	type DelegateStakeEpochsRemovalWindow = DelegateStakeEpochsRemovalWindow;

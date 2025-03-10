@@ -1,3 +1,18 @@
+// Copyright (C) Hypertensor.
+// SPDX-License-Identifier: Apache-2.0
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use super::*;
 
 impl<T: Config> Pallet<T> {
@@ -85,12 +100,8 @@ impl<T: Config> Pallet<T> {
     ) as u32 + min_subnet_nodes
   }
 
-  pub fn get_subnet_initialization_cost(block: u64) -> u128 {
-    T::SubnetInitializationCost::get()
-  }
-
   pub fn registration_cost(epoch: u32) -> u128 {
-    let period: u32 = SubnetRegistrationFeePeriod::<T>::get();
+    let period: u32 = SubnetRegistrationInterval::<T>::get();
     let last_registration_epoch = LastSubnetRegistrationEpoch::<T>::get();
     let next_registration_epoch = Self::get_next_registration_epoch(last_registration_epoch);
     let fee_min: u128 = MinSubnetRegistrationFee::<T>::get();
@@ -117,13 +128,13 @@ impl<T: Config> Pallet<T> {
 
   pub fn get_next_registration_epoch(current_epoch: u32) -> u32 {
     let last_registration_epoch: u32 = LastSubnetRegistrationEpoch::<T>::get();
-    let subnet_registration_fee_period: u32 = SubnetRegistrationFeePeriod::<T>::get();
+    let period: u32 = SubnetRegistrationInterval::<T>::get();
     // // --- Genesis handling
     // if last_registration_epoch < subnet_registration_fee_period {
     //   return 0
     // }
     let next_valid_epoch = last_registration_epoch + (
-      subnet_registration_fee_period - (last_registration_epoch % subnet_registration_fee_period)
+      period - (last_registration_epoch % period)
     );
     next_valid_epoch
   }

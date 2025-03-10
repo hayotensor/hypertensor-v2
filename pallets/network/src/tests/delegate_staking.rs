@@ -115,7 +115,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     System::set_block_number(System::block_number() + ((EpochLength::get()  + 1) * DelegateStakeCooldownEpochs::get()));
 
     assert_ok!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)),
       )
     );
@@ -127,8 +127,6 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
       (post_balance <= starting_delegator_balance)
     );
 
-    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1), subnet_id);
-    // assert_eq!(unbondings.len(), 0);
     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
     assert_eq!(unbondings.len(), 0);
   });
@@ -378,7 +376,7 @@ fn test_claim_removal_of_delegate_stake() {
     assert!(*ledger_balance <= delegate_balance);
 
     assert_err!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(n_account)),
       ),
       Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
@@ -389,7 +387,7 @@ fn test_claim_removal_of_delegate_stake() {
     let pre_claim_balance = Balances::free_balance(&account(n_account));
 
     assert_ok!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(n_account)),
       )
     );
@@ -402,9 +400,6 @@ fn test_claim_removal_of_delegate_stake() {
       (post_balance >= Network::percent_mul(starting_delegator_balance, 9999)) &&
       (post_balance <= starting_delegator_balance)
     );
-
-    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
-    // assert_eq!(unbondings.len(), 0);
 
     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 0);
@@ -463,8 +458,6 @@ fn test_claim_removal_of_delegate_stake() {
 //         delegate_shares/2,
 //       )
 //     );
-//     // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
-//     // assert_eq!(unbondings.len(), 1);
 //     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
 //     assert_eq!(unbondings.len(), 1);
 
@@ -542,8 +535,6 @@ fn test_remove_to_delegate_stake_max_unlockings_reached_err() {
             1000,
           )
         );
-        // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
-        // assert_eq!(unbondings.len() as u32, n+1);
         let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
         assert_eq!(unbondings.len() as u32, n+1);
       }
@@ -838,11 +829,6 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     let post_balance = Balances::free_balance(&account(n_account));
     assert_eq!(post_balance, balance);
 
-    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
-    // assert_eq!(unbondings.len(), 1);
-    // let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
-    // assert_eq!(ledger_epoch, &epoch);
-    // assert!(*ledger_balance <= delegate_balance);
     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 1);
     let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
@@ -851,7 +837,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
 
 
     assert_err!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(n_account)),
       ),
       Error::<Test>::NoStakeUnbondingsOrCooldownNotMet
@@ -860,7 +846,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     System::set_block_number(System::block_number() + ((epoch_length  + 1) * cooldown_epochs));
 
     assert_ok!(
-      Network::claim_stake_unbondings(
+      Network::claim_unbondings(
         RuntimeOrigin::signed(account(n_account)),
       )
     );
@@ -871,9 +857,6 @@ fn test_remove_delegate_stake_after_subnet_remove() {
       (post_balance >= Network::percent_mul(starting_delegator_balance, 9999)) &&
       (post_balance <= starting_delegator_balance)
     );
-
-    // let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<Test>::get(account(n_account), subnet_id);
-    // assert_eq!(unbondings.len(), 0);
 
     let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
     assert_eq!(unbondings.len(), 0);

@@ -59,7 +59,6 @@ pub use sp_runtime::{Perbill, Permill};
 use pallet_network::DefaultSubnetNodeUniqueParamLimit;
 
 pub use pallet_network;
-pub use pallet_admin;
 pub use pallet_rewards;
 
 /// An index to a block.
@@ -497,7 +496,6 @@ parameter_types! {
 	pub const InitialTxRateLimit: u64 = 0;
 	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
-	pub const SubnetInitializationCost: u128 = 100_000_000_000_000_000_000;
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18
 	pub const DelegateStakeCooldownEpochs: u64 = 100;
 	pub const StakeCooldownEpochs: u64 = 100;
@@ -510,14 +508,14 @@ impl pallet_network::Config for Runtime {
 	type WeightInfo = ();
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type MajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
+	type SuperMajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 4, 5>;
 	type EpochLength = EpochLength;
-	// type EpochsPerYear = EpochLength;
 	type StringLimit = ConstU32<12288>;
 	type InitialTxRateLimit = InitialTxRateLimit;
 // 	type OffchainSignature = Signature;
 // 	type OffchainPublic = AccountPublic;
 	type PalletId = NetworkPalletId;
-	type SubnetInitializationCost = SubnetInitializationCost;
   type DelegateStakeCooldownEpochs = DelegateStakeCooldownEpochs;
 	type DelegateStakeEpochsRemovalWindow = DelegateStakeEpochsRemovalWindow;
 	type MaxDelegateStakeUnlockings = MaxDelegateStakeUnlockings;
@@ -555,12 +553,6 @@ impl pallet_rewards::Config for Runtime {
 	type HalvingInterval = HalvingInterval;
 	type InitialBlockSubsidy = InitialBlockSubsidy;
 	type IncreaseStakeVault = Network;
-}
-
-impl pallet_admin::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type CollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
-	type NetworkAdminInterface = Network;
 }
 
 impl pallet_atomic_swap::Config for Runtime {
@@ -623,27 +615,24 @@ mod runtime {
 	pub type Rewards = pallet_rewards;
 
 	#[runtime::pallet_index(12)]
-	pub type Admin = pallet_admin;
-
-	#[runtime::pallet_index(13)]
 	pub type Utility = pallet_utility;
 
-	#[runtime::pallet_index(14)]
+	#[runtime::pallet_index(13)]
 	pub type Proxy = pallet_proxy;
 
-	#[runtime::pallet_index(15)]
+	#[runtime::pallet_index(14)]
 	pub type Preimage = pallet_preimage;
 
-	#[runtime::pallet_index(16)]
+	#[runtime::pallet_index(15)]
 	pub type Scheduler = pallet_scheduler;
 
-	#[runtime::pallet_index(17)]
+	#[runtime::pallet_index(16)]
 	pub type Collective = pallet_collective::Pallet<Runtime, Instance1>;
 
-	#[runtime::pallet_index(18)]
+	#[runtime::pallet_index(17)]
 	pub type AtomicSwap = pallet_atomic_swap;
 
-	#[runtime::pallet_index(19)]
+	#[runtime::pallet_index(18)]
 	pub type NodeAuthorization = pallet_node_authorization;
 }
 

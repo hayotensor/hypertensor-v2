@@ -16,7 +16,7 @@ use crate::{
   LastSubnetRegistrationEpoch,
   MinSubnetRegistrationFee,
   MaxSubnetRegistrationFee,
-  SubnetRegistrationFeePeriod,
+  SubnetRegistrationInterval,
 };
 
 #[test]
@@ -58,7 +58,7 @@ fn test_registration_cost() {
     let last_registration_epoch = LastSubnetRegistrationEpoch::<Test>::get();
     let fee_min: u128 = MinSubnetRegistrationFee::<Test>::get();
     let fee_max: u128 = MaxSubnetRegistrationFee::<Test>::get();
-    let period: u32 = SubnetRegistrationFeePeriod::<Test>::get();
+    let period: u32 = SubnetRegistrationInterval::<Test>::get();
     increase_epochs(period);
 
     let epoch_length = EpochLength::get();
@@ -88,7 +88,7 @@ fn test_registration_cost() {
 fn test_get_next_registration_epoch() {
   new_test_ext().execute_with(|| {
     let last_registration_epoch: u32 = LastSubnetRegistrationEpoch::<Test>::get();
-    let subnet_registration_fee_period: u32 = SubnetRegistrationFeePeriod::<Test>::get();
+    let subnet_registration_fee_period: u32 = SubnetRegistrationInterval::<Test>::get();
 
     let next_registration_epoch = Network::get_next_registration_epoch(0);
     assert_eq!(next_registration_epoch, subnet_registration_fee_period);

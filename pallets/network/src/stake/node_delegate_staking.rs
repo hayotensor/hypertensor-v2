@@ -166,7 +166,7 @@ impl<T: Config> Pallet<T> {
     );
     
     // --- We add the balancer to the account_id.  If the above fails we will not credit this account_id.
-    Self::add_balance_to_stake_unbonding_ledger(
+    Self::add_balance_to_unbonding_ledger(
       &account_id, 
       delegate_stake_to_be_removed, 
       T::DelegateStakeCooldownEpochs::get(),
@@ -192,20 +192,20 @@ impl<T: Config> Pallet<T> {
     from_subnet_node_id: u32,
     to_subnet_id: u32,
     to_subnet_node_id: u32,
-    delegate_stake_shares_to_be_switched: u128,
+    node_delegate_stake_shares_to_be_switched: u128,
   ) -> DispatchResult {
     let account_id: T::AccountId = ensure_signed(origin)?;
 
     // --- Ensure that the delegate_stake amount to be removed is above zero.
     ensure!(
-      delegate_stake_shares_to_be_switched > 0,
+      node_delegate_stake_shares_to_be_switched > 0,
       Error::<T>::NotEnoughStakeToWithdraw
     );
     let from_account_delegate_stake_shares: u128 = AccountNodeDelegateStakeShares::<T>::get((&account_id.clone(), from_subnet_id, from_subnet_node_id.clone()));
 
     // --- Ensure that the account has enough delegate_stake to withdraw.
     ensure!(
-      from_account_delegate_stake_shares >= delegate_stake_shares_to_be_switched,
+      from_account_delegate_stake_shares >= node_delegate_stake_shares_to_be_switched,
       Error::<T>::NotEnoughStakeToWithdraw
     );
     
@@ -243,7 +243,7 @@ impl<T: Config> Pallet<T> {
       from_subnet_id, 
       from_subnet_node_id.clone(),
       delegate_stake_to_be_transferred, 
-      delegate_stake_shares_to_be_switched
+      node_delegate_stake_shares_to_be_switched
     );
 
 

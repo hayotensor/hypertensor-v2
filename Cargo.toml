@@ -9,6 +9,8 @@ edition = "2021"
 members = [
     "node",
     "pallets/network",
+    "pallets/atomic-swap",
+    "pallets/collective",
     "runtime",
 ]
 resolver = "2"
