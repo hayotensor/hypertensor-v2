@@ -75,7 +75,7 @@ fn funded_initializer<T: Config>(name: &'static str, index: u32) -> T::AccountId
 	let caller: T::AccountId = account(name, index, SEED);
 	// Give the account half of the maximum value of the `Balance` type.
 	// Otherwise some transfers will fail with an overflow error.
-	let deposit_amount: u128 = Network::<T>::get_subnet_initialization_cost(0) + 1000000;
+	let deposit_amount: u128 = Network::<T>::registration_cost(0) + 1000000;
 	T::Currency::deposit_creating(&caller, deposit_amount.try_into().ok().expect("REASON"));
 	caller
 }
@@ -502,7 +502,6 @@ mod benchmarks {
 	// // 	deactivate_subnet_node(RawOrigin::Signed(subnet_node_account.clone()), subnet_id);
 
 	// // 	assert_eq!(TotalSubnetNodes::<T>::get(subnet_id), end+1);
-	// // 	assert_eq!(TotalActiveSubnetNodes::<T>::get(subnet_id), end);
 	// // }
 
 	// #[benchmark]
@@ -740,58 +739,6 @@ mod benchmarks {
 	// 	let (epoch, balance) = unbondings.iter().next().unwrap();
   //   assert_eq!(*epoch, current_epoch);
   //   assert_eq!(*balance, delegate_shares);
-	// }
-
-	// #[benchmark]
-	// fn claim_delegate_stake_unbondings() {
-	// 	let end = 12;
-	// 	build_activated_subnet::<T>(DEFAULT_SUBNET_PATH.into(), 0, end, DEFAULT_DEPOSIT_AMOUNT, DEFAULT_SUBNET_NODE_STAKE);
-	// 	let subnet_id = SubnetPaths::<T>::get::<Vec<u8>>(DEFAULT_SUBNET_PATH.into()).unwrap();
-
-	// 	let delegate_account: T::AccountId = funded_account::<T>("delegate_account", 0);
-	// 	assert_ok!(
-	// 		Network::<T>::add_to_delegate_stake(
-	// 			RawOrigin::Signed(delegate_account.clone()).into(), 
-	// 			subnet_id, 
-	// 			DEFAULT_DELEGATE_STAKE_TO_BE_ADDED
-	// 		)
-	// 	);
-	// 	let delegate_shares = AccountSubnetDelegateStakeShares::<T>::get(delegate_account.clone(), subnet_id);
-
-	// 	assert_ok!(
-	// 		Network::<T>::remove_delegate_stake(
-	// 			RawOrigin::Signed(delegate_account.clone()).into(), 
-	// 			subnet_id, 
-	// 			delegate_shares
-	// 		)
-	// 	);
-
-	// 	let epoch_length = T::EpochLength::get();
-  //   let delegate_stake_cooldown_epochs = T::DelegateStakeCooldownEpochs::get();
-
-	// 	let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<T>::get(delegate_account.clone(), subnet_id);
-  //   assert_eq!(unbondings.len(), 1);
-  //   let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
-
-	// 	frame_system::Pallet::<T>::set_block_number(
-	// 		frame_system::Pallet::<T>::block_number() + 
-	// 		u64_to_block::<T>((epoch_length + 1) * delegate_stake_cooldown_epochs)
-	// 	);
-
-	// 	let balance = T::Currency::free_balance(&delegate_account.clone());
-
-	// 	#[extrinsic_call]
-	// 	claim_delegate_stake_unbondings(
-	// 		RawOrigin::Signed(delegate_account.clone()), 
-	// 		subnet_id, 
-	// 	);
-
-	// 	let after_claim_balance = T::Currency::free_balance(&delegate_account.clone());
-	// 	let ledger_balance_as_balance = u128_to_balance::<T>(*ledger_balance);
-  //   assert_eq!(after_claim_balance, balance + ledger_balance_as_balance.unwrap());
-
-  //   let unbondings: BTreeMap<u64, u128> = DelegateStakeUnbondingLedger::<T>::get(delegate_account.clone(), subnet_id);
-  //   assert_eq!(unbondings.len(), 0);
 	// }
 
 	// #[benchmark]

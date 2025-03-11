@@ -24,7 +24,7 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 pub use frame_support::{
-	construct_runtime, derive_impl, parameter_types,
+	construct_runtime, derive_impl, parameter_types, ord_parameter_types,
 	traits::{
 		fungible::HoldConsideration,
 		ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem,
@@ -47,6 +47,7 @@ pub use frame_support::{
 	genesis_builder_helper::{build_state, get_preset},
 	storage::bounded_vec::BoundedVec,
 };
+
 pub use frame_system::EnsureRoot;
 pub use pallet_balances::Call as BalancesCall;
 pub use frame_system::Call as SystemCall;
@@ -58,8 +59,6 @@ pub use sp_runtime::{Perbill, Permill};
 use pallet_network::DefaultSubnetNodeUniqueParamLimit;
 
 pub use pallet_network;
-// pub use pallet_subnet_democracy;
-pub use pallet_admin;
 pub use pallet_rewards;
 
 /// An index to a block.
@@ -357,7 +356,6 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 				RuntimeCall::Network(pallet_network::Call::add_to_delegate_stake { .. })
 				| RuntimeCall::Network(pallet_network::Call::transfer_delegate_stake { .. })
 				| RuntimeCall::Network(pallet_network::Call::remove_delegate_stake { .. })
-				| RuntimeCall::Network(pallet_network::Call::claim_delegate_stake_unbondings { .. })
 			),
 			// ProxyType::NonTransfer => !matches!(
 			// 	c,
@@ -449,6 +447,23 @@ impl pallet_scheduler::Config for Runtime {
 	type Preimages = Preimage;
 }
 
+parameter_types! {
+  pub const MaxWellKnownNodes: u32 = 8;
+  pub const MaxPeerIdLength: u32 = 128;
+}
+
+impl pallet_node_authorization::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type MaxWellKnownNodes = MaxWellKnownNodes;
+	type MaxPeerIdLength = MaxPeerIdLength;
+	type AddOrigin = EnsureRoot<AccountId>;
+	type RemoveOrigin = EnsureRoot<AccountId>;
+	type SwapOrigin = EnsureRoot<AccountId>;
+	type ResetOrigin = EnsureRoot<AccountId>;
+	type WeightInfo = ();
+}
+
+
 // /// We assume that ~10% of the block weight is consumed by `on_initialize` handlers.
 // /// This is used to limit the maximal weight of a single extrinsic.
 // const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_percent(10);
@@ -480,9 +495,7 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 parameter_types! {
 	pub const InitialTxRateLimit: u64 = 0;
 	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
-	// pub const EpochsPerYear: u64 = 10*10; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
-	pub const SubnetInitializationCost: u128 = 100_000_000_000_000_000_000;
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18
 	pub const DelegateStakeCooldownEpochs: u64 = 100;
 	pub const StakeCooldownEpochs: u64 = 100;
@@ -495,14 +508,14 @@ impl pallet_network::Config for Runtime {
 	type WeightInfo = ();
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type MajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
+	type SuperMajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 4, 5>;
 	type EpochLength = EpochLength;
-	// type EpochsPerYear = EpochLength;
 	type StringLimit = ConstU32<12288>;
 	type InitialTxRateLimit = InitialTxRateLimit;
 // 	type OffchainSignature = Signature;
 // 	type OffchainPublic = AccountPublic;
 	type PalletId = NetworkPalletId;
-	type SubnetInitializationCost = SubnetInitializationCost;
   type DelegateStakeCooldownEpochs = DelegateStakeCooldownEpochs;
 	type DelegateStakeEpochsRemovalWindow = DelegateStakeEpochsRemovalWindow;
 	type MaxDelegateStakeUnlockings = MaxDelegateStakeUnlockings;
@@ -511,42 +524,6 @@ impl pallet_network::Config for Runtime {
 	type Randomness = InsecureRandomnessCollectiveFlip;
 	type MinProposalStake = MinProposalStake;
 }
-
-parameter_types! {
-	// Mainnet
-	// pub const VotingPeriod: BlockNumber = DAYS * 21;
-	// pub const EnactmentPeriod: BlockNumber = DAYS * 7;
-
-	// Testnet
-	pub const VotingPeriod: BlockNumber = DAYS * 13;
-	pub const EnactmentPeriod: BlockNumber = DAYS * 12;
-	pub const VerifyPeriod: BlockNumber = DAYS * 4;
-	pub const MinProposerStake: u128 = 100_000_000_000_000_000_000; // 100 * 1e18
-	pub const Quorum: u128 = 10_000_000_000_000_000_000_000; // 10,000 * 1e18
-	pub const CancelSlashPercent: u8 = 5;
-	pub const QuorumVotingPowerPercentage: u8 = 40;
-	// Local
-	// pub const VotingPeriod: BlockNumber = 50; // ~5 minutes
-	// pub const EnactmentPeriod: BlockNumber = 600; // ~60 minutes
-
-}
-
-// impl pallet_subnet_democracy::Config for Runtime {
-// 	type WeightInfo = ();
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type SubnetVote = Network;
-// 	type Currency = Balances;
-// 	type MaxActivateProposals = ConstU32<1>;
-// 	type MaxDeactivateProposals = ConstU32<32>;
-// 	type MaxProposals = ConstU32<32>;
-// 	type VotingPeriod = VotingPeriod;
-// 	type EnactmentPeriod = EnactmentPeriod;
-// 	type VerifyPeriod = VerifyPeriod;
-// 	type MinProposerStake = MinProposerStake;
-// 	type Quorum = Quorum;
-// 	type CancelSlashPercent = CancelSlashPercent;
-// 	type QuorumVotingPowerPercentage = QuorumVotingPowerPercentage;
-// }
 
 pub struct AuraAccountAdapter;
 impl frame_support::traits::FindAuthor<AccountId> for AuraAccountAdapter {
@@ -576,12 +553,6 @@ impl pallet_rewards::Config for Runtime {
 	type HalvingInterval = HalvingInterval;
 	type InitialBlockSubsidy = InitialBlockSubsidy;
 	type IncreaseStakeVault = Network;
-}
-
-impl pallet_admin::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type CollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
-	type NetworkAdminInterface = Network;
 }
 
 impl pallet_atomic_swap::Config for Runtime {
@@ -640,32 +611,29 @@ mod runtime {
 	#[runtime::pallet_index(10)]
 	pub type Network = pallet_network;
 
-	// #[runtime::pallet_index(11)]
-	// pub type SubnetDemocracy = pallet_subnet_democracy;
-
 	#[runtime::pallet_index(11)]
 	pub type Rewards = pallet_rewards;
 
 	#[runtime::pallet_index(12)]
-	pub type Admin = pallet_admin;
-
-	#[runtime::pallet_index(13)]
 	pub type Utility = pallet_utility;
 
-	#[runtime::pallet_index(14)]
+	#[runtime::pallet_index(13)]
 	pub type Proxy = pallet_proxy;
 
-	#[runtime::pallet_index(15)]
+	#[runtime::pallet_index(14)]
 	pub type Preimage = pallet_preimage;
 
-	#[runtime::pallet_index(16)]
+	#[runtime::pallet_index(15)]
 	pub type Scheduler = pallet_scheduler;
 
-	#[runtime::pallet_index(17)]
+	#[runtime::pallet_index(16)]
 	pub type Collective = pallet_collective::Pallet<Runtime, Instance1>;
 
-	#[runtime::pallet_index(18)]
+	#[runtime::pallet_index(17)]
 	pub type AtomicSwap = pallet_atomic_swap;
+
+	#[runtime::pallet_index(18)]
+	pub type NodeAuthorization = pallet_node_authorization;
 }
 
 /// The address format for describing accounts.
@@ -717,7 +685,6 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_network, Network]
 		[pallet_collective, Collective]
-		// [pallet_subnet_democracy, SubnetDemocracy]
 	);
 }
 
