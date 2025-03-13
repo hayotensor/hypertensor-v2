@@ -3282,12 +3282,16 @@ pub mod pallet {
         Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
 			};
 
+			//
+			// TODO: Allow node to activate if already registered
+			//
+
 			// --- Subnet nodes can only register if within registration period or if it's activated
 			// --- Ensure the subnet outside of the enactment period or still registering
-			ensure!(
-				subnet.activated != 0 || subnet.activated == 0 && block <= subnet.initialized + subnet.registration_blocks,
-				Error::<T>::SubnetMustBeRegisteringOrActivated
-			);
+			// ensure!(
+			// 	subnet.activated != 0 || subnet.activated == 0 && block <= subnet.initialized + subnet.registration_blocks,
+			// 	Error::<T>::SubnetMustBeRegisteringOrActivated
+			// );
 
 			SubnetNodesData::<T>::try_mutate_exists(
 				subnet_id,
@@ -3313,9 +3317,10 @@ pub mod pallet {
 					// of other nodes that come in post activation
 					if subnet.activated == 0 {
 						class = SubnetNodeClass::Validator;
+						// --- Start node on current epoch for the next era
 						epoch_increase -= 1;
 					} else if params.classification.class == SubnetNodeClass::Deactivated {
-						// --- If coming out od deactivation, start back at Validator on the following epoch
+						// --- If coming out of deactivation, start back at Validator on the following epoch
 						class = SubnetNodeClass::Validator;
 					}
 					
