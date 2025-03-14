@@ -839,8 +839,8 @@ pub mod pallet {
 		// 9 days at 6s blocks
 		// 129_600
 		
-		// Testnet && Local 24 blocks
-		25
+		// Testnet && Local 150 blocks ||| 15 minutes
+		150
 	}
 	#[pallet::type_value]
 	pub fn DefaultMaxSubnetRegistrationBlocks() -> u64 {
