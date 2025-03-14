@@ -3211,6 +3211,10 @@ pub mod pallet {
 				start_epoch: epoch,
 			};
 
+			//
+			// TODO: Only use block for `last_delegate_reward_rate_update` if reward rate is > 0
+			//
+
 			let subnet_node: SubnetNode<T::AccountId> = SubnetNode {
 				hotkey: hotkey.clone(),
 				peer_id: peer_id.clone(),
