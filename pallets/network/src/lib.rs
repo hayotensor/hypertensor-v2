@@ -3068,6 +3068,7 @@ pub mod pallet {
 			// Remove all subnet nodes data
 			let _ = SubnetNodesData::<T>::clear_prefix(subnet_id, u32::MAX, None);
 			let _ = TotalSubnetNodes::<T>::remove(subnet_id);
+			let _ = TotalSubnetNodeUids::<T>::remove(subnet_id);
 			let _ = SubnetNodeAccount::<T>::clear_prefix(subnet_id, u32::MAX, None);
 			let _ = SubnetNodeUniqueParam::<T>::clear_prefix(subnet_id, u32::MAX, None);
 			let _ = HotkeySubnetNodeId::<T>::clear_prefix(subnet_id, u32::MAX, None);
@@ -3227,25 +3228,23 @@ pub mod pallet {
 				c: c,
 			};
 
-			// --- Start the UIDs at zero
-			let uid = TotalSubnetNodeUids::<T>::get(subnet_id);
+			// --- Start the UIDs at 1
+			TotalSubnetNodeUids::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+			let current_uid = TotalSubnetNodeUids::<T>::get(subnet_id);
 
-			HotkeySubnetNodeId::<T>::insert(subnet_id, hotkey.clone(), uid);
+			HotkeySubnetNodeId::<T>::insert(subnet_id, hotkey.clone(), current_uid);
 
 			// Insert subnet node ID -> hotkey
-			SubnetNodeIdHotkey::<T>::insert(subnet_id, uid, hotkey.clone());
+			SubnetNodeIdHotkey::<T>::insert(subnet_id, current_uid, hotkey.clone());
 
 			// Insert hotkey -> coldkey
 			HotkeyOwner::<T>::insert(hotkey.clone(), coldkey.clone());
 			
 			// Insert SubnetNodesData with hotkey as key
-			SubnetNodesData::<T>::insert(subnet_id, uid, subnet_node);
+			SubnetNodesData::<T>::insert(subnet_id, current_uid, subnet_node);
 
 			// Insert subnet peer account to keep peer_ids unique within subnets
-			SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), uid);
-
-			let next_uid = uid + 1;
-			TotalSubnetNodeUids::<T>::insert(subnet_id, next_uid);
+			SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), current_uid);
 
 			// Increase total subnet nodes
 			TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
@@ -3255,7 +3254,7 @@ pub mod pallet {
 			Self::deposit_event(
 				Event::SubnetNodeRegistered { 
 					subnet_id: subnet_id, 
-					subnet_node_id: uid,
+					subnet_node_id: current_uid,
 					coldkey: coldkey.clone(),
 					hotkey: hotkey.clone(), 
 					peer_id: peer_id.clone(),

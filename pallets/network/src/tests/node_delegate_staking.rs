@@ -298,12 +298,13 @@ fn test_validate_with_delegate_rewards_rate() {
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
   
     // --- Insert validator
-    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 0);
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
+    let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
 
     // validate without n-1
     assert_ok!(
       Network::validate(
-        RuntimeOrigin::signed(account(0)), 
+        RuntimeOrigin::signed(account(1)), 
         subnet_id,
         subnet_node_data_vec.clone(),
         None,
@@ -311,7 +312,11 @@ fn test_validate_with_delegate_rewards_rate() {
     );
 
     // Attest without n-1
-    for n in 1..total_subnet_nodes {
+    for n in 1..total_subnet_nodes+1 {
+      let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
+      if attestor == validator.clone() {
+        continue
+      }
       assert_ok!(
         Network::attest(
           RuntimeOrigin::signed(account(n)), 
@@ -349,12 +354,12 @@ fn test_validate_with_delegate_rewards_rate() {
     let attestation_percentage: u128 = Network::percent_div(submission_attestations, submission_nodes_count);
 
     // check each subnet nodes balance increased
-    for n in 0..total_subnet_nodes {
+    for n in 1..total_subnet_nodes+1 {
       let hotkey_subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(n)).unwrap();
       let subnet_node_id_hotkey = SubnetNodeIdHotkey::<Test>::get(subnet_id, hotkey_subnet_node_id).unwrap();
       let subnet_node = SubnetNodesData::<Test>::get(subnet_id, hotkey_subnet_node_id);
 
-      if n == 0 {
+      if n == 1 {
         // validator
         let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
         let validator_reward: u128 = Network::percent_mul(base_reward, attestation_percentage);

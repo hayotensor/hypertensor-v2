@@ -95,7 +95,7 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
   // --- Add subnet nodes
   let block_number = System::block_number();
   let mut amount_staked = 0;
-  for n in start..end {
+  for n in start+1..end+1 {
     let _ = Balances::deposit_creating(&account(n), deposit_amount);
     amount_staked += amount;
     assert_ok!(
@@ -224,7 +224,7 @@ pub fn build_activated_subnet_with_delegator_rewards(
   // --- Add subnet nodes
   let block_number = System::block_number();
   let mut amount_staked = 0;
-  for n in start..end {
+  for n in start+1..end+1 {
     let _ = Balances::deposit_creating(&account(n), deposit_amount);
     amount_staked += amount;
     assert_ok!(
@@ -303,7 +303,7 @@ pub fn build_activated_subnet_with_delegator_rewards(
 // Returns total staked on subnet
 pub fn build_subnet_nodes(subnet_id: u32, start: u32, end: u32, deposit_amount: u128, amount: u128) -> u128 {
   let mut amount_staked = 0;
-  for n in start..end {
+  for n in start+1..end+1 {
     let _ = Balances::deposit_creating(&account(n), deposit_amount);
     amount_staked += amount;
     assert_ok!(
@@ -328,7 +328,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
   let subnet = SubnetsData::<Test>::try_get(subnet_id);
   assert_eq!(subnet, Err(()));
 
-  for n in start..end {
+  for n in start+1..end+1 {
     let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(n));
     assert_eq!(subnet_node_id, None);
 
@@ -369,7 +369,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
   
 
   // --- Ensure unstaking is stable
-  for n in start..end {
+  for n in start+1..end+1 {
     System::set_block_number(System::block_number() + ((epoch_length  + 1) * stake_cooldown_epochs));
     let starting_balance = Balances::free_balance(&account(n));
     let unbondings = StakeUnbondingLedger::<Test>::get(account(n));
@@ -386,7 +386,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
     System::set_block_number(starting_block_number);
   }
 
-  // for n in start..end {
+  // for n in start+1..end+1 {
   //   System::set_block_number(System::block_number() + ((epoch_length  + 1) * DelegateStakeCooldownEpochs::get()));
   //   let starting_balance = Balances::free_balance(&account(n));
   //   let unbondings = StakeUnbondingLedger::<Test>::get(account(n));
@@ -411,7 +411,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
 // pub fn build_for_submit_consensus_data(subnet_id: u32, start: u32, end: u32, start_data: u32, end_data: u32) {
 //   let subnet_node_data_vec = subnet_node_data(start_data, end_data);
 
-//   for n in start..end {
+//   for n in start+1..end+1 {
 //     assert_ok!(
 //       Network::submit_consensus_data(
 //         RuntimeOrigin::signed(account(n)),
@@ -507,7 +507,7 @@ pub fn make_subnet_submittable() {
 pub fn subnet_node_data(start: u32, end: u32) -> Vec<SubnetNodeData> {
   // initialize peer consensus data array
   let mut subnet_node_data: Vec<SubnetNodeData> = Vec::new();
-  for n in start..end {
+  for n in start+1..end+1 {
     // let peer_subnet_node_data: SubnetNodeData<<Test as frame_system::Config>::AccountId> = SubnetNodeData {
     //   // account_id: account(n),
     //   peer_id: peer(n),
@@ -527,7 +527,7 @@ pub fn subnet_node_data_invalid_scores(start: u32, end: u32) -> Vec<SubnetNodeDa
   // initialize peer consensus data array
   // let mut subnet_node_data: Vec<SubnetNodeData<<Test as frame_system::Config>::AccountId>> = Vec::new();
   let mut subnet_node_data: Vec<SubnetNodeData> = Vec::new();
-  for n in start..end {
+  for n in start+1..end+1 {
     // let peer_subnet_node_data: SubnetNodeData<<Test as frame_system::Config>::AccountId> = SubnetNodeData {
     //   // account_id: account(n),
     //   peer_id: peer(n),

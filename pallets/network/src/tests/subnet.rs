@@ -457,7 +457,7 @@ fn test_activate_subnet() {
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
-    for n in 0..min_nodes {
+    for n in 1..min_nodes+1 {
       let _ = Balances::deposit_creating(&account(n), deposit_amount);
       assert_ok!(
         Network::add_subnet_node(
@@ -563,7 +563,7 @@ fn test_activate_subnet_invalid_subnet_id_error() {
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
-    for n in 0..min_nodes {
+    for n in 1..min_nodes+1 {
       let _ = Balances::deposit_creating(&account(n), deposit_amount);
       assert_ok!(
         Network::add_subnet_node(
@@ -641,7 +641,7 @@ fn test_activate_subnet_already_activated_err() {
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
-    for n in 0..min_nodes {
+    for n in 1..min_nodes+1 {
       let _ = Balances::deposit_creating(&account(n), deposit_amount);
       assert_ok!(
         Network::add_subnet_node(
@@ -740,7 +740,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
-    for n in 0..min_nodes {
+    for n in 1..min_nodes+1 {
       let _ = Balances::deposit_creating(&account(n), deposit_amount);
       assert_ok!(
         Network::add_subnet_node(
@@ -850,7 +850,7 @@ fn test_activate_subnet_initializing_error() {
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
-    for n in 0..min_nodes {
+    for n in 1..min_nodes+1 {
       let _ = Balances::deposit_creating(&account(n), deposit_amount);
       assert_ok!(
         Network::add_subnet_node(
@@ -1075,7 +1075,7 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
-    for n in 0..min_nodes {
+    for n in 1..min_nodes+1 {
       let _ = Balances::deposit_creating(&account(n), deposit_amount);
       assert_ok!(
         Network::add_subnet_node(

@@ -579,9 +579,9 @@ fn test_remove_to_delegate_stake_max_unlockings_reached_err() {
     );
 
     let max_unlockings = MaxDelegateStakeUnlockings::get();
-    for n in 0..max_unlockings+1 {
+    for n in 1..max_unlockings+2 {
       System::set_block_number(System::block_number() + EpochLength::get() + 1);
-      if n+1 > max_unlockings {
+      if n > max_unlockings {
         assert_err!(
           Network::remove_delegate_stake(
             RuntimeOrigin::signed(account(n_account)),
@@ -599,7 +599,7 @@ fn test_remove_to_delegate_stake_max_unlockings_reached_err() {
           )
         );
         let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
-        assert_eq!(unbondings.len() as u32, n+1);
+        assert_eq!(unbondings.len() as u32, n);
       }
     }
   });
