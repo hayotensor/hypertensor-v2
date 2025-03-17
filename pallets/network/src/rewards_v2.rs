@@ -40,6 +40,12 @@ impl<T: Config> Pallet<T> {
     let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
     let subnet_owner_percentage = SubnetOwnerPercentage::<T>::get();
 
+
+
+
+
+    let total_delegate_stake = TotalDelegateStake::<T>::get();
+
     for (subnet_id, data) in SubnetsData::<T>::iter() {
       let mut attestation_percentage: u128 = 0;
 
@@ -49,15 +55,30 @@ impl<T: Config> Pallet<T> {
       if let Ok(mut submission) = SubnetRewardsSubmission::<T>::try_get(subnet_id, epoch) {
         // --- Get memory of the subnet
         let memory_mb = data.memory_mb;
+        
 
         // --- Get overall subnet rewards
         let overall_subnet_reward: u128 = Self::percent_mul(base_reward_per_mb, memory_mb);
 
+        // --- Get owner rewards
+        let subnet_owner_reward: u128 = Self::percent_mul(overall_subnet_reward, subnet_owner_percentage);
+
+        // --- Get subnet rewards minus owner cut
+        let subnet_reward: u128 = overall_subnet_reward.saturating_sub(subnet_owner_reward);
+
         // --- Get delegators rewards
-        let delegate_stake_reward: u128 = Self::percent_mul(overall_subnet_reward, delegate_stake_rewards_percentage);
+        let delegate_stake_reward: u128 = Self::percent_mul(subnet_reward, delegate_stake_rewards_percentage);
 
         // --- Get subnet nodes rewards
-        let subnet_node_reward: u128 = overall_subnet_reward.saturating_sub(delegate_stake_reward);
+        let subnet_node_reward: u128 = subnet_reward.saturating_sub(delegate_stake_reward);
+
+
+
+
+
+        let total_subnet_delegate_stake = TotalSubnetDelegateStake::<T>::get(subnet_id);
+        let subnet_delegate_stake_weight = Self::percent_div(total_subnet_delegate_stake, total_delegate_stake);
+
 
         // --- Redundant
         if subnet_node_reward == 0 {

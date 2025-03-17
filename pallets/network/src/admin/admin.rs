@@ -18,7 +18,7 @@ use sp_std::vec::Vec;
 
 impl<T: Config> Pallet<T> {
   // TODO: update this for a smoother line
-  pub fn set_min_nodes_slope_parameters(mut params: CurveParametersSet) -> DispatchResult {
+  pub fn do_set_min_nodes_slope_parameters(mut params: CurveParametersSet) -> DispatchResult {
     let x_curve_start = params.x_curve_start;
     let y_end = params.y_end;
     let y_start = params.y_start;
@@ -55,38 +55,43 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn set_base_subnet_node_memory_mb(value: u128) -> DispatchResult {
+  pub fn do_set_base_subnet_node_memory_mb(value: u128) -> DispatchResult {
     BaseSubnetNodeMemoryMB::<T>::put(value);
     Ok(())
   }
 
-  pub fn set_max_subnet_memory_mb(value: u128) -> DispatchResult {
+  pub fn do_set_max_subnet_memory_mb(value: u128) -> DispatchResult {
     MaxSubnetMemoryMB::<T>::put(value);
     Ok(())
   }
 
-  pub fn set_overall_max_subnet_memory_mb(value: u128) -> DispatchResult {
+  pub fn do_set_overall_max_subnet_memory_mb(value: u128) -> DispatchResult {
     MaxTotalSubnetMemoryMB::<T>::put(value);
     Ok(())
   }
 
-  pub fn set_proposal_min_subnet_nodes(value: u32) -> DispatchResult {
+  pub fn do_set_proposal_min_subnet_nodes(value: u32) -> DispatchResult {
     ProposalMinSubnetNodes::<T>::put(value);
     Ok(())
   }
   
-  pub fn set_subnet_node_registration_epochs(value: u64) -> DispatchResult {
+  pub fn do_set_subnet_node_registration_epochs(value: u64) -> DispatchResult {
     SubnetNodeRegistrationEpochs::<T>::put(value);
     Ok(())
   }
 
   // TODO: remove target multipler logic from application
-  pub fn set_target_subnet_node_multiplier(value: u128) -> DispatchResult {
+  pub fn do_set_target_subnet_node_multiplier(value: u128) -> DispatchResult {
     TargetSubnetNodesMultiplier::<T>::put(value);
     Ok(())
   }
 
-  pub fn set_subnet_memory(subnet_id: u32, memory_mb: u128) -> DispatchResult {
+  pub fn do_set_subnet_owner_percentage(value: u128) -> DispatchResult {
+    SubnetOwnerPercentage::<T>::put(value);
+    Ok(())
+  }
+
+  pub fn do_set_subnet_memory(subnet_id: u32, memory_mb: u128) -> DispatchResult {
     let subnet = match SubnetsData::<T>::try_get(subnet_id) {
       Ok(subnet) => subnet,
       Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
@@ -119,7 +124,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn set_max_subnets(value: u32) -> DispatchResult {
+  pub fn do_set_max_subnets(value: u32) -> DispatchResult {
     MaxSubnets::<T>::set(value);
 
     Self::deposit_event(Event::SetMaxSubnets(value));
@@ -127,7 +132,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn set_min_subnet_nodes(value: u32) -> DispatchResult {
+  pub fn do_set_min_subnet_nodes(value: u32) -> DispatchResult {
     ensure!(
       value > 0 && value < MaxSubnetNodes::<T>::get(),
       Error::<T>::InvalidMinSubnetNodes
@@ -164,7 +169,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn set_tx_rate_limit(value: u64) -> DispatchResult {
+  pub fn do_set_tx_rate_limit(value: u64) -> DispatchResult {
     TxRateLimit::<T>::set(value);
 
     Self::deposit_event(Event::SetTxRateLimit(value));

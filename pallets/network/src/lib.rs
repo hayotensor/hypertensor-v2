@@ -91,6 +91,8 @@ pub mod rpc_info;
 pub use rpc_info::*;
 pub mod admin;
 pub use admin::*;
+pub mod supply;
+pub use supply::*;
 
 mod subnet_validator;
 mod rewards;
@@ -908,6 +910,12 @@ pub mod pallet {
 		// 100800
 		0
 	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetOwnerPercentage() -> u128 {
+		100_000_000
+	}
+
+	
 
 	/// Count of subnets
 	#[pallet::storage]
@@ -922,6 +930,12 @@ pub mod pallet {
 	// Stores subnet data by a unique id
 	#[pallet::storage] // subnet_id => data struct
 	pub type SubnetsData<T: Config> = StorageMap<_, Blake2_128Concat, u32, SubnetData>;
+
+	#[pallet::storage] // subnet_id => AccountId
+	pub type SubnetOwner<T: Config> = StorageMap<_, Blake2_128Concat, u32, T::AccountId>;
+
+	#[pallet::storage] // subnet_id => AccountId
+	pub type SubnetOwnerPercentage<T: Config> = StorageValue<_, u128, ValueQuery, DefaultSubnetOwnerPercentage>;
 
 	// Max per subnet node entry interval to any given subnet
 	#[pallet::storage] // subnet_id => block_interval
@@ -1308,6 +1322,10 @@ pub mod pallet {
 	// Percentage of epoch rewards that go towards delegate stake pools
 	#[pallet::storage]
 	pub type DelegateStakeRewardsPercentage<T: Config> = StorageValue<_, u128, ValueQuery, DefaultDelegateStakeRewardsPercentage>;
+
+	#[pallet::storage] // ( total_stake )
+	#[pallet::getter(fn total_delegate_stake)]
+	pub type TotalDelegateStake<T: Config> = StorageValue<_, u128, ValueQuery>;
 
 	// Total stake sum of all nodes in specified subnet
 	#[pallet::storage] // subnet_uid --> peer_data
@@ -2848,12 +2866,23 @@ pub mod pallet {
 
 			Self::do_set_min_stake_balance(value)
 		}
+
+		#[pallet::call_index(35)]
+		#[pallet::weight({0})]
+		pub fn set_subnet_owner_percentage(
+			origin: OriginFor<T>, 
+			value: u128
+		) -> DispatchResult {
+			T::SuperMajorityCollectiveOrigin::ensure_origin(origin)?;
+
+			Self::do_set_subnet_owner_percentage(value)
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
 		/// Register subnet
 		pub fn do_register_subnet(
-			activator: T::AccountId,
+			owner: T::AccountId,
 			subnet_data: RegistrationSubnetData,
 		) -> DispatchResult {
 			// Ensure path is unique
@@ -2906,17 +2935,17 @@ pub mod pallet {
 			let subnet_fee: u128 = Self::registration_cost(epoch);
 
 			if subnet_fee > 0 {
-				// unreserve from activator
+				// unreserve from owner
 				let subnet_fee_as_balance = Self::u128_to_balance(subnet_fee);
 
 				ensure!(
-					Self::can_remove_balance_from_coldkey_account(&activator, subnet_fee_as_balance.unwrap()),
+					Self::can_remove_balance_from_coldkey_account(&owner, subnet_fee_as_balance.unwrap()),
 					Error::<T>::NotEnoughBalanceToStake
 				);
 				
 				// --- Burn fee
 				ensure!(
-					Self::remove_balance_from_coldkey_account(&activator, subnet_fee_as_balance.unwrap()) == true,
+					Self::remove_balance_from_coldkey_account(&owner, subnet_fee_as_balance.unwrap()) == true,
 					Error::<T>::BalanceWithdrawalError
 				);
 
@@ -2947,6 +2976,7 @@ pub mod pallet {
 				entry_interval: 0,
 			};
 
+			SubnetOwner::<T>::insert(subnet_id, &owner);
 			// Increase total subnet memory
 			TotalSubnetMemoryMB::<T>::mutate(|n: &mut u128| *n += subnet_data.memory_mb);
 			// Store unique path
@@ -2959,7 +2989,7 @@ pub mod pallet {
 			LastSubnetRegistrationEpoch::<T>::set(epoch);
 
 			Self::deposit_event(Event::SubnetRegistered { 
-				account_id: activator, 
+				account_id: owner, 
 				path: subnet_data.path, 
 				subnet_id: subnet_id 
 			});
@@ -3671,16 +3701,16 @@ pub mod pallet {
 			}	
 			TotalSubnetDelegateStakeBalance::<T>::insert(subnet_id, min_subnet_delegate_stake_balance);
 			
-			// // --- Initialize subnet nodes
-			// // Only initialize to test using subnet nodes
-			// // If testing using subnet nodes in a subnet, comment out the ``for`` loop
+			// --- Initialize subnet nodes
+			// Only initialize to test using subnet nodes
+			// If testing using subnet nodes in a subnet, comment out the ``for`` loop
 
-			// let mut stake_amount: u128 = MinStakeBalance::<T>::get();
+			let mut stake_amount: u128 = MinStakeBalance::<T>::get();
 			
 
-			//
-			//
-			//
+			
+			
+			
 			
 			// let mut count = 0;
 			// for (account_id, peer_id) in &self.subnet_nodes {
@@ -3746,25 +3776,23 @@ pub mod pallet {
 			// 		c: Some(BoundedVec::new()),
 			// 	};
 	
-			// 	let uid = TotalSubnetNodeUids::<T>::get(subnet_id);
-
-			// 	HotkeySubnetNodeId::<T>::insert(subnet_id, account_id.clone(), uid);
+			// 	TotalSubnetNodeUids::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+			// 	let current_uid = TotalSubnetNodeUids::<T>::get(subnet_id);
+	
+			// 	HotkeySubnetNodeId::<T>::insert(subnet_id, account_id.clone(), current_uid);
 	
 			// 	// Insert subnet node ID -> hotkey
-			// 	SubnetNodeIdHotkey::<T>::insert(subnet_id, uid, account_id.clone());
+			// 	SubnetNodeIdHotkey::<T>::insert(subnet_id, current_uid, account_id.clone());
 	
 			// 	// Insert hotkey -> coldkey
 			// 	HotkeyOwner::<T>::insert(account_id.clone(), account_id.clone());
 				
 			// 	// Insert SubnetNodesData with hotkey as key
-			// 	SubnetNodesData::<T>::insert(subnet_id, uid, subnet_node);
+			// 	SubnetNodesData::<T>::insert(subnet_id, current_uid, subnet_node);
 	
 			// 	// Insert subnet peer account to keep peer_ids unique within subnets
-			// 	SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), uid);
-	
-			// 	let next_uid = uid + 1;
-			// 	TotalSubnetNodeUids::<T>::insert(subnet_id, next_uid);
-	
+			// 	SubnetNodeAccount::<T>::insert(subnet_id, peer_id.clone(), current_uid);
+		
 			// 	// Increase total subnet nodes
 			// 	TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
 
