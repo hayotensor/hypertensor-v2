@@ -46,6 +46,27 @@ frame_support::construct_runtime!(
 	}
 );
 
+pub const MILLISECS_PER_BLOCK: u64 = 6000;
+
+// NOTE: Currently it is not possible to change the slot duration after the chain has started.
+//       Attempting to do so will brick block production.
+pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
+
+// Time is measured by number of blocks.
+pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
+pub const HOURS: BlockNumber = MINUTES * 60;
+pub const DAYS: BlockNumber = HOURS * 24;
+pub const YEAR: BlockNumber = DAYS * 365;
+pub const BLOCKS_PER_HALVING: BlockNumber = YEAR * 2;
+pub const TARGET_MAX_TOTAL_SUPPLY: u128 = 2_800_000_000_000_000_000_000_000;
+pub const INITIAL_REWARD_PER_BLOCK: u128 = (TARGET_MAX_TOTAL_SUPPLY / 2) / BLOCKS_PER_HALVING as u128;
+
+pub const SECS_PER_BLOCK: u64 = 6000 / 1000;
+
+pub const EPOCH_LENGTH: u64 = 10;
+pub const BLOCKS_PER_EPOCH: u64 = SECS_PER_BLOCK * EPOCH_LENGTH;
+pub const EPOCHS_PER_YEAR: u64 = YEAR as u64 / BLOCKS_PER_EPOCH;
+
 mod mock_democracy {
 	pub use pallet::*;
 	#[frame_support::pallet(dev_mode)]
@@ -93,7 +114,8 @@ impl pallet_balances::Config for Test {
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
 
 parameter_types! {
-	pub const EpochLength: u64 = 100;
+	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochsPerYear: u64 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
   pub const NetworkPalletId: PalletId = PalletId(*b"/network");
   pub const MinProposalStake: u128 = 1_000_000_000_000_000_000;
   pub const DelegateStakeCooldownEpochs: u64 = 100;
@@ -109,7 +131,8 @@ impl pallet_network::Config for Test {
   type Currency = Balances;
 	type MajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, Instance1, 2, 3>;
 	type SuperMajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, Instance1, 4, 5>;
-  type EpochLength = EpochLength;
+	type EpochLength = EpochLength;
+	type EpochsPerYear = EpochsPerYear;
   type StringLimit = ConstU32<100>;
 	type InitialTxRateLimit = ConstU64<0>;
   type Randomness = InsecureRandomnessCollectiveFlip;
@@ -123,11 +146,6 @@ impl pallet_network::Config for Test {
 }
 
 pub type BlockNumber = u32;
-
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
-pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
-pub const HOURS: BlockNumber = MINUTES * 60;
-pub const DAYS: BlockNumber = HOURS * 24;
 
 parameter_types! {
 	pub const VotingPeriod: BlockNumber = DAYS * 21;

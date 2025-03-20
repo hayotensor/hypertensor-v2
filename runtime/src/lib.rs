@@ -495,6 +495,7 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 parameter_types! {
 	pub const InitialTxRateLimit: u64 = 0;
 	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochsPerYear: u64 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18
 	pub const DelegateStakeCooldownEpochs: u64 = 100;
@@ -511,6 +512,7 @@ impl pallet_network::Config for Runtime {
 	type MajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
 	type SuperMajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 4, 5>;
 	type EpochLength = EpochLength;
+	type EpochsPerYear = EpochsPerYear;
 	type StringLimit = ConstU32<12288>;
 	type InitialTxRateLimit = InitialTxRateLimit;
 // 	type OffchainSignature = Signature;

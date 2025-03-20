@@ -55,6 +55,25 @@ pub type BalanceCall = pallet_balances::Call<Test>;
 
 pub const MILLISECS_PER_BLOCK: u64 = 6000;
 
+// NOTE: Currently it is not possible to change the slot duration after the chain has started.
+//       Attempting to do so will brick block production.
+pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
+
+// Time is measured by number of blocks.
+pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
+pub const HOURS: BlockNumber = MINUTES * 60;
+pub const DAYS: BlockNumber = HOURS * 24;
+pub const YEAR: BlockNumber = DAYS * 365;
+pub const BLOCKS_PER_HALVING: BlockNumber = YEAR * 2;
+pub const TARGET_MAX_TOTAL_SUPPLY: u128 = 2_800_000_000_000_000_000_000_000;
+pub const INITIAL_REWARD_PER_BLOCK: u128 = (TARGET_MAX_TOTAL_SUPPLY / 2) / BLOCKS_PER_HALVING as u128;
+
+pub const SECS_PER_BLOCK: u64 = 6000 / 1000;
+
+pub const EPOCH_LENGTH: u64 = 10;
+pub const BLOCKS_PER_EPOCH: u64 = SECS_PER_BLOCK * EPOCH_LENGTH;
+pub const EPOCHS_PER_YEAR: u64 = YEAR as u64 / BLOCKS_PER_EPOCH;
+
 parameter_types! {
   pub const BlockHashCount: u64 = 250;
   pub const SS58Prefix: u8 = 42;
@@ -78,19 +97,6 @@ pub type Balance = u128;
 #[allow(dead_code)]
 pub type BlockNumber = u64;
 
-// NOTE: Currently it is not possible to change the slot duration after the chain has started.
-//       Attempting to do so will brick block production.
-pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
-
-// Time is measured by number of blocks.
-pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
-pub const HOURS: BlockNumber = MINUTES * 60;
-pub const DAYS: BlockNumber = HOURS * 24;
-
-pub const YEAR: BlockNumber = DAYS * 365;
-
-pub const SECS_PER_BLOCK: u64 = MILLISECS_PER_BLOCK / 1000;
-
 pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
@@ -100,8 +106,6 @@ impl pallet_balances::Config for Test {
   type RuntimeEvent = RuntimeEvent;
   type DustRemoval = ();
   type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-  // type AccountStore = AccountData<u128>;
-  // type AccountStore = StoredMap<Self::AccountId, AccountData<Self::Balance>>;
   type AccountStore = System;
   type MaxLocks = ();
   type WeightInfo = ();
@@ -109,57 +113,9 @@ impl pallet_balances::Config for Test {
   type ReserveIdentifier = [u8; 8];
   type RuntimeHoldReason = ();
   type FreezeIdentifier = ();
-  // type MaxHolds = ();
   type MaxFreezes = ();
   type RuntimeFreezeReason = ();
 }
-
-// impl pallet_balances::Config for Runtime {
-// 	type MaxLocks = ConstU32<50>;
-// 	type MaxReserves = ();
-// 	type ReserveIdentifier = [u8; 8];
-// 	/// The type for recording an account's balance.
-// 	type Balance = Balance;
-// 	/// The ubiquitous event type.
-// 	type RuntimeEvent = RuntimeEvent;
-// 	type DustRemoval = ();
-// 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-// 	type AccountStore = System;
-// 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-// 	type FreezeIdentifier = RuntimeFreezeReason;
-// 	type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
-// 	type RuntimeHoldReason = RuntimeHoldReason;
-// 	type RuntimeFreezeReason = RuntimeHoldReason;
-// }
-
-
-// impl system::Config for Test {
-//   type BaseCallFilter = Everything;
-//   type BlockWeights = ();
-//   type BlockLength = ();
-//   type Block = Block;
-//   type DbWeight = ();
-//   type RuntimeOrigin = RuntimeOrigin;
-//   type RuntimeCall = RuntimeCall;
-//   type Nonce = u64;
-//   type Hash = H256;
-//   type Hashing = BlakeTwo256;
-//   // type AccountId = U256;
-//   type AccountId = AccountId;
-//   // type Lookup = IdentityLookup<Self::AccountId>;
-//   type Lookup = AccountIdLookup<AccountId, ()>;
-//   type RuntimeEvent = RuntimeEvent;
-//   type BlockHashCount = BlockHashCount;
-//   type Version = ();
-//   type PalletInfo = PalletInfo;
-//   type AccountData = pallet_balances::AccountData<u128>;
-//   type OnNewAccount = ();
-//   type OnKilledAccount = ();
-//   type SystemWeightInfo = ();
-//   type SS58Prefix = SS58Prefix;
-//   type OnSetCode = ();
-//   type MaxConsumers = frame_support::traits::ConstU32<16>;
-// }
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl frame_system::Config for Test {
@@ -217,7 +173,8 @@ impl pallet_collective::Config<CouncilCollective> for Test {
 }
 
 parameter_types! {
-	pub const EpochLength: u64 = 100;
+	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochsPerYear: u64 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
   pub const NetworkPalletId: PalletId = PalletId(*b"/network");
   pub const MinProposalStake: u128 = 1_000_000_000_000_000_000;
   pub const DelegateStakeCooldownEpochs: u64 = 100;
@@ -233,11 +190,10 @@ impl Config for Test {
   type Currency = Balances;
   type MajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
   type SuperMajorityCollectiveOrigin = pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 4, 5>;
-  type EpochLength = EpochLength;
+	type EpochLength = EpochLength;
+	type EpochsPerYear = EpochsPerYear;
   type StringLimit = ConstU32<100>;
 	type InitialTxRateLimit = ConstU64<0>;
-  // type OffchainSignature = Signature;
-	// type OffchainPublic = AccountPublic;
   type Randomness = InsecureRandomnessCollectiveFlip;
 	type PalletId = NetworkPalletId;
   type DelegateStakeCooldownEpochs = DelegateStakeCooldownEpochs;

@@ -331,6 +331,8 @@ impl<T: Config> Pallet<T> {
   ) {
     // -- increase total subnet delegate stake 
     TotalSubnetDelegateStakeBalance::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(amount));
+
+    TotalDelegateStake::<T>::mutate(|mut n| n.saturating_accrue(amount));
   }
 
   pub fn convert_account_shares_to_balance(

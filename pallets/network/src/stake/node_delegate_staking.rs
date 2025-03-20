@@ -332,6 +332,8 @@ impl<T: Config> Pallet<T> {
 
     // -- increase total subnet delegate stake shares
     TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(shares));
+
+    TotalNodeDelegateStake::<T>::mutate(|mut n| n.saturating_accrue(amount));
   }
   
   pub fn decrease_account_node_delegate_stake_shares(
@@ -349,6 +351,8 @@ impl<T: Config> Pallet<T> {
 
     // -- decrease total subnet delegate stake shares
     TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_reduce(shares));
+
+    TotalNodeDelegateStake::<T>::mutate(|mut n| n.saturating_reduce(amount));
   }
 
   /// Rewards are deposited here from the ``rewards.rs`` or by donations
@@ -359,5 +363,7 @@ impl<T: Config> Pallet<T> {
   ) {
     // -- increase total subnet delegate stake 
     TotalNodeDelegateStakeBalance::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(amount));
+
+    TotalNodeDelegateStake::<T>::mutate(|mut n| n.saturating_accrue(amount));
   }
 }

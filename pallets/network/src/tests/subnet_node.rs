@@ -28,7 +28,7 @@ use crate::{
   HotkeySubnetNodeId, 
   SubnetNodeIdHotkey, 
   SubnetNodesData, 
-  SubnetNodeAccount,
+  PeerIdSubnetNode,
   DeactivationLedger, 
   SubnetNodeDeactivation, 
   MaxRewardRateDecrease,
@@ -91,10 +91,9 @@ fn test_register_subnet_node() {
     // assert_eq!(subnet_node.coldkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.hotkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.peer_id, peer(total_subnet_nodes+1));
-    assert_eq!(subnet_node.initialized, 0);
     assert_eq!(subnet_node.classification.class, SubnetNodeClass::Registered);
 
-    let subnet_node_account = SubnetNodeAccount::<Test>::get(subnet_id, peer(total_subnet_nodes+1));
+    let subnet_node_account = PeerIdSubnetNode::<Test>::get(subnet_id, peer(total_subnet_nodes+1));
     assert_eq!(subnet_node_account, hotkey_subnet_node_id);
 
     let account_subnet_stake = AccountSubnetStake::<Test>::get(account(total_subnet_nodes+1), subnet_id);
@@ -402,10 +401,10 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
     let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
     
     log::error!("subnet.activated {:?}",subnet.activated );
-    log::error!("subnet.initialized {:?}",subnet.initialized );
+    log::error!("subnet.registered {:?}",subnet.registered );
     log::error!("subnet.registration_blocks {:?}",subnet.registration_blocks );
 
-    System::set_block_number(System::block_number() + subnet.initialized + subnet.registration_blocks + 1);
+    System::set_block_number(System::block_number() + subnet.registered + subnet.registration_blocks + 1);
   
 
     assert_err!(
@@ -647,10 +646,9 @@ fn test_register_subnet_node_activate_subnet_node() {
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, subnet_node_id);
     assert_eq!(subnet_node.hotkey, account(total_subnet_nodes+1));
     assert_eq!(subnet_node.peer_id, peer(total_subnet_nodes+1));
-    assert_eq!(subnet_node.initialized, 0);
     assert_eq!(subnet_node.classification.class, SubnetNodeClass::Registered);
 
-    let subnet_node_account = SubnetNodeAccount::<Test>::get(subnet_id, peer(total_subnet_nodes+1));
+    let subnet_node_account = PeerIdSubnetNode::<Test>::get(subnet_id, peer(total_subnet_nodes+1));
     assert_eq!(subnet_node_account, subnet_node_id);
 
     let account_subnet_stake = AccountSubnetStake::<Test>::get(account(total_subnet_nodes+1), subnet_id);
@@ -670,7 +668,6 @@ fn test_register_subnet_node_activate_subnet_node() {
 
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, subnet_node_id);
 
-    assert_eq!(subnet_node.initialized, block_number);
     assert_eq!(subnet_node.classification.class, SubnetNodeClass::Idle);
     assert_eq!(subnet_node.classification.start_epoch, epoch + 1);
   })
@@ -2109,7 +2106,7 @@ fn test_remove_subnet_node() {
       let subnet_node_id = HotkeySubnetNodeId::<Test>::try_get(subnet_id, account(n));
       assert_eq!(subnet_node_id, Err(()));
 
-      let subnet_node_account = SubnetNodeAccount::<Test>::try_get(subnet_id, peer(n));
+      let subnet_node_account = PeerIdSubnetNode::<Test>::try_get(subnet_id, peer(n));
       assert_eq!(subnet_node_account, Err(()));
   
       let account_subnet_stake = AccountSubnetStake::<Test>::get(account(n), subnet_id);
@@ -2278,7 +2275,6 @@ fn test_deactivation_ledger_as_chosen_validator() {
     //   coldkey: account(1),
     //   hotkey: account(1),
     //   peer_id: peer(1),
-    //   initialized: 1,
     //   classification: SubnetNodeClassification {
     //     class: SubnetNodeClass::Validator,
     //     start_epoch: 1,

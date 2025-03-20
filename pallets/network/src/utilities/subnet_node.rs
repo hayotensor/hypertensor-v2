@@ -56,7 +56,7 @@ impl<T: Config> Pallet<T> {
       }
 
       // Remove all subnet node elements
-      SubnetNodeAccount::<T>::remove(subnet_id, peer_id.clone());
+      PeerIdSubnetNode::<T>::remove(subnet_id, peer_id.clone());
       HotkeySubnetNodeId::<T>::remove(subnet_id, hotkey.clone());
       SubnetNodeIdHotkey::<T>::remove(subnet_id, subnet_node_id);
 
@@ -65,6 +65,8 @@ impl<T: Config> Pallet<T> {
 
       // Reset sequential absent subnet node count
       SubnetNodePenalties::<T>::remove(subnet_id, subnet_node_id);
+
+      TotalActiveNodes::<T>::mutate(|n: &mut u32| n.saturating_dec());
 
 			Self::deposit_event(Event::SubnetNodeRemoved { subnet_id: subnet_id, subnet_node_id: subnet_node_id });
     }

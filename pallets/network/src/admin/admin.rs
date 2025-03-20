@@ -55,21 +55,6 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn do_set_base_subnet_node_memory_mb(value: u128) -> DispatchResult {
-    BaseSubnetNodeMemoryMB::<T>::put(value);
-    Ok(())
-  }
-
-  pub fn do_set_max_subnet_memory_mb(value: u128) -> DispatchResult {
-    MaxSubnetMemoryMB::<T>::put(value);
-    Ok(())
-  }
-
-  pub fn do_set_overall_max_subnet_memory_mb(value: u128) -> DispatchResult {
-    MaxTotalSubnetMemoryMB::<T>::put(value);
-    Ok(())
-  }
-
   pub fn do_set_proposal_min_subnet_nodes(value: u32) -> DispatchResult {
     ProposalMinSubnetNodes::<T>::put(value);
     Ok(())
@@ -88,39 +73,6 @@ impl<T: Config> Pallet<T> {
 
   pub fn do_set_subnet_owner_percentage(value: u128) -> DispatchResult {
     SubnetOwnerPercentage::<T>::put(value);
-    Ok(())
-  }
-
-  pub fn do_set_subnet_memory(subnet_id: u32, memory_mb: u128) -> DispatchResult {
-    let subnet = match SubnetsData::<T>::try_get(subnet_id) {
-      Ok(subnet) => subnet,
-      Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
-    };
-
-    ensure!(
-      memory_mb <= MaxSubnetMemoryMB::<T>::get(),
-      Error::<T>::InvalidMaxSubnetMemoryMB
-    );
-
-    let base_node_memory: u128 = BaseSubnetNodeMemoryMB::<T>::get();
-
-    let min_subnet_nodes: u32 = Self::get_min_subnet_nodes(base_node_memory, memory_mb);
-    let target_subnet_nodes: u32 = Self::get_target_subnet_nodes(min_subnet_nodes);
-
-    let subnet_data = SubnetData {
-      id: subnet_id,
-      path: subnet.path,
-      min_nodes: min_subnet_nodes,
-      target_nodes: target_subnet_nodes,
-      memory_mb: memory_mb,  
-      initialized: subnet.initialized,
-      registration_blocks: subnet.registration_blocks,
-      activated: subnet.activated,
-      entry_interval: subnet.entry_interval,
-    };
-
-    SubnetsData::<T>::insert(subnet_id, subnet_data);
-
     Ok(())
   }
 
@@ -173,6 +125,33 @@ impl<T: Config> Pallet<T> {
     TxRateLimit::<T>::set(value);
 
     Self::deposit_event(Event::SetTxRateLimit(value));
+
+    Ok(())
+  }
+
+  pub fn do_set_subnet_inflation_factor(value: u128) -> DispatchResult {
+    ensure!(
+      value <= Self::PERCENTAGE_FACTOR,
+      Error::<T>::InvalidPercent
+    );
+
+    SubnetInflationFactor::<T>::set(value);
+
+    Self::deposit_event(Event::SetSubnetInflationFactor(value));
+
+    Ok(())
+  }
+
+  
+  pub fn do_set_inflation_adj_factor(value: u128) -> DispatchResult {
+    ensure!(
+      value <= Self::PERCENTAGE_FACTOR,
+      Error::<T>::InvalidPercent
+    );
+
+    InflationAdjFactor::<T>::set(value);
+
+    Self::deposit_event(Event::SetSubnetInflationFactor(value));
 
     Ok(())
   }

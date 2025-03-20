@@ -3,16 +3,25 @@ use sp_core::OpaquePeerId as PeerId;
 use frame_support::assert_ok;
 use log::info;
 use crate::{
-  SubnetNodeData, TotalStake, SubnetRewardsValidator,
+  SubnetNodeData, 
+  TotalStake, 
+  SubnetRewardsValidator,
   SubnetPaths, 
   SubnetNodeClass,
   SubnetsData,
-  AccountSubnetStake, MinStakeBalance,
-  AccountSubnetDelegateStakeShares, RegistrationSubnetData,
+  AccountSubnetStake, 
+  MinStakeBalance,
+  AccountSubnetDelegateStakeShares, 
+  RegistrationSubnetData,
   StakeUnbondingLedger, 
-  TotalSubnetStake, MinSubnetRegistrationBlocks,
-  HotkeySubnetNodeId, SubnetNodeIdHotkey, SubnetNodesData, SubnetNodeAccount,
+  TotalSubnetStake, 
+  MinSubnetRegistrationBlocks,
+  HotkeySubnetNodeId, 
+  SubnetNodeIdHotkey, 
+  SubnetNodesData, 
+  PeerIdSubnetNode,
   HotkeyOwner,
+  MinSubnetNodes,
 };
 use frame_support::traits::{OnInitialize, Currency};
 
@@ -67,7 +76,6 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
 
   let add_subnet_data = RegistrationSubnetData {
     path: subnet_path.clone().into(),
-    memory_mb: DEFAULT_MEM_MB,
     registration_blocks: registration_blocks,
     entry_interval: 0,
   };
@@ -83,7 +91,7 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
   let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
   let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
 
-  let min_nodes = subnet.min_nodes;
+  let min_nodes = MinSubnetNodes::<Test>::get();
 
   if end == 0 {
     end = min_nodes;
@@ -124,13 +132,12 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
     assert_eq!(key_owner, account(n));
 
     assert_eq!(subnet_node_data.peer_id, peer(n));
-    assert_eq!(subnet_node_data.initialized, block_number);
 
     // --- Is ``Validator`` if registered before subnet activation
     assert_eq!(subnet_node_data.classification.class, SubnetNodeClass::Validator);
     assert!(subnet_node_data.has_classification(&SubnetNodeClass::Validator, epoch));
 
-    let subnet_node_account = SubnetNodeAccount::<Test>::get(subnet_id, peer(n));
+    let subnet_node_account = PeerIdSubnetNode::<Test>::get(subnet_id, peer(n));
     assert_eq!(subnet_node_account, hotkey_subnet_node_id);
 
     let account_subnet_stake = AccountSubnetStake::<Test>::get(account(n), subnet_id);
@@ -196,7 +203,6 @@ pub fn build_activated_subnet_with_delegator_rewards(
 
   let add_subnet_data = RegistrationSubnetData {
     path: subnet_path.clone().into(),
-    memory_mb: DEFAULT_MEM_MB,
     registration_blocks: registration_blocks,
     entry_interval: 0,
   };
@@ -212,7 +218,7 @@ pub fn build_activated_subnet_with_delegator_rewards(
   let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
   let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
 
-  let min_nodes = subnet.min_nodes;
+  let min_nodes = MinSubnetNodes::<Test>::get();
 
   if end == 0 {
     end = min_nodes;
@@ -254,13 +260,12 @@ pub fn build_activated_subnet_with_delegator_rewards(
     assert_eq!(key_owner, account(n));
 
     assert_eq!(subnet_node_data.peer_id, peer(n));
-    assert_eq!(subnet_node_data.initialized, block_number);
 
     // --- Is ``Validator`` if registered before subnet activation
     assert_eq!(subnet_node_data.classification.class, SubnetNodeClass::Validator);
     assert!(subnet_node_data.has_classification(&SubnetNodeClass::Validator, epoch));
 
-    let subnet_node_account = SubnetNodeAccount::<Test>::get(subnet_id, peer(n));
+    let subnet_node_account = PeerIdSubnetNode::<Test>::get(subnet_id, peer(n));
     assert_eq!(subnet_node_account, hotkey_subnet_node_id);
 
     let account_subnet_stake = AccountSubnetStake::<Test>::get(account(n), subnet_id);
@@ -332,8 +337,8 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, start: u32, end: u32) {
     let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(n));
     assert_eq!(subnet_node_id, None);
 
-    // ensure SubnetNodeAccount removed
-    let subnet_node_account = SubnetNodeAccount::<Test>::try_get(subnet_id, peer(n));
+    // ensure PeerIdSubnetNode removed
+    let subnet_node_account = PeerIdSubnetNode::<Test>::try_get(subnet_id, peer(n));
     assert_eq!(subnet_node_account, Err(()));
   
     let stake_balance = AccountSubnetStake::<Test>::get(account(n), subnet_id);
@@ -571,8 +576,8 @@ pub fn post_remove_subnet_node_ensures(n: u32, subnet_id: u32) {
   // let subnet_node_data = SubnetNodesData::<Test>::try_get(subnet_id, account(n));
   // assert_eq!(subnet_node_hotkey, Err(()));
 
-  // ensure SubnetNodeAccount removed
-  let subnet_node_account = SubnetNodeAccount::<Test>::try_get(subnet_id, peer(n));
+  // ensure PeerIdSubnetNode removed
+  let subnet_node_account = PeerIdSubnetNode::<Test>::try_get(subnet_id, peer(n));
   assert_eq!(subnet_node_account, Err(()));
 
   // // ensure SubnetNodeConsensusResults removed

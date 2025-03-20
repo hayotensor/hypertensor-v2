@@ -15,19 +15,31 @@
 //
 // Enables accounts to delegate stake to subnets for a portion of emissions
 
-use libm::pow;
+use super::*;
+use libm::{exp, pow};
 
 pub struct Inflation {
-  initial: f64,       // Initial inflation rate (8%)
-  terminal: f64,    // Annual decay rate (15%)
-  taper: f64,     // Minimum inflation rate (1.5%)
-  epochs_per_year: u64, // Number of epochs per year
+  /// Initial inflation percentage, from time=0
+  pub initial: f64,
+
+  /// Terminal inflation percentage, to time=INF
+  pub terminal: f64,
+
+  /// Rate per year, at which inflation is lowered until reaching terminal
+  ///  i.e. inflation(year) == MAX(terminal, initial*((1-taper)^year))
+  pub taper: f64,
+
+  /// Percentage of total inflation allocated to the foundation
+  pub foundation: f64,
+  /// Duration of foundation pool inflation, in years
+  pub foundation_term: f64,
 }
 
-const DEFAULT_INITIAL: f64 = 0.08;
+const DEFAULT_INITIAL: f64 = 0.1;
 const DEFAULT_TERMINAL: f64 = 0.015;
 const DEFAULT_TAPER: f64 = 0.15;
-const DEFAULT_EPOCHS_PER_YEAR: u64 = 52_594;
+const DEFAULT_FOUNDATION: f64 = 0.05;
+const DEFAULT_FOUNDATION_TERM: f64 = 7.0;
 
 impl Default for Inflation {
   fn default() -> Self {
@@ -35,22 +47,36 @@ impl Default for Inflation {
       initial: DEFAULT_INITIAL,
       terminal: DEFAULT_TERMINAL,
       taper: DEFAULT_TAPER,
-      epochs_per_year: DEFAULT_EPOCHS_PER_YEAR,
+      foundation: DEFAULT_FOUNDATION,
+      foundation_term: DEFAULT_FOUNDATION_TERM,
     }
   }
 }
 
 impl Inflation {
-  pub fn epoch(&self, epoch: u64) -> u128 {
-    let years_elapsed = epoch as f64 / self.epochs_per_year as f64;
-    // let rate = self.initial * (1.0 - self.terminal).powf(years_elapsed);
-    let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
+  // pub fn epoch(&self, epoch: u64) -> u128 {
+  //   let years_elapsed = epoch as f64 / self.epochs_per_year as f64;
+  //   // let rate = self.initial * (1.0 - self.terminal).powf(years_elapsed);
+  //   let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
+
+  //   // Ensure inflation does not go below the minimum taper rate
+  //   let final_rate = rate.max(self.taper);
+
+  //   // Convert to u128 with 1e18 scaling
+  //   (final_rate * 1e+18) as u128
+  // }
+
+  pub fn epoch(&self, epoch: u64, epochs_per_year: u64, denominator: u128) -> f64 {
+    let years_elapsed = epoch as f64 / epochs_per_year as f64;
+    // let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
+
+    self.total(years_elapsed)
 
     // Ensure inflation does not go below the minimum taper rate
-    let final_rate = rate.max(self.taper);
+    // let final_rate = rate.max(self.taper);
 
-    // Convert to u128 with 1e18 scaling
-    (final_rate * 1e+18) as u128
+    // final_rate
+    // final_rate as u128 * denominator
   }
 
   /// inflation rate at year
@@ -63,4 +89,131 @@ impl Inflation {
       self.terminal
     }
   }
+
+  pub fn year_from_epoch(&self, epoch: u64, epochs_per_year: u64) -> f64 {
+    epoch as f64 / epochs_per_year as f64
+  }
+}
+
+impl<T: Config> Pallet<T> {
+  /// Get total tokens in circulation
+  pub fn get_total_network_issuance() -> u128 {
+    let total_issuance_as_balance = T::Currency::total_issuance();
+    let total_issuance: u128 = total_issuance_as_balance.try_into().unwrap_or(0);
+    let total_staked: u128 = TotalStake::<T>::get();
+    let total_delegate_staked: u128 = TotalDelegateStake::<T>::get();
+    let total_node_delegate_staked: u128 = TotalNodeDelegateStake::<T>::get();
+    total_issuance
+      .saturating_add(total_staked)
+      .saturating_add(total_delegate_staked)
+      .saturating_add(total_node_delegate_staked)
+  }
+
+  /// Get the current epochs total emissions to subnets
+  ///
+  /// Inflation is based on the current network activity
+  ///   - Subnet activity
+  ///   - Subnet node activity
+  ///
+  /// # Steps
+  ///
+  /// 1. Gets utilization factors
+  ///   - Subnet utilization
+  ///   - Subnet node utilization
+  ///
+  /// 2. Combine the utilization factors based on the `SubnetInflationFactor`
+  ///   e.g. SubnetInflationFactor == 80%, then subnet node factor will be 20% (1.0-sif)
+  ///   - SIF is 80%
+  ///   - SNIF is 20%
+  ///
+  /// If subnet utilization is 20% and subnet node utilization is 15%
+  ///   e.g. 19% = 20% * 80% + 15% * 20% = `inflation_factor`
+  ///
+  /// 3. Get exponential adjustment of `inflation_factor`
+  ///
+  /// 4. Get network inflation on epoch
+  ///
+  /// 5. Adjust network inflation based on network activity
+  ///
+  pub fn get_epoch_emissions(
+    epoch: u64, 
+  ) -> u128 {
+    let max_subnets: u32 = MaxSubnets::<T>::get();
+    let mut total_activate_subnets: u32 = TotalActiveSubnets::<T>::get();
+    // There can be n+1 subnets at this time before 1 is removed in the epoch steps
+    if total_activate_subnets > max_subnets {
+      total_activate_subnets = max_subnets;
+    }
+
+    // --- Get subnet utilization
+    let subnet_utilization_rate: f64 = total_activate_subnets as f64 / max_subnets as f64;
+
+    // Max subnet nodes per subnet
+    let max_subnet_nodes: u32 = MaxSubnetNodes::<T>::get();
+    let max_nodes: u32 = max_subnets.saturating_mul(max_subnet_nodes);
+    let total_active_nodes: u32 = TotalActiveNodes::<T>::get();
+
+    // --- Get subnet node utilization
+    let node_utilization_rate: f64 = total_active_nodes as f64 / max_nodes as f64;
+
+    // --- Get final utilization factors
+    let sif: f64 = Self::get_percent_as_f64(SubnetInflationFactor::<T>::get());
+    let snif: f64 = 1.0 - sif;
+
+    let adj_subnet_utilization_rate: f64 = subnet_utilization_rate * sif;
+    let adj_node_utilization_rate: f64 = node_utilization_rate * snif;
+
+    let inflation_factor: f64 = Self::test2(snif + adj_node_utilization_rate);
+
+    let total_issuance: f64 = Self::get_total_network_issuance() as f64;
+    let epochs_per_year: f64 = T::EpochsPerYear::get() as f64;
+
+    let inflation = Inflation::default();
+    let year: f64 = epoch as f64 / epochs_per_year;
+
+    let apr: f64 = inflation.total(year);
+
+    (total_issuance * apr * inflation_factor) as u128
+  }
+
+  pub fn test(x: f64) -> f64 {
+    // =1 - EXP(-B2 * A2)
+    if x >= 1.0 {
+      return 1.0
+    }
+    (1.0 - exp(-5.0 * x)).min(1.0)
+  }
+
+  pub fn test2(x: f64) -> f64 {
+    // =1 - EXP(-B2 * A2)
+    if x >= 1.0 {
+      return 1.0
+    }
+
+    let k: f64 = 0.15;
+    if k == 0.0 {
+      return 1.0
+    }
+
+    pow(x, Self::get_percent_as_f64(InflationAdjFactor::<T>::get())).min(1.0)
+  }
+
+  pub fn get_epoch_emissions_v1(epoch: u64, subnet_nodes_count: u32) -> u128 {
+    // let max_subnet_nodes: u128 = MaxSubnetNodes::<T>::get() as u128;
+    // let max_emissions: u128 = Self::get_max_epoch_emissions(epoch);
+    // // Redundant
+    // if subnet_nodes_count as u128 >= max_subnet_nodes {
+    //   return max_emissions
+    // }
+    // let max_subnets: u128 = MaxSubnets::<T>::get() as u128;
+    // let max_total_subnet_nodes: u128 = max_subnets.saturating_mul(max_subnet_nodes);
+    // ((subnet_nodes_count as u128).saturating_mul(max_emissions)).saturating_div(max_subnet_nodes)
+    0
+  }
+
+  // pub fn get_epoch_emissions(epoch: u64, subnet_nodes_count: u32) -> u128 {
+  //   let inflation = Inflation::default();
+  //   inflation.total(year: f64)
+  // }
+
 }

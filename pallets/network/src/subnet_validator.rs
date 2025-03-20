@@ -54,7 +54,7 @@ impl<T: Config> Pallet<T> {
     data.retain(|x| {
       match SubnetNodesData::<T>::try_get(
         subnet_id, 
-        SubnetNodeAccount::<T>::get(subnet_id, &x.peer_id)
+        PeerIdSubnetNode::<T>::get(subnet_id, &x.peer_id)
       ) {
         Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Included, epoch as u64),
         Err(()) => false,

@@ -11,3 +11,4 @@ mod math;
 mod randomization;
 mod steps;
 mod utils;
+mod inflation;

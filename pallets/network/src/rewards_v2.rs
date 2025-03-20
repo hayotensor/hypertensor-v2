@@ -20,8 +20,6 @@ use frame_support::pallet_prelude::Pays;
 
 impl<T: Config> Pallet<T> {
   pub fn reward_subnets(block: u64, epoch: u32) -> DispatchResultWithPostInfo {
-    // --- Get base rewards based on subnet memory requirements
-    let base_reward_per_mb: u128 = BaseRewardPerMB::<T>::get();
     // --- Get required attestation percentage
     let min_attestation_percentage = MinAttestationPercentage::<T>::get();
     let min_vast_majority_attestation_percentage = MinVastMajorityAttestationPercentage::<T>::get();
@@ -40,11 +38,11 @@ impl<T: Config> Pallet<T> {
     let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
     let subnet_owner_percentage = SubnetOwnerPercentage::<T>::get();
 
-
-
-
-
     let total_delegate_stake = TotalDelegateStake::<T>::get();
+    let min_subnet_nodes = MinSubnetNodes::<T>::get();
+
+    // --- Get total rewards for this epoch
+    let rewards: u128 = Self::get_epoch_emissions(epoch as u64);
 
     for (subnet_id, data) in SubnetsData::<T>::iter() {
       let mut attestation_percentage: u128 = 0;
@@ -53,12 +51,14 @@ impl<T: Config> Pallet<T> {
       //     as they the validator will not be chosen in ``do_epoch_preliminaries`` if the 
       //     min nodes are not met on that epoch.
       if let Ok(mut submission) = SubnetRewardsSubmission::<T>::try_get(subnet_id, epoch) {
-        // --- Get memory of the subnet
-        let memory_mb = data.memory_mb;
-        
+        // --- Get total subnet delegate stake balance
+        let total_subnet_delegate_stake = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
+
+        // --- Get subnet delegate stake weight
+        let subnet_delegate_stake_weight = Self::percent_div(total_subnet_delegate_stake, total_delegate_stake);
 
         // --- Get overall subnet rewards
-        let overall_subnet_reward: u128 = Self::percent_mul(base_reward_per_mb, memory_mb);
+        let overall_subnet_reward: u128 = Self::percent_mul(rewards, subnet_delegate_stake_weight);
 
         // --- Get owner rewards
         let subnet_owner_reward: u128 = Self::percent_mul(overall_subnet_reward, subnet_owner_percentage);
@@ -71,21 +71,11 @@ impl<T: Config> Pallet<T> {
 
         // --- Get subnet nodes rewards
         let subnet_node_reward: u128 = subnet_reward.saturating_sub(delegate_stake_reward);
-
-
-
-
-
-        let total_subnet_delegate_stake = TotalSubnetDelegateStake::<T>::get(subnet_id);
-        let subnet_delegate_stake_weight = Self::percent_div(total_subnet_delegate_stake, total_delegate_stake);
-
-
+        
         // --- Redundant
         if subnet_node_reward == 0 {
           continue
         }
-
-        let min_nodes = data.min_nodes;
 
         // --- Get subnet nodes count to check against attestation count
         // ``reward_subnuts`` is called before ``shift_node_classes`` so we can know how many nodes are validators
@@ -94,7 +84,7 @@ impl<T: Config> Pallet<T> {
         let subnet_node_count = subnet_nodes.len() as u128;
 
         // --- Ensure nodes are at min requirement to continue rewards operations
-        if subnet_node_count < min_nodes as u128 {
+        if subnet_node_count < min_subnet_nodes as u128 {
           continue
         }
 
@@ -117,7 +107,7 @@ impl<T: Config> Pallet<T> {
         // The subnet is deemed broken is there is no consensus or not enough nodes
         //
         // The subnet has up to the MaxSubnetPenaltyCount to solve the issue before the subnet and all subnet nodes are removed
-        if (data_len as u32) < min_nodes  {
+        if (data_len as u32) < min_subnet_nodes  {
           // --- Increase the penalty count for the subnet because its deemed in a broken state
           SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
 
@@ -156,6 +146,20 @@ impl<T: Config> Pallet<T> {
           // --- Attestation not successful, move on to next subnet
           continue
         }
+
+        // --- Deposit owners rewards
+        match SubnetOwner::<T>::try_get(subnet_id) {
+          Ok(coldkey) => {
+            let subnet_owner_reward_as_currency = Self::u128_to_balance(subnet_owner_reward);
+            if subnet_owner_reward_as_currency.is_some() {
+              Self::add_balance_to_coldkey_account(
+                &coldkey,
+                subnet_owner_reward_as_currency.unwrap()
+              );    
+            }
+          },
+          Err(()) => continue,
+        };
 
         // --- Get sum of subnet total scores for use of divvying rewards
         let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);

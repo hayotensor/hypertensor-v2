@@ -38,11 +38,11 @@ impl<T: Config> Pallet<T> {
       //       Out of Enactment Period:
       //         - Remove if not activated, althought should be automatically removed in Enactment if it didn't
       //           meet HT requirements.
-      // let max_registration_block = data.initialized + data.registration_blocks;
+      // let max_registration_block = data.registered + data.registration_blocks;
       // let max_enactment_block = max_registration_block + subnet_activation_enactment_period;
 
       // --- Ensure subnet is active is able to submit consensus
-      let max_registration_block = data.initialized + data.registration_blocks + subnet_activation_enactment_period;
+      let max_registration_block = data.registered + data.registration_blocks + subnet_activation_enactment_period;
       if data.activated == 0 && block <= max_registration_block {
         // We check if the subnet is still in registration phase and not yet out of the enactment phase
         continue
@@ -61,7 +61,7 @@ impl<T: Config> Pallet<T> {
       //  - Minimum nodes (increases penalties if less than)
       //  - Minimum delegate stake balance (remove subnet if less than)
 
-      let min_subnet_nodes = data.min_nodes;
+      let min_subnet_nodes = MinSubnetNodes::<T>::get();
 			let subnet_delegate_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
 			let min_subnet_delegate_stake_balance = Self::get_min_subnet_delegate_stake_balance(min_subnet_nodes);
 

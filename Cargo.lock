@@ -5277,6 +5277,7 @@ dependencies = [
 name = "pallet-network"
 version = "4.0.0-dev"
 dependencies = [
+ "env_logger",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

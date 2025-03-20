@@ -89,6 +89,13 @@ impl<T: Config> Pallet<T> {
     x.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(y).saturating_add(u128::from(x % y == 0))
   }
 
+  /// Get percentage in decimal format that uses `PERCENTAGE_FACTOR` as f64
+  pub fn get_percent_as_f64(v: u128) -> f64 {
+    v as f64 / Self::PERCENTAGE_FACTOR as f64
+  }
+
+
+  /// 1e18 version
   pub const PERCENTAGE_FACTOR_V2: u128 = 1e+18 as u128;
   pub const HALF_PERCENT_V2: u128 = Self::PERCENTAGE_FACTOR_V2 / 2;
   

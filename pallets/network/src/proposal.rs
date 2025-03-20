@@ -51,7 +51,7 @@ impl<T: Config> Pallet<T> {
 
     // Unique subnet_id -> PeerId
     // Ensure peer ID exists within subnet
-    let defendant_subnet_node_id = match SubnetNodeAccount::<T>::try_get(subnet_id, peer_id.clone()) {
+    let defendant_subnet_node_id = match PeerIdSubnetNode::<T>::try_get(subnet_id, peer_id.clone()) {
       Ok(defendant_subnet_node_id) => defendant_subnet_node_id,
       Err(()) => return Err(Error::<T>::PeerIdNotExist.into()),
     };
@@ -73,7 +73,7 @@ impl<T: Config> Pallet<T> {
 
     // safe unwrap after `contains_key`
     ensure!(
-      subnet_nodes_count as u32 >= subnet.min_nodes,
+      subnet_nodes_count as u32 >= MinSubnetNodes::<T>::get(),
       Error::<T>::SubnetNodesMin
     );
 

@@ -63,4 +63,10 @@ impl<T: Config> Pallet<T> {
 
     return current_block - prev_tx_block <= rate_limit;
   }
+
+  pub fn balance_to_u128(
+    input: <<T as pallet::Config>::Currency as frame_support::traits::Currency<<T as frame_system::Config>::AccountId>>::Balance,
+  ) -> Option<u128> {
+    input.try_into().ok()
+  }  
 }
