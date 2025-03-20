@@ -1051,6 +1051,8 @@ fn test_reward_subnets_account_penalty_count() {
 //       path: subnet_path.clone().into(),
 //       registration_blocks: registration_blocks,
 //       entry_interval: 0,
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      // coldkey_whitelist: None,
 //     };
   
 //     let epoch_length = EpochLength::get();

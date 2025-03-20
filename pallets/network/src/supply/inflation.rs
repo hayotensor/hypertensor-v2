@@ -177,7 +177,6 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn test(x: f64) -> f64 {
-    // =1 - EXP(-B2 * A2)
     if x >= 1.0 {
       return 1.0
     }
@@ -185,11 +184,9 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn test2(x: f64) -> f64 {
-    // =1 - EXP(-B2 * A2)
     if x >= 1.0 {
       return 1.0
     }
-
     let k: f64 = 0.15;
     if k == 0.0 {
       return 1.0
@@ -197,23 +194,4 @@ impl<T: Config> Pallet<T> {
 
     pow(x, Self::get_percent_as_f64(InflationAdjFactor::<T>::get())).min(1.0)
   }
-
-  pub fn get_epoch_emissions_v1(epoch: u64, subnet_nodes_count: u32) -> u128 {
-    // let max_subnet_nodes: u128 = MaxSubnetNodes::<T>::get() as u128;
-    // let max_emissions: u128 = Self::get_max_epoch_emissions(epoch);
-    // // Redundant
-    // if subnet_nodes_count as u128 >= max_subnet_nodes {
-    //   return max_emissions
-    // }
-    // let max_subnets: u128 = MaxSubnets::<T>::get() as u128;
-    // let max_total_subnet_nodes: u128 = max_subnets.saturating_mul(max_subnet_nodes);
-    // ((subnet_nodes_count as u128).saturating_mul(max_emissions)).saturating_div(max_subnet_nodes)
-    0
-  }
-
-  // pub fn get_epoch_emissions(epoch: u64, subnet_nodes_count: u32) -> u128 {
-  //   let inflation = Inflation::default();
-  //   inflation.total(year: f64)
-  // }
-
 }

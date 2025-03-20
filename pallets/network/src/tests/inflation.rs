@@ -40,7 +40,7 @@ fn test_inflation_total() {
       last = total;
     }
     assert_eq!(last, inflation.terminal);
-    assert!(false);
+    // assert!(false);
   });
 }
 
@@ -50,10 +50,18 @@ fn test_inflation_test() {
     let inflation = Inflation::default();
     let x1 = Network::test(1.0);
     log::error!("test_inflation_test x1 {:?}", x1);
-    assert!(false);
+    // assert!(false);
   });
 }
 
+#[test]
+fn test_get_epoch_emissions() {
+  new_test_ext().execute_with(|| {
+    let inflation = Inflation::default();
+
+    Network::get_epoch_emissions(0);
+  });
+}
 
 // #[test]
 // fn test_inflation_epoch() {

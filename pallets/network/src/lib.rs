@@ -290,10 +290,6 @@ pub mod pallet {
 		SubnetExist,
 		/// Subnet registration cooldown period not met
 		SubnetRegistrationCooldown,
-		/// Max total subnet memory exceeded
-		MaxTotalSubnetMemory,
-		/// Max subnet memory size exceeded
-		MaxSubnetMemory,
 		/// Invalid registration block
 		InvalidSubnetRegistrationBlocks,
 		/// Subnet node must be unstaked to re-register to use the same balance
@@ -452,7 +448,7 @@ pub mod pallet {
 	pub struct SubnetNode<AccountId> {
 		pub hotkey: AccountId,
 		pub peer_id: PeerId,
-		pub bootstrap_peer_id: Option<PeerId>,
+		pub bootstrap_peer_id: PeerId,
 		pub classification: SubnetNodeClassification,
 		pub delegate_reward_rate: u128,
 		pub last_delegate_reward_rate_update: u64,
@@ -702,7 +698,7 @@ pub mod pallet {
 		return SubnetNode {
 			hotkey: T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
 			peer_id: PeerId(Vec::new()),
-			bootstrap_peer_id: Some(PeerId(Vec::new())),
+			bootstrap_peer_id: PeerId(Vec::new()),
 			classification: SubnetNodeClassification {
 				class: SubnetNodeClass::Registered,
 				start_epoch: 0,
@@ -1696,7 +1692,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			hotkey: T::AccountId,
 			peer_id: PeerId, 
-			bootstrap_peer_id: Option<PeerId>,
+			bootstrap_peer_id: PeerId,
 			delegate_reward_rate: u128,
 			stake_to_be_added: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -1758,7 +1754,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			hotkey: T::AccountId,
 			peer_id: PeerId, 
-			bootstrap_peer_id: Option<PeerId>,
+			bootstrap_peer_id: PeerId,
 			delegate_reward_rate: u128,
 			stake_to_be_added: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -2898,7 +2894,7 @@ pub mod pallet {
 				subnet_node_id,
 				|maybe_params| -> DispatchResult {
 					let params = maybe_params.as_mut().ok_or(Error::<T>::SubnetNodeExist)?;	
-					params.bootstrap_peer_id = Some(new_bootstrap_peer_id);
+					params.bootstrap_peer_id = new_bootstrap_peer_id;
 					Ok(())
 				}
 			)?;
@@ -3188,7 +3184,7 @@ pub mod pallet {
 			subnet_id: u32, 
 			hotkey: T::AccountId,
 			peer_id: PeerId, 
-			bootstrap_peer_id: Option<PeerId>,
+			bootstrap_peer_id: PeerId,
 			delegate_reward_rate: u128,
 			stake_to_be_added: u128,
 			a: Option<BoundedVec<u8, DefaultSubnetNodeUniqueParamLimit>>,
@@ -3280,17 +3276,15 @@ pub mod pallet {
 				Error::<T>::InvalidPeerId
 			);
 
-			if bootstrap_peer_id.is_some() {
-				match BootstrapPeerIdSubnetNode::<T>::try_get(subnet_id, bootstrap_peer_id.clone().unwrap()) {
-					Ok(_) => return Err(Error::<T>::PeerIdExist.into()),
-					Err(()) => (),
-				};
+			match BootstrapPeerIdSubnetNode::<T>::try_get(subnet_id, bootstrap_peer_id.clone()) {
+				Ok(_) => return Err(Error::<T>::PeerIdExist.into()),
+				Err(()) => (),
+			};
 
-				ensure!(
-					Self::validate_peer_id(bootstrap_peer_id.clone().unwrap()),
-					Error::<T>::InvalidBootstrapPeerId
-				);	
-			}
+			ensure!(
+				Self::validate_peer_id(bootstrap_peer_id.clone()),
+				Error::<T>::InvalidBootstrapPeerId
+			);	
 
 			// --- Ensure they have no stake on registration
 			// If a subnet node deregisters, then they must fully unstake its stake balance to register again using that same balance
@@ -3359,9 +3353,7 @@ pub mod pallet {
 			// Insert subnet peer account to keep peer_ids unique within subnets
 			PeerIdSubnetNode::<T>::insert(subnet_id, peer_id.clone(), current_uid);
 
-			if bootstrap_peer_id.is_some() {
-				BootstrapPeerIdSubnetNode::<T>::insert(subnet_id, bootstrap_peer_id.clone().unwrap(), current_uid);
-			}
+			BootstrapPeerIdSubnetNode::<T>::insert(subnet_id, bootstrap_peer_id.clone(), current_uid);
 
 			// Increase total subnet nodes
 			TotalSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);

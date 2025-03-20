@@ -6,7 +6,7 @@ use frame_support::{
 };
 use log::info;
 use frame_support::traits::{OnInitialize, Currency};
-
+use sp_std::collections::btree_set::BTreeSet;
 use crate::{
   Error,
   SubnetPaths, 
@@ -57,7 +57,8 @@ fn test_register_subnet() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -100,7 +101,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -126,7 +128,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
 
     assert_err!(
@@ -166,7 +169,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
 
     assert_err!(
@@ -198,7 +202,8 @@ fn test_register_subnet_exists_error() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -243,7 +248,8 @@ fn test_register_subnet_registration_blocks_err() {
       path: subnet_path.clone().into(),
       registration_blocks: MinSubnetRegistrationBlocks::<Test>::get() - 1,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
     
     let epoch_length = EpochLength::get();
@@ -264,6 +270,8 @@ fn test_register_subnet_registration_blocks_err() {
       path: subnet_path.clone().into(),
       registration_blocks: MaxSubnetRegistrationBlocks::<Test>::get() + 1,
       entry_interval: 0,
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
 
     assert_err!(
@@ -272,43 +280,6 @@ fn test_register_subnet_registration_blocks_err() {
         add_subnet_data,
       ),
       Error::<Test>::InvalidSubnetRegistrationBlocks
-    );
-  })
-}
-
-#[test]
-fn test_register_subnet_max_subnet_mem_err() {
-  new_test_ext().execute_with(|| {
-    let epoch_length = EpochLength::get();
-    let block_number = System::block_number();
-    let epoch = System::block_number().saturating_div(epoch_length);
-  
-    let cost = Network::registration_cost(epoch as u32);
-  
-    let _ = Balances::deposit_creating(&account(0), cost+1000);
-
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
-    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-    let add_subnet_data = RegistrationSubnetData {
-      path: subnet_path.into(),
-      registration_blocks: registration_blocks,
-      entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
-    };
-
-    let epoch_length = EpochLength::get();
-    let block_number = System::block_number();
-    let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
-
-    assert_err!(
-      Network::register_subnet(
-        RuntimeOrigin::signed(account(0)),
-        add_subnet_data,
-      ),
-      Error::<Test>::MaxSubnetMemory
     );
   })
 }
@@ -347,7 +318,8 @@ fn test_register_subnet_max_subnet_mem_err() {
 //         path: path,
 //         registration_blocks: registration_blocks,
 //         entry_interval: 0,
-//         coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      // coldkey_whitelist: None,
 //       };
 
 //       let next_subnet_total_memory_mb = TotalSubnetMemoryMB::<Test>::get() + subnet_mem_mb;
@@ -383,7 +355,8 @@ fn test_register_subnet_not_enough_balance_err() {
       path: subnet_path.into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
 
     let epoch_length = EpochLength::get();
@@ -421,7 +394,8 @@ fn test_activate_subnet() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -458,6 +432,7 @@ fn test_activate_subnet() {
           RuntimeOrigin::signed(account(n)),
           subnet_id,
           account(n),
+          peer(n),
           peer(n),
           0,
           amount,
@@ -522,7 +497,8 @@ fn test_activate_subnet_invalid_subnet_id_error() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -559,6 +535,7 @@ fn test_activate_subnet_invalid_subnet_id_error() {
           RuntimeOrigin::signed(account(n)),
           subnet_id,
           account(n),
+          peer(n),
           peer(n),
           0,
           amount,
@@ -598,7 +575,8 @@ fn test_activate_subnet_already_activated_err() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -635,6 +613,7 @@ fn test_activate_subnet_already_activated_err() {
           RuntimeOrigin::signed(account(n)),
           subnet_id,
           account(n),
+          peer(n),
           peer(n),
           0,
           amount,
@@ -695,7 +674,8 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -732,6 +712,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
           RuntimeOrigin::signed(account(n)),
           subnet_id,
           account(n),
+          peer(n),
           peer(n),
           0,
           amount,
@@ -803,7 +784,8 @@ fn test_activate_subnet_initializing_error() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -840,6 +822,7 @@ fn test_activate_subnet_initializing_error() {
           RuntimeOrigin::signed(account(n)),
           subnet_id,
           account(n),
+          peer(n),
           peer(n),
           0,
           amount,
@@ -897,6 +880,7 @@ fn test_not_subnet_node_owner() {
         subnet_id,
         account(total_subnet_nodes+1),
         peer(total_subnet_nodes+1),
+        peer(total_subnet_nodes+1),
         0,
         amount,
         None,
@@ -952,7 +936,8 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -1024,7 +1009,8 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: BTreeSet::new(),
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -1061,6 +1047,7 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
           RuntimeOrigin::signed(account(n)),
           subnet_id,
           account(n),
+          peer(n),
           peer(n),
           0,
           amount,

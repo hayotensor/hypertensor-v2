@@ -57,6 +57,7 @@ impl<T: Config> Pallet<T> {
 
       // Remove all subnet node elements
       PeerIdSubnetNode::<T>::remove(subnet_id, peer_id.clone());
+      BootstrapPeerIdSubnetNode::<T>::remove(subnet_id, subnet_node.bootstrap_peer_id);
       HotkeySubnetNodeId::<T>::remove(subnet_id, hotkey.clone());
       SubnetNodeIdHotkey::<T>::remove(subnet_id, subnet_node_id);
 

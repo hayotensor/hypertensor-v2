@@ -24,6 +24,7 @@ use crate::{
   MinSubnetNodes,
 };
 use frame_support::traits::{OnInitialize, Currency};
+use sp_std::collections::btree_set::BTreeSet;
 
 pub type AccountIdOf<Test> = <Test as frame_system::Config>::AccountId;
 
@@ -78,6 +79,8 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
     path: subnet_path.clone().into(),
     registration_blocks: registration_blocks,
     entry_interval: 0,
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
   };
 
   // --- Register subnet for activation
@@ -111,6 +114,7 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
         RuntimeOrigin::signed(account(n)),
         subnet_id,
         account(n),
+        peer(n),
         peer(n),
         0,
         amount,
@@ -205,6 +209,8 @@ pub fn build_activated_subnet_with_delegator_rewards(
     path: subnet_path.clone().into(),
     registration_blocks: registration_blocks,
     entry_interval: 0,
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      coldkey_whitelist: None,
   };
 
   // --- Register subnet for activation
@@ -238,6 +244,7 @@ pub fn build_activated_subnet_with_delegator_rewards(
         RuntimeOrigin::signed(account(n)),
         subnet_id,
         account(n),
+        peer(n),
         peer(n),
         delegate_reward_rate,
         amount,
@@ -316,6 +323,7 @@ pub fn build_subnet_nodes(subnet_id: u32, start: u32, end: u32, deposit_amount: 
         RuntimeOrigin::signed(account(n)),
         subnet_id,
         account(n),
+        peer(n),
         peer(n),
         0,
         amount,
@@ -605,6 +613,7 @@ pub fn add_subnet_node(
     RuntimeOrigin::signed(account(account_id)),
     subnet_id,
     account(account_id),
+    peer(peer_id),
     peer(peer_id),
     0,
     amount,
