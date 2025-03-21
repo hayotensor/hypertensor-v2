@@ -143,6 +143,7 @@ impl pallet_network::Config for Test {
   type MaxDelegateStakeUnlockings = MaxDelegateStakeUnlockings;
   type MaxStakeUnlockings = MaxStakeUnlockings;
   type MinProposalStake = MinProposalStake;
+	type TreasuryAccount = ();
 }
 
 pub type BlockNumber = u32;

@@ -68,5 +68,21 @@ impl<T: Config> Pallet<T> {
     input: <<T as pallet::Config>::Currency as frame_support::traits::Currency<<T as frame_system::Config>::AccountId>>::Balance,
   ) -> Option<u128> {
     input.try_into().ok()
-  }  
+  }
+
+  pub fn send_to_treasury(
+    who: &T::AccountId, 
+    amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance
+  ) -> DispatchResult {
+    let treasury_account = T::TreasuryAccount::get();
+
+    T::Currency::transfer(
+      who,
+      &treasury_account,
+      amount,
+      ExistenceRequirement::KeepAlive,
+    )?;
+
+    Ok(())
+  }
 }

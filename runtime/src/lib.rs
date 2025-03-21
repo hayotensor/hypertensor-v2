@@ -12,21 +12,22 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify},
+	traits::{BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify, IdentityLookup},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
 	RuntimeDebug
 };
 use codec::{Encode, Decode, MaxEncodedLen};
-
+use sp_runtime::traits::Get;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
-
+use alloc::collections::BTreeMap;
 pub use frame_support::{
 	construct_runtime, derive_impl, parameter_types, ord_parameter_types,
 	traits::{
 		fungible::HoldConsideration,
+		tokens::{ConversionFromAssetBalance, PaymentStatus, Pay, PayFromAccount, UnityAssetBalanceConversion},
 		ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem,
 		StorageInfo,
 		InstanceFilter,
@@ -47,8 +48,8 @@ pub use frame_support::{
 	genesis_builder_helper::{build_state, get_preset},
 	storage::bounded_vec::BoundedVec,
 };
-
-pub use frame_system::EnsureRoot;
+use core::{cell::RefCell, marker::PhantomData};
+pub use frame_system::{EnsureRoot, EnsureRootWithSuccess, EnsureWithSuccess};
 pub use pallet_balances::Call as BalancesCall;
 pub use frame_system::Call as SystemCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -56,6 +57,7 @@ use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
+
 use pallet_network::DefaultSubnetNodeUniqueParamLimit;
 
 pub use pallet_network;
@@ -525,6 +527,7 @@ impl pallet_network::Config for Runtime {
 	type StakeCooldownEpochs = StakeCooldownEpochs;
 	type Randomness = InsecureRandomnessCollectiveFlip;
 	type MinProposalStake = MinProposalStake;
+	type TreasuryAccount = TreasuryAccount;
 }
 
 pub struct AuraAccountAdapter;
@@ -561,6 +564,36 @@ impl pallet_atomic_swap::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type SwapAction = pallet_atomic_swap::BalanceSwapAction<AccountId, Balances>;
 	type ProofLimit = ConstU32<1024>;
+}
+
+parameter_types! {
+	pub const Burn: Permill = Permill::from_percent(50);
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub const SpendLimit: Balance = u128::MAX;
+	pub TreasuryAccount: AccountId = Treasury::account_id();
+}
+
+impl pallet_treasury::Config for Runtime {
+	type PalletId = TreasuryPalletId;
+	type Currency = Balances;
+	type RejectOrigin = EnsureRoot<AccountId>;
+	type RuntimeEvent = RuntimeEvent;
+	type SpendPeriod = ConstU32<2>;
+	type Burn = Burn;
+	type BurnDestination = (); // Just gets burned.
+	type WeightInfo = ();
+	type SpendFunds = ();
+	type MaxApprovals = ConstU32<100>;
+	type SpendOrigin = EnsureRootWithSuccess<AccountId, SpendLimit>;
+	type AssetKind = ();
+	type Beneficiary = AccountId;
+	type BeneficiaryLookup = IdentityLookup<Self::Beneficiary>;
+	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
+	type BalanceConverter = UnityAssetBalanceConversion;
+	type PayoutPeriod = ConstU32<10>;
+	// type BlockNumberProvider = System;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -636,6 +669,10 @@ mod runtime {
 
 	// #[runtime::pallet_index(18)]
 	// pub type NodeAuthorization = pallet_node_authorization;
+
+	#[runtime::pallet_index(18)]
+	pub type Treasury = pallet_treasury;
+
 }
 
 /// The address format for describing accounts.
@@ -687,6 +724,7 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_network, Network]
 		[pallet_collective, Collective]
+		[pallet_treasury, Treasury]
 	);
 }
 

@@ -77,6 +77,11 @@ fn test_register_subnet() {
   
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
+
+    // Check treasury pot
+    let minimum_balance = Balances::minimum_balance();
+    let pot = Treasury::pot();
+    assert_eq!(cost, pot + minimum_balance);
   })
 }
 

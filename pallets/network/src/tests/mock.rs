@@ -17,7 +17,10 @@ use crate::*;
 use crate as pallet_network;
 use frame_support::{
   parameter_types,
-  traits::Everything,
+  traits::{
+    Everything,
+    tokens::{PayFromAccount, UnityAssetBalanceConversion},
+  },
   PalletId,
   derive_impl,
   weights::{
@@ -35,7 +38,8 @@ use sp_runtime::{
 	MultiSignature
 };
 use sp_runtime::Perbill;
-use frame_system::EnsureRoot;
+pub use frame_system::{EnsureRoot, EnsureRootWithSuccess};
+use sp_runtime::Permill;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -48,6 +52,7 @@ frame_support::construct_runtime!(
     Balances: pallet_balances,
     Network: pallet_network,
     Collective: pallet_collective::<Instance1>,
+    Treasury: pallet_treasury,
 	}
 );
 
@@ -173,6 +178,35 @@ impl pallet_collective::Config<CouncilCollective> for Test {
 }
 
 parameter_types! {
+	pub const Burn: Permill = Permill::from_percent(50);
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub const SpendLimit: Balance = u128::MAX;
+	pub TreasuryAccount: AccountId = Treasury::account_id();
+}
+
+impl pallet_treasury::Config for Test {
+	type PalletId = TreasuryPalletId;
+	type Currency = Balances;
+	type RejectOrigin = EnsureRoot<AccountId>;
+	type RuntimeEvent = RuntimeEvent;
+	type SpendPeriod = ConstU64<2>;
+	type Burn = Burn;
+	type BurnDestination = (); // Just gets burned.
+	type WeightInfo = ();
+	type SpendFunds = ();
+	type MaxApprovals = ConstU32<100>;
+	type SpendOrigin = EnsureRootWithSuccess<AccountId, SpendLimit>;
+	type AssetKind = ();
+	type Beneficiary = AccountId;
+	type BeneficiaryLookup = IdentityLookup<Self::Beneficiary>;
+	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
+	type BalanceConverter = UnityAssetBalanceConversion;
+	type PayoutPeriod = ConstU64<10>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
+}
+
+parameter_types! {
 	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const EpochsPerYear: u64 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
   pub const NetworkPalletId: PalletId = PalletId(*b"/network");
@@ -202,6 +236,7 @@ impl Config for Test {
   type MaxDelegateStakeUnlockings = MaxDelegateStakeUnlockings;
   type MaxStakeUnlockings = MaxStakeUnlockings;
   type MinProposalStake = MinProposalStake;
+  type TreasuryAccount = TreasuryAccount;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

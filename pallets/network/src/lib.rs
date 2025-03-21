@@ -169,6 +169,9 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type MinProposalStake: Get<u128>;
+
+		#[pallet::constant]
+		type TreasuryAccount: Get<Self::AccountId>;
 	}
 
 	/// A storage item for this pallet.
@@ -2980,21 +2983,16 @@ pub mod pallet {
 			let subnet_fee: u128 = Self::registration_cost(epoch);
 
 			if subnet_fee > 0 {
-				// unreserve from owner
 				let subnet_fee_as_balance = Self::u128_to_balance(subnet_fee);
 
+				// Ensure user has the funds, give accurate information on errors
 				ensure!(
 					Self::can_remove_balance_from_coldkey_account(&owner, subnet_fee_as_balance.unwrap()),
 					Error::<T>::NotEnoughBalanceToStake
 				);
 				
-				ensure!(
-					Self::remove_balance_from_coldkey_account(&owner, subnet_fee_as_balance.unwrap()) == true,
-					Error::<T>::BalanceWithdrawalError
-				);
-
-				// TODO
-				// Send portion to treasury
+				// Send funds to Treasury and revert if failed
+				Self::send_to_treasury(&owner, subnet_fee_as_balance.unwrap())?;
 			}
 
 			// Get total subnets ever
