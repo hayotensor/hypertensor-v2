@@ -19,11 +19,11 @@ impl<T: Config> Pallet<T> {
   pub fn add_balance_to_unbonding_ledger(
     coldkey: &T::AccountId,
     amount: u128,
-    cooldown_epoch_length: u64,
-    block: u64,
+    cooldown_epoch_length: u32,
+    block: u32,
   ) -> DispatchResult {
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
+    let epoch_length: u32 = T::EpochLength::get();
+    let epoch: u32 = block / epoch_length;
 
     let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
@@ -42,7 +42,7 @@ impl<T: Config> Pallet<T> {
     );
 
     StakeUnbondingLedger::<T>::mutate(&coldkey, |ledger| {
-      ledger.entry(epoch).and_modify(|v| *v += amount).or_insert(amount);
+      ledger.entry(epoch).and_modify(|v| v.saturating_accrue(amount)).or_insert(amount);
     });
 
     Ok(())
@@ -50,9 +50,9 @@ impl<T: Config> Pallet<T> {
 
   // Infallible
   pub fn do_claim_unbondings(coldkey: &T::AccountId) -> u32 {
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
+    let block: u32 = Self::get_current_block_as_u32();
+    let epoch_length: u32 = T::EpochLength::get();
+    let epoch: u32 = block / epoch_length;
     let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
 
     let mut unbondings_copy = unbondings.clone();
@@ -60,7 +60,7 @@ impl<T: Config> Pallet<T> {
     let mut successful_unbondings = 0;
 
     for (unbonding_epoch, amount) in unbondings.iter() {
-      if epoch <= unbonding_epoch + T::StakeCooldownEpochs::get() {
+      if epoch <= unbonding_epoch.saturating_add(T::StakeCooldownEpochs::get()) {
         continue
       }
 

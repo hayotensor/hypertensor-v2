@@ -18,14 +18,14 @@ use super::*;
 impl<T: Config> Pallet<T> {
   /// Remove subnet peer from subnet
   // to-do: Add slashing to subnet peers stake balance
-  pub fn perform_remove_subnet_node(block: u64, subnet_id: u32, subnet_node_id: u32) {
+  pub fn perform_remove_subnet_node(block: u32, subnet_id: u32, subnet_node_id: u32) {
     if let Ok(subnet_node) = SubnetNodesData::<T>::try_get(subnet_id, subnet_node_id) {
       let hotkey = subnet_node.hotkey;
       let peer_id = subnet_node.peer_id;
 
       // Remove from attestations
-      let epoch_length: u64 = T::EpochLength::get();
-			let epoch: u64 = block / epoch_length;
+      let epoch_length: u32 = T::EpochLength::get();
+			let epoch: u32 = block / epoch_length;
 
       let submittable_nodes: BTreeSet<T::AccountId> = Self::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
 
@@ -76,7 +76,7 @@ impl<T: Config> Pallet<T> {
   pub fn get_classified_subnet_node_ids<C>(
     subnet_id: u32,
     classification: &SubnetNodeClass,
-    epoch: u64,
+    epoch: u32,
   ) -> C
     where
       C: FromIterator<u32>,
@@ -88,13 +88,13 @@ impl<T: Config> Pallet<T> {
   }
   
   /// Get subnet nodes by classification
-  pub fn get_classified_subnet_nodes(subnet_id: u32, classification: &SubnetNodeClass, epoch: u64) -> Vec<SubnetNode<T::AccountId>> {
+  pub fn get_classified_subnet_nodes(subnet_id: u32, classification: &SubnetNodeClass, epoch: u32) -> Vec<SubnetNode<T::AccountId>> {
     SubnetNodesData::<T>::iter_prefix_values(subnet_id)
       .filter(|subnet_node| subnet_node.has_classification(classification, epoch))
       .collect()
   }
 
-  pub fn get_classified_subnet_node_info(subnet_id: u32, classification: &SubnetNodeClass, epoch: u64) -> Vec<SubnetNodeInfo<T::AccountId>> {
+  pub fn get_classified_subnet_node_info(subnet_id: u32, classification: &SubnetNodeClass, epoch: u32) -> Vec<SubnetNodeInfo<T::AccountId>> {
     SubnetNodesData::<T>::iter_prefix(subnet_id)
       .filter(|(subnet_node_id, subnet_node)| subnet_node.has_classification(classification, epoch))
       .map(|(subnet_node_id, subnet_node)| {
@@ -116,7 +116,7 @@ impl<T: Config> Pallet<T> {
   pub fn get_classified_hotkeys<C>(
     subnet_id: u32,
     classification: &SubnetNodeClass,
-    epoch: u64,
+    epoch: u32,
   ) -> C
     where
       C: FromIterator<T::AccountId>,
@@ -177,5 +177,23 @@ impl<T: Config> Pallet<T> {
       Ok(subnet_node_coldkey) => return subnet_node_coldkey == coldkey,
       Err(()) => return false
     }
+  }
+
+  pub fn increase_class(
+    subnet_id: u32, 
+    subnet_node_id: u32, 
+    start_epoch: u32,
+  ) {
+    // TODO: Add querying epoch here
+    SubnetNodesData::<T>::mutate(
+      subnet_id,
+      subnet_node_id,
+      |params: &mut SubnetNode<T::AccountId>| {
+        params.classification = SubnetNodeClassification {
+          class: params.classification.class.next(),
+          start_epoch: start_epoch,
+        };
+      },
+    );
   }
 }

@@ -21,10 +21,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_target_subnet_nodes(min_subnet_nodes: u32) -> u32 {
-    Self::percent_mul(
-      min_subnet_nodes.into(), 
-      TargetSubnetNodesMultiplier::<T>::get()
-    ) as u32 + min_subnet_nodes
+    min_subnet_nodes
   }
 
   pub fn registration_cost(epoch: u32) -> u128 {
@@ -43,13 +40,13 @@ impl<T: Config> Pallet<T> {
     }
 
     // Calculate the current position within the registration period
-    let cycle_epoch = epoch - next_registration_lower_bound_epoch;
+    let cycle_epoch = epoch.saturating_sub(next_registration_lower_bound_epoch);
 
     // Calculate the fee decrease per epoch
-    let decrease_per_epoch = (fee_max - fee_min) / period as u128;
+    let decrease_per_epoch = (fee_max.saturating_sub(fee_min)).saturating_div(period as u128);
 
     // Calculate the current fee
-    let cost = fee_max - (decrease_per_epoch * cycle_epoch as u128);
+    let cost = fee_max.saturating_sub(decrease_per_epoch.saturating_mul(cycle_epoch as u128));
 
     // Ensure the fee doesn't go below the minimum
     cost.max(fee_min)
@@ -112,8 +109,8 @@ impl<T: Config> Pallet<T> {
       return 0
     }
     let period: u32 = SubnetRegistrationInterval::<T>::get();
-    last_registration_epoch + (
-      period - (last_registration_epoch % period)
+    last_registration_epoch.saturating_add(
+      period.saturating_sub(last_registration_epoch % period)
     )
   }
 }

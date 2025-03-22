@@ -54,7 +54,7 @@ impl Default for Inflation {
 }
 
 impl Inflation {
-  // pub fn epoch(&self, epoch: u64) -> u128 {
+  // pub fn epoch(&self, epoch: u32) -> u128 {
   //   let years_elapsed = epoch as f64 / self.epochs_per_year as f64;
   //   // let rate = self.initial * (1.0 - self.terminal).powf(years_elapsed);
   //   let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
@@ -66,7 +66,7 @@ impl Inflation {
   //   (final_rate * 1e+18) as u128
   // }
 
-  pub fn epoch(&self, epoch: u64, epochs_per_year: u64, denominator: u128) -> f64 {
+  pub fn epoch(&self, epoch: u32, epochs_per_year: u32, denominator: u128) -> f64 {
     let years_elapsed = epoch as f64 / epochs_per_year as f64;
     // let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
 
@@ -90,7 +90,7 @@ impl Inflation {
     }
   }
 
-  pub fn year_from_epoch(&self, epoch: u64, epochs_per_year: u64) -> f64 {
+  pub fn year_from_epoch(&self, epoch: u32, epochs_per_year: u32) -> f64 {
     epoch as f64 / epochs_per_year as f64
   }
 }
@@ -136,7 +136,7 @@ impl<T: Config> Pallet<T> {
   /// 5. Adjust network inflation based on network activity
   ///
   pub fn get_epoch_emissions(
-    epoch: u64, 
+    epoch: u32, 
   ) -> u128 {
     let max_subnets: u32 = MaxSubnets::<T>::get();
     let mut total_activate_subnets: u32 = TotalActiveSubnets::<T>::get();

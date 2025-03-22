@@ -18,7 +18,7 @@ use crate::{
   MinSubnetDelegateStakePercentage, 
   MinSubnetRegistrationBlocks, 
   MaxSubnetRegistrationBlocks, 
-  SubnetActivationEnactmentPeriod,
+  SubnetActivationEnactmentBlocks,
   HotkeySubnetNodeId,
 };
 
@@ -47,7 +47,7 @@ fn test_register_subnet() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -64,8 +64,8 @@ fn test_register_subnet() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -96,7 +96,7 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -113,8 +113,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    // increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    // increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -148,14 +148,14 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
     increase_epochs(next_registration_epoch);
 
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
 
@@ -197,7 +197,7 @@ fn test_register_subnet_exists_error() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -214,8 +214,8 @@ fn test_register_subnet_exists_error() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -245,7 +245,7 @@ fn test_register_subnet_registration_blocks_err() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -260,8 +260,8 @@ fn test_register_subnet_registration_blocks_err() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     assert_err!(
       Network::register_subnet(
@@ -296,7 +296,7 @@ fn test_register_subnet_registration_blocks_err() {
 //     let block_number = System::block_number();
 //     let epoch = System::block_number().saturating_div(epoch_length);
   
-//     let cost = Network::registration_cost(epoch as u32);
+//     let cost = Network::registration_cost(epoch);
     
 //     let total_subnet_memory_mb = TotalSubnetMemoryMB::<Test>::get();
 
@@ -310,8 +310,8 @@ fn test_register_subnet_registration_blocks_err() {
 //       let epoch_length = EpochLength::get();
 //       let block_number = System::block_number();
 //       let epoch = System::block_number().saturating_div(epoch_length);
-//       let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-//       increase_epochs(next_registration_epoch - epoch as u32);
+//       let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+//       increase_epochs(next_registration_epoch - epoch);
   
 //       let _ = Balances::deposit_creating(&account(0), cost+1000);
 
@@ -367,8 +367,8 @@ fn test_register_subnet_not_enough_balance_err() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     assert_err!(
       Network::register_subnet(
@@ -389,7 +389,7 @@ fn test_activate_subnet() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -406,8 +406,8 @@ fn test_activate_subnet() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
   
     // --- Register subnet for activation
     assert_ok!(
@@ -492,7 +492,7 @@ fn test_activate_subnet_invalid_subnet_id_error() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -509,8 +509,8 @@ fn test_activate_subnet_invalid_subnet_id_error() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -570,7 +570,7 @@ fn test_activate_subnet_already_activated_err() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -587,8 +587,8 @@ fn test_activate_subnet_already_activated_err() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -669,7 +669,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -686,8 +686,8 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -741,7 +741,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     );
 
     // --- Increase blocks to max registration block
-    System::set_block_number(System::block_number() + subnet.registration_blocks + SubnetActivationEnactmentPeriod::<Test>::get() + 1);
+    System::set_block_number(System::block_number() + subnet.registration_blocks + SubnetActivationEnactmentBlocks::<Test>::get() + 1);
     let current_block_number = System::block_number();
 
     assert_ok!(
@@ -765,7 +765,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     assert_eq!(subnet, Err(()));
 
     // --- Ensure nodes can be removed and unstake
-    post_subnet_removal_ensures(subnet_id, 0, total_subnet_nodes);
+    post_subnet_removal_ensures(subnet_id, subnet_path, 0, total_subnet_nodes);
   })
 }
 
@@ -779,7 +779,7 @@ fn test_activate_subnet_initializing_error() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -796,8 +796,8 @@ fn test_activate_subnet_initializing_error() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -931,7 +931,7 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -948,8 +948,8 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -1004,7 +1004,7 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
@@ -1021,8 +1021,8 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(

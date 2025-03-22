@@ -297,7 +297,7 @@ fn test_remove_node_delegate_stake() {
 //     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
   
 //     // --- Insert validator
-//     SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
+//     SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
 //     let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
 
 //     // validate without n-1
@@ -327,13 +327,13 @@ fn test_remove_node_delegate_stake() {
 //     // --- Get submission data and count before node is removed
 //     // Check rewards
 //     // Ensure only attestors, validators, and validated get rewards
-//     let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+//     let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
 
 //     // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
 //     let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
 //     let submission_nodes_count = submission_nodes.len() as u128;
 
-//     Network::reward_subnets(System::block_number(), epoch as u32);
+//     Network::reward_subnets(System::block_number(), epoch);
 //     let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes-1);
 //     assert_eq!(node_absent_count, 0); 
           

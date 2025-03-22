@@ -22,9 +22,7 @@ impl<T: Config> Pallet<T> {
     if !SubnetsData::<T>::contains_key(subnet_id) {
       return Vec::new();
     }
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
+    let epoch: u32 = Self::get_current_epoch_as_u32();
     Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Idle, epoch)
   }
 
@@ -34,9 +32,7 @@ impl<T: Config> Pallet<T> {
     if !SubnetsData::<T>::contains_key(subnet_id) {
       return Vec::new();
     }
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
+    let epoch: u32 = Self::get_current_epoch_as_u32();
     Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Included, epoch)
   }
 
@@ -46,9 +42,7 @@ impl<T: Config> Pallet<T> {
     if !SubnetsData::<T>::contains_key(subnet_id) {
       return Vec::new();
     }
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
+    let epoch: u32 = Self::get_current_epoch_as_u32();
     Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Validator, epoch)
   }
 
@@ -58,9 +52,7 @@ impl<T: Config> Pallet<T> {
     if !SubnetsData::<T>::contains_key(subnet_id) {
       return Vec::new();
     }
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch_length: u64 = T::EpochLength::get();
-    let epoch: u64 = block / epoch_length;
+    let epoch: u32 = Self::get_current_epoch_as_u32();
     Self::get_classified_subnet_node_info(subnet_id, &SubnetNodeClass::Validator, epoch)
   }
 

@@ -148,11 +148,11 @@ pub const BLOCKS_PER_HALVING: BlockNumber = YEAR * 2;
 pub const TARGET_MAX_TOTAL_SUPPLY: u128 = 2_800_000_000_000_000_000_000_000;
 pub const INITIAL_REWARD_PER_BLOCK: u128 = (TARGET_MAX_TOTAL_SUPPLY / 2) / BLOCKS_PER_HALVING as u128;
 
-pub const SECS_PER_BLOCK: u64 = 6000 / 1000;
+pub const SECS_PER_BLOCK: u32 = 6000 / 1000;
 
-pub const EPOCH_LENGTH: u64 = 10;
-pub const BLOCKS_PER_EPOCH: u64 = SECS_PER_BLOCK * EPOCH_LENGTH;
-pub const EPOCHS_PER_YEAR: u64 = YEAR as u64 / BLOCKS_PER_EPOCH;
+pub const EPOCH_LENGTH: u32 = 10;
+pub const BLOCKS_PER_EPOCH: u32 = SECS_PER_BLOCK * EPOCH_LENGTH;
+pub const EPOCHS_PER_YEAR: u32 = YEAR as u32 / BLOCKS_PER_EPOCH;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -495,14 +495,14 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 }
 
 parameter_types! {
-	pub const InitialTxRateLimit: u64 = 0;
-	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
-	pub const EpochsPerYear: u64 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const InitialTxRateLimit: u32 = 0;
+	pub const EpochLength: u32 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochsPerYear: u32 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18
-	pub const DelegateStakeCooldownEpochs: u64 = 100;
-	pub const StakeCooldownEpochs: u64 = 100;
-	pub const DelegateStakeEpochsRemovalWindow: u64 = 10;
+	pub const DelegateStakeCooldownEpochs: u32 = 100;
+	pub const StakeCooldownEpochs: u32 = 100;
+	pub const DelegateStakeEpochsRemovalWindow: u32 = 10;
 	pub const MaxDelegateStakeUnlockings: u32 = 32;
 	pub const MaxStakeUnlockings: u32 = 32;
 }
@@ -591,7 +591,6 @@ impl pallet_treasury::Config for Runtime {
 	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
 	type BalanceConverter = UnityAssetBalanceConversion;
 	type PayoutPeriod = ConstU32<10>;
-	// type BlockNumberProvider = System;
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
 }

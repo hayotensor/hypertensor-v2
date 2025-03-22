@@ -37,15 +37,15 @@ impl<T: Config> Pallet<T> {
       Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
     };
 
-    let block: u64 = Self::get_current_block_as_u64();
-    let epoch: u64 = block / T::EpochLength::get();
+    let block: u32 = Self::get_current_block_as_u32();
+    let epoch: u32 = block / T::EpochLength::get();
 
     // --- Ensure proposer account has peer and is validator class
     match SubnetNodesData::<T>::try_get(
       subnet_id, 
       subnet_node_id
     ) {
-      Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Validator, epoch as u64),
+      Ok(subnet_node) => subnet_node.has_classification(&SubnetNodeClass::Validator, epoch),
       Err(()) => return Err(Error::<T>::SubnetNotExist.into()),
     };
 
@@ -216,7 +216,7 @@ impl<T: Config> Pallet<T> {
     );
     
     let challenge_period = ChallengePeriod::<T>::get();
-    let block: u64 = Self::get_current_block_as_u64();
+    let block: u32 = Self::get_current_block_as_u32();
 
     // --- Ensure challenge period is active
     ensure!(
@@ -253,7 +253,7 @@ impl<T: Config> Pallet<T> {
       ExistenceRequirement::KeepAlive,
     );
 
-    let epoch: u64 = block / T::EpochLength::get();
+    let epoch: u32 = block / T::EpochLength::get();
 
     Proposals::<T>::mutate(
       subnet_id,
@@ -326,7 +326,7 @@ impl<T: Config> Pallet<T> {
     );
     
     let voting_period = VotingPeriod::<T>::get();
-    let block: u64 = Self::get_current_block_as_u64();
+    let block: u32 = Self::get_current_block_as_u32();
 
     // --- Ensure voting period is active
     // Voting period starts after the challenge block
@@ -454,7 +454,7 @@ impl<T: Config> Pallet<T> {
     );
     
     let voting_period = VotingPeriod::<T>::get();
-    let block: u64 = Self::get_current_block_as_u64();
+    let block: u32 = Self::get_current_block_as_u32();
 
     // --- Ensure voting period is completed
     ensure!(
@@ -588,7 +588,7 @@ impl<T: Config> Pallet<T> {
   fn account_has_active_proposal_as_plaintiff(
     subnet_id: u32, 
     subnet_node_id: u32, 
-    block: u64,
+    block: u32,
   ) -> bool {
     let challenge_period = ChallengePeriod::<T>::get();
     let voting_period = VotingPeriod::<T>::get();
@@ -602,8 +602,8 @@ impl<T: Config> Pallet<T> {
       }
 
       // At this point we have a proposal that matches the plaintiff
-      let proposal_block: u64 = proposal.start_block;
-      let challenge_block: u64 = proposal.challenge_block;
+      let proposal_block: u32 = proposal.start_block;
+      let challenge_block: u32 = proposal.challenge_block;
       if challenge_block == 0 {
         // If time remaining for challenge
         if block < proposal.start_block + challenge_period {
@@ -627,7 +627,7 @@ impl<T: Config> Pallet<T> {
   fn account_has_active_proposal_as_defendant(
     subnet_id: u32, 
     subnet_node_id: u32, 
-    block: u64,
+    block: u32,
   ) -> bool {
     let challenge_period = ChallengePeriod::<T>::get();
     let voting_period = VotingPeriod::<T>::get();
@@ -646,8 +646,8 @@ impl<T: Config> Pallet<T> {
       }
 
       // At this point we have a proposal that matches the defendant
-      let proposal_block: u64 = proposal.start_block;
-      let challenge_block: u64 = proposal.challenge_block;
+      let proposal_block: u32 = proposal.start_block;
+      let challenge_block: u32 = proposal.challenge_block;
       if challenge_block == 0 {
         // If time remaining for challenge
         if block < proposal.start_block + challenge_period {

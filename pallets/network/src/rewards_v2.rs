@@ -17,9 +17,10 @@ use super::*;
 use sp_runtime::Saturating;
 use frame_support::pallet_prelude::DispatchResultWithPostInfo;
 use frame_support::pallet_prelude::Pays;
+use libm::sqrt;
 
 impl<T: Config> Pallet<T> {
-  pub fn reward_subnets(block: u64, epoch: u32) -> DispatchResultWithPostInfo {
+  pub fn reward_subnets(block: u32, epoch: u32) -> DispatchResultWithPostInfo {
     // --- Get required attestation percentage
     let min_attestation_percentage = MinAttestationPercentage::<T>::get();
     let min_vast_majority_attestation_percentage = MinVastMajorityAttestationPercentage::<T>::get();
@@ -42,7 +43,7 @@ impl<T: Config> Pallet<T> {
     let min_subnet_nodes = MinSubnetNodes::<T>::get();
 
     // --- Get total rewards for this epoch
-    let rewards: u128 = Self::get_epoch_emissions(epoch as u64);
+    let rewards: u128 = Self::get_epoch_emissions(epoch);
 
     for (subnet_id, data) in SubnetsData::<T>::iter() {
       let mut attestation_percentage: u128 = 0;
@@ -78,9 +79,8 @@ impl<T: Config> Pallet<T> {
         }
 
         // --- Get subnet nodes count to check against attestation count
-        // ``reward_subnuts`` is called before ``shift_node_classes`` so we can know how many nodes are validators
         // while in this function that should have in the epoch the rewards are destined for
-        let subnet_nodes: Vec<T::AccountId> = Self::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
+        let subnet_nodes: Vec<T::AccountId> = Self::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
         let subnet_node_count = subnet_nodes.len() as u128;
 
         // --- Ensure nodes are at min requirement to continue rewards operations
@@ -158,7 +158,7 @@ impl<T: Config> Pallet<T> {
               );    
             }
           },
-          Err(()) => continue,
+          Err(()) => (),
         };
 
         // --- Get sum of subnet total scores for use of divvying rewards
@@ -176,22 +176,17 @@ impl<T: Config> Pallet<T> {
           // Always continue if any of these are true
           // Note: Only ``included`` or above nodes can get emissions
           if subnet_node.classification.class <= SubnetNodeClass::Registered {
-            if epoch as u64 > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
+            if epoch > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
               Self::perform_remove_subnet_node(block, subnet_id, subnet_node_id);
             }
             continue
           } else if subnet_node.classification.class == SubnetNodeClass::Idle {
             // If not, upgrade classification and continue
             // --- Upgrade to included
-            SubnetNodesData::<T>::mutate(
-              subnet_id,
-              subnet_node_id,
-              |params: &mut SubnetNode<T::AccountId>| {
-                params.classification = SubnetNodeClassification {
-                  class: SubnetNodeClass::Included,
-                  start_epoch: (epoch) as u64,
-                };
-              },
+            Self::increase_class(
+              subnet_id, 
+              subnet_node_id, 
+              epoch,
             );
             continue
           }
@@ -251,15 +246,10 @@ impl<T: Config> Pallet<T> {
           let is_included = subnet_node.classification.class == SubnetNodeClass::Included;
           if is_included && penalties == 0 {
             // --- Upgrade to Validator
-            SubnetNodesData::<T>::mutate(
-              subnet_id,
-              subnet_node_id,
-              |params: &mut SubnetNode<T::AccountId>| {
-                params.classification = SubnetNodeClassification {
-                  class: SubnetNodeClass::Validator,
-                  start_epoch: (epoch) as u64, // in case rewards are called late, we add them to the next epoch, 2 from the consensus data
-                };
-              },
+            Self::increase_class(
+              subnet_id, 
+              subnet_node_id, 
+              epoch,
             );
             continue
           } else if is_included && penalties != 0 {
@@ -358,7 +348,6 @@ impl<T: Config> Pallet<T> {
         Self::slash_validator(subnet_id, validator_id, 0, block);
       }
 
-      // TODO: Automatically remove subnet if greater than max penalties count
       // TODO: Get benchmark for removing max subnets in one epoch to ensure does not surpass max weights
 
       Self::deposit_event(
@@ -373,6 +362,323 @@ impl<T: Config> Pallet<T> {
       if subnet_penalty_count > max_subnet_penalty_count {
         Self::deactivate_subnet(
           data.path,
+          SubnetRemovalReason::MaxPenalties,
+        );
+      }
+    }
+
+    Ok(None.into())
+  }
+
+  pub fn reward_subnets_v2(block: u32, epoch: u32) -> DispatchResultWithPostInfo {
+    let subnets: Vec<_> = SubnetsData::<T>::iter()
+      .filter(|(_, subnet)| subnet.activated > 0)
+      .collect();
+
+    let total_subnets: u32 = subnets.len() as u32;
+    let total_delegate_stake = TotalDelegateStake::<T>::get();
+
+    let mut stake_weights: BTreeMap<&u32, f64> = BTreeMap::new();
+    let mut stake_weight_sum: f64 = 0.0;
+
+    for (subnet_id, _) in &subnets {
+      let total_subnet_delegate_stake = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
+      // 1. Get all weights in f64
+      // *We later use sqrt that uses floats
+
+      let weight: f64 = total_subnet_delegate_stake as f64 / total_delegate_stake as f64;
+      let weight_sqrt: f64 = sqrt(weight);
+
+      stake_weights.insert(subnet_id, weight_sqrt);
+      stake_weight_sum += weight_sqrt;
+    }
+
+    let mut stake_weights_normalized: BTreeMap<&u32, u128> = BTreeMap::new();
+
+    for (subnet_id, weight) in stake_weights {
+      let weight_normalized: u128 = (weight / stake_weight_sum * Self::PERCENTAGE_FACTOR as f64) as u128;
+      stake_weights_normalized.insert(subnet_id, weight_normalized);
+    }
+
+    let subnet_owner_percentage = SubnetOwnerPercentage::<T>::get();
+    let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<T>::get();
+    let min_attestation_percentage = MinAttestationPercentage::<T>::get();
+    let min_vast_majority_attestation_percentage = MinVastMajorityAttestationPercentage::<T>::get();
+    let min_subnet_nodes = MinSubnetNodes::<T>::get();
+    let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
+    let node_attestation_removal_threshold = NodeAttestationRemovalThreshold::<T>::get();
+    let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get();
+    let max_subnet_penalty_count = MaxSubnetPenaltyCount::<T>::get();
+
+    // --- Get total rewards for this epoch
+    let rewards: u128 = Self::get_epoch_emissions(epoch);
+
+    for (subnet_id, data) in &subnets {
+      let mut attestation_percentage: u128 = 0;
+
+      // --- Get subnet validator submission
+      // --- - Run rewards logic
+      // --- Otherwise, check if validator exists since they didn't submit incentives consensus
+      // --- - Penalize and slash validator if existed
+      if let Ok(mut submission) = SubnetRewardsSubmission::<T>::try_get(subnet_id, epoch) {
+        // --- Get overall subnet rewards
+        let weight: u128 = match stake_weights_normalized.get(&subnet_id) {
+          Some(weight) => {
+            if weight == &0 {
+              continue
+            }
+            *weight
+          },
+          None => continue,
+        };
+
+        let overall_subnet_reward: u128 = Self::percent_mul(rewards, weight);
+
+        // --- Get owner rewards
+        let subnet_owner_reward: u128 = Self::percent_mul(overall_subnet_reward, subnet_owner_percentage);
+
+        // --- Get subnet rewards minus owner cut
+        let subnet_reward: u128 = overall_subnet_reward.saturating_sub(subnet_owner_reward);
+
+        // --- Get delegators rewards
+        let delegate_stake_reward: u128 = Self::percent_mul(subnet_reward, delegate_stake_rewards_percentage);
+
+        // --- Get subnet nodes rewards
+        let subnet_node_reward: u128 = subnet_reward.saturating_sub(delegate_stake_reward);
+
+        // --- Get subnet nodes count to check against attestation count and make sure min nodes are present during time of rewards
+        let subnet_nodes: Vec<T::AccountId> = Self::get_classified_hotkeys(*subnet_id, &SubnetNodeClass::Validator, epoch);
+        let subnet_node_count = subnet_nodes.len() as u128;
+
+        // --- Ensure nodes are at min requirement to continue rewards operations
+        if subnet_node_count < min_subnet_nodes as u128 {
+          continue
+        }
+
+        let attestations: u128 = submission.attests.len() as u128;
+        attestation_percentage = Self::percent_div(attestations, subnet_node_count);
+
+        // Redundant
+        // When subnet nodes exit, the consensus data is updated to remove them from it
+        if attestation_percentage > Self::PERCENTAGE_FACTOR {
+          attestation_percentage = Self::PERCENTAGE_FACTOR;
+        }
+        
+        let validator_subnet_node_id: u32 = submission.validator_id;
+
+        let data_len = submission.data.len();
+
+        /* 
+          - Ensures the subnet has enough nodes.
+            * If validator submits under the minimum nodes we assume the subnet is in an unusable state
+          - If the subnet agrees in the validators logic we don't skip rewards
+            * This is to not incentivize subnets from falsely attesting any epochs that have under the required nodes.
+          - Slashes the validator if attestation is below the required minimum.
+        */
+        // If the number of data points (data_len) is less than the required minimum subnet nodes
+        if (data_len as u32) < min_subnet_nodes {
+          // Check if the attestation percentage is below the "vast majority" threshold
+          if attestation_percentage < min_vast_majority_attestation_percentage {
+            // If the attestation percentage is also below the minimum required threshold, slash the validator
+            if attestation_percentage < min_attestation_percentage {
+              Self::slash_validator(*subnet_id, validator_subnet_node_id, attestation_percentage, block);
+            }
+            // Skip further execution and continue to the next iteration
+            continue;
+          }
+          // Subnet agrees with validators submission, continue
+        }
+
+        // --- If the minimum required attestation not reached, assume validator is dishonest, slash, and continue
+        // We don't increase subnet penalty count here because this is likely the validators fault
+        if attestation_percentage < min_attestation_percentage {
+          // --- Slash validator and increase penalty score
+          Self::slash_validator(*subnet_id, validator_subnet_node_id, attestation_percentage, block);
+          
+          // --- Attestation not successful, move on to next subnet
+          continue
+        }
+
+        // --- Deposit owners rewards
+        match SubnetOwner::<T>::try_get(subnet_id) {
+          Ok(coldkey) => {
+            let subnet_owner_reward_as_currency = Self::u128_to_balance(subnet_owner_reward);
+            if subnet_owner_reward_as_currency.is_some() {
+              Self::add_balance_to_coldkey_account(
+                &coldkey,
+                subnet_owner_reward_as_currency.unwrap()
+              );    
+            }
+          },
+          Err(()) => (),
+        };
+
+        // --- Get sum of subnet total scores for use of divvying rewards
+        let sum = submission.data.iter().fold(0, |acc, x| acc.saturating_add(x.score));
+
+        for (subnet_node_id, subnet_node) in SubnetNodesData::<T>::iter_prefix(subnet_id) {
+          let hotkey: T::AccountId = match SubnetNodeIdHotkey::<T>::try_get(subnet_id, subnet_node_id) {
+            Ok(hotkey) => hotkey,
+            Err(()) => continue,
+          };
+
+          // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
+          // --- (else if) Check if past Idle and can be included in validation data
+          //
+          // Note: Only ``included`` or above nodes can get emissions
+          if subnet_node.classification.class <= SubnetNodeClass::Registered {
+            if epoch > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
+              Self::perform_remove_subnet_node(block, *subnet_id, subnet_node_id);
+            }
+            continue
+          } else if subnet_node.classification.class == SubnetNodeClass::Idle {
+            // --- Automatically upgrade to Inclusion if activated into Idle class
+            Self::increase_class(*subnet_id, subnet_node_id, epoch);
+            continue
+          }
+
+          // --- At this point, all nodes can be included in consensus data and receive rewards
+
+          let peer_id: PeerId = subnet_node.peer_id;
+
+          let subnet_node_data_find = submission.data
+            .iter()
+            .find(|data| data.peer_id == peer_id);
+    
+          let penalties = SubnetNodePenalties::<T>::get(subnet_id, subnet_node_id);
+
+          if subnet_node_data_find.is_none() {
+            // --- Mutate nodes penalties count if not in consensus
+            SubnetNodePenalties::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
+
+            // --- To be removed or increase penalty count, the consensus threshold must be reached
+            if attestation_percentage > node_attestation_removal_threshold {
+              // We don't slash nodes for not being in consensus
+              // A node can be removed for any reason such as shutting their node down and may not be due to dishonesty
+              // If subnet validators want to remove and slash a node, they can use the proposals mechanism
+
+              // --- Ensure maximum sequential removal consensus threshold is reached
+              // We make sure the super majority are in agreeance to remove someone
+              // TODO: Check the size of subnet and scale it from there
+              if penalties + 1 > max_subnet_node_penalties {
+                // --- Increase account penalty count
+                Self::perform_remove_subnet_node(block, *subnet_id, subnet_node_id);
+              }
+            }
+
+            continue
+          }
+          
+          // --- At this point, the subnet node is in the consensus data
+
+          // --- Check if can be included in validation data
+          // By this point, node is validated, update to submittable if they have no penalties
+          let is_included = subnet_node.classification.class == SubnetNodeClass::Included;
+          if is_included && penalties == 0 {
+            // --- Upgrade to Validator
+            Self::increase_class(*subnet_id, subnet_node_id, epoch);
+            continue
+          } else if is_included && penalties != 0 {
+            // --- Decrease subnet node penalty count by one if in consensus and attested consensus
+            SubnetNodePenalties::<T>::mutate(subnet_id, subnet_node_id, |n: &mut u32| n.saturating_dec());
+            continue
+          }
+
+          // --- At this point, the subnet node is submittable and included in consensus data
+
+          // --- If subnet node does not attest a super majority attested era, we penalize and skip them
+          if !submission.attests.contains_key(&subnet_node_id) {
+            if attestation_percentage > min_vast_majority_attestation_percentage {
+              // --- Penalize on vast majority only
+              SubnetNodePenalties::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
+              continue
+            }  
+          }
+
+          let subnet_node_data: SubnetNodeData = subnet_node_data_find.unwrap().clone();
+
+          let score = subnet_node_data.score;
+
+          // --- Decrease subnet node penalty count by one if in consensus and attested consensus
+          // Don't hit the db unless we have to
+          if penalties != 0 {
+            SubnetNodePenalties::<T>::mutate(subnet_id, subnet_node_id, |n: &mut u32| n.saturating_dec());
+          }
+
+          // --- Calculate score percentage of peer versus sum
+          let score_percentage: u128 = Self::percent_div(subnet_node_data.score, sum as u128);
+          // --- Calculate score percentage of total subnet generated epoch rewards
+          let mut account_reward: u128 = Self::percent_mul(score_percentage, subnet_node_reward);
+
+          // --- Increase reward if validator
+          if subnet_node_id == validator_subnet_node_id {
+            account_reward += Self::get_validator_reward(attestation_percentage);    
+          }
+
+          // --- Skip if no rewards to give
+          // Unlikely to happen
+          if account_reward == 0 {
+            continue
+          }
+
+          let mut node_delegate_reward = 0;
+          if subnet_node.delegate_reward_rate != 0 {
+            let total_node_delegated_stake_shares = TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id);
+            if total_node_delegated_stake_shares != 0 {
+              node_delegate_reward = Self::percent_mul(account_reward, subnet_node.delegate_reward_rate);
+              account_reward = account_reward - node_delegate_reward;
+              Self::do_increase_node_delegate_stake(
+                *subnet_id,
+                subnet_node_id,
+                node_delegate_reward,
+              );  
+            }
+          }
+
+          // --- Increase account stake and emit event
+          Self::increase_account_stake(
+            &hotkey,
+            *subnet_id, 
+            account_reward,
+          );
+        }
+        // --- Portion of rewards to delegate stakers
+        Self::do_increase_delegate_stake(
+          *subnet_id,
+          delegate_stake_reward,
+        );
+
+        // --- Increment down subnet penalty score on successful epochs
+        SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
+      } else if let Ok(validator_id) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
+        // --- If a validator has been chosen that means they are supposed to be submitting consensus data
+        // --- If there is no submission but validator chosen, increase penalty on subnet and validator
+        // --- Increase the penalty count for the subnet
+        // The next validator on the next epoch can increment the penalty score down
+        SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+
+        // NOTE:
+        //  Each subnet increases the penalty score if they don't have the minimum subnet nodes required by the time
+        //  the subnet is enabled for emissions. This happens by the blockchain validator before choosing the subnet validator
+
+        // If validator didn't submit anything, then slash
+        // Even if a subnet is in a broken state, the chosen validator must submit blank data
+        Self::slash_validator(*subnet_id, validator_id, 0, block);
+      }
+      // TODO: Get benchmark for removing max subnets in one epoch to ensure does not surpass max weights
+
+      Self::deposit_event(
+        Event::RewardResult { 
+          subnet_id: *subnet_id, 
+          attestation_percentage: attestation_percentage, 
+        }
+      );
+
+      // --- If subnet is past its max penalty count, remove
+      let subnet_penalty_count = SubnetPenaltyCount::<T>::get(subnet_id);
+      if subnet_penalty_count > max_subnet_penalty_count {
+        Self::deactivate_subnet(
+          data.path.clone(),
           SubnetRemovalReason::MaxPenalties,
         );
       }

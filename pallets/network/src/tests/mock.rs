@@ -42,7 +42,7 @@ pub use frame_system::{EnsureRoot, EnsureRootWithSuccess};
 use sp_runtime::Permill;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
+type Block = frame_system::mocking::MockBlockU32<Test>;
 
 frame_support::construct_runtime!(
 	pub enum Test
@@ -55,6 +55,9 @@ frame_support::construct_runtime!(
     Treasury: pallet_treasury,
 	}
 );
+
+// An index to a block.
+pub type BlockNumber = u32;
 
 pub type BalanceCall = pallet_balances::Call<Test>;
 
@@ -73,14 +76,14 @@ pub const BLOCKS_PER_HALVING: BlockNumber = YEAR * 2;
 pub const TARGET_MAX_TOTAL_SUPPLY: u128 = 2_800_000_000_000_000_000_000_000;
 pub const INITIAL_REWARD_PER_BLOCK: u128 = (TARGET_MAX_TOTAL_SUPPLY / 2) / BLOCKS_PER_HALVING as u128;
 
-pub const SECS_PER_BLOCK: u64 = 6000 / 1000;
+pub const SECS_PER_BLOCK: u32 = 6000 / 1000;
 
-pub const EPOCH_LENGTH: u64 = 10;
-pub const BLOCKS_PER_EPOCH: u64 = SECS_PER_BLOCK * EPOCH_LENGTH;
-pub const EPOCHS_PER_YEAR: u64 = YEAR as u64 / BLOCKS_PER_EPOCH;
+pub const EPOCH_LENGTH: u32 = 10;
+pub const BLOCKS_PER_EPOCH: u32 = SECS_PER_BLOCK * EPOCH_LENGTH;
+pub const EPOCHS_PER_YEAR: u32 = YEAR as u32 / BLOCKS_PER_EPOCH;
 
 parameter_types! {
-  pub const BlockHashCount: u64 = 250;
+  pub const BlockHashCount: BlockNumber = 250;
   pub const SS58Prefix: u8 = 42;
 }
 
@@ -97,10 +100,6 @@ pub type Address = AccountId;
 
 // Balance of an account.
 pub type Balance = u128;
-
-// An index to a block.
-#[allow(dead_code)]
-pub type BlockNumber = u64;
 
 pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 
@@ -131,7 +130,7 @@ impl frame_system::Config for Test {
   type DbWeight = ();
   type RuntimeOrigin = RuntimeOrigin;
   type RuntimeCall = RuntimeCall;
-  type Nonce = u64;
+  type Nonce = u32;
   type Hash = H256;
   type Hashing = BlakeTwo256;
   type AccountId = AccountId;
@@ -189,7 +188,7 @@ impl pallet_treasury::Config for Test {
 	type Currency = Balances;
 	type RejectOrigin = EnsureRoot<AccountId>;
 	type RuntimeEvent = RuntimeEvent;
-	type SpendPeriod = ConstU64<2>;
+	type SpendPeriod = ConstU32<2>;
 	type Burn = Burn;
 	type BurnDestination = (); // Just gets burned.
 	type WeightInfo = ();
@@ -201,19 +200,19 @@ impl pallet_treasury::Config for Test {
 	type BeneficiaryLookup = IdentityLookup<Self::Beneficiary>;
 	type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
 	type BalanceConverter = UnityAssetBalanceConversion;
-	type PayoutPeriod = ConstU64<10>;
+	type PayoutPeriod = ConstU32<10>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
 }
 
 parameter_types! {
-	pub const EpochLength: u64 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
-	pub const EpochsPerYear: u64 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochLength: u32 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochsPerYear: u32 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
   pub const NetworkPalletId: PalletId = PalletId(*b"/network");
   pub const MinProposalStake: u128 = 1_000_000_000_000_000_000;
-  pub const DelegateStakeCooldownEpochs: u64 = 100;
-  pub const StakeCooldownEpochs: u64 = 100;
-	pub const DelegateStakeEpochsRemovalWindow: u64 = 10;
+  pub const DelegateStakeCooldownEpochs: u32 = 100;
+  pub const StakeCooldownEpochs: u32 = 100;
+	pub const DelegateStakeEpochsRemovalWindow: u32 = 10;
   pub const MaxDelegateStakeUnlockings: u32 = 32;
   pub const MaxStakeUnlockings: u32 = 32;
 }
@@ -227,7 +226,7 @@ impl Config for Test {
 	type EpochLength = EpochLength;
 	type EpochsPerYear = EpochsPerYear;
   type StringLimit = ConstU32<100>;
-	type InitialTxRateLimit = ConstU64<0>;
+	type InitialTxRateLimit = ConstU32<0>;
   type Randomness = InsecureRandomnessCollectiveFlip;
 	type PalletId = NetworkPalletId;
   type DelegateStakeCooldownEpochs = DelegateStakeCooldownEpochs;

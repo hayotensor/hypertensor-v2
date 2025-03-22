@@ -60,14 +60,8 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
   
-  pub fn do_set_subnet_node_registration_epochs(value: u64) -> DispatchResult {
+  pub fn do_set_subnet_node_registration_epochs(value: u32) -> DispatchResult {
     SubnetNodeRegistrationEpochs::<T>::put(value);
-    Ok(())
-  }
-
-  // TODO: remove target multipler logic from application
-  pub fn do_set_target_subnet_node_multiplier(value: u128) -> DispatchResult {
-    TargetSubnetNodesMultiplier::<T>::put(value);
     Ok(())
   }
 
@@ -121,7 +115,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn do_set_tx_rate_limit(value: u64) -> DispatchResult {
+  pub fn do_set_tx_rate_limit(value: u32) -> DispatchResult {
     TxRateLimit::<T>::set(value);
 
     Self::deposit_event(Event::SetTxRateLimit(value));

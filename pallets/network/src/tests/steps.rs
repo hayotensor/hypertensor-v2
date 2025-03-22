@@ -42,7 +42,7 @@ use crate::{
 //       let epoch = System::block_number() / epoch_length;
 //       log::error!("test_epoch_steps epoch: {:?}", epoch);
 
-//       Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+//       Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
       
 //       let included_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Included, epoch);
 //       let included_nodes_count = included_nodes.len() as u128;
@@ -53,7 +53,7 @@ use crate::{
 //       let submittable_nodes_count = submittable_nodes.len() as u128;
 
 //       // --- Get validator
-//       let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32).unwrap();
+//       let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
 //       let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
 
 //       let subnet_node_data_vec = subnet_node_data(0, (included_nodes_count) as u32);
@@ -90,13 +90,13 @@ use crate::{
 //         );
 //       }
       
-//       let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+//       let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
   
 //       assert_eq!(submission.validator_id, validator_id);
 //       assert_eq!(submission.data.len(), subnet_node_data_vec.len());
 //       assert_eq!(submission.attests.len(), submittable_nodes_count as usize);
 
-//       Network::reward_subnets(System::block_number(), epoch as u32);
+//       Network::reward_subnets(System::block_number(), epoch);
 
 //       // Add new subnet node and check if they're inclusion on next epoch      
 //       if n == 0 {

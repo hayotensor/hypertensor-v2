@@ -25,7 +25,7 @@ use crate::inflation::Inflation;
 #[test]
 fn test_inflation_total() {
   new_test_ext().execute_with(|| {
-    let _ = env_logger::builder().is_test(true).try_init(); // Ensures logging works in tests
+    let _ = env_logger::builder().is_test(true).try_init();
 
     let inflation = Inflation::default();
 
@@ -66,7 +66,7 @@ fn test_get_epoch_emissions() {
 // #[test]
 // fn test_inflation_epoch() {
 //   new_test_ext().execute_with(|| {
-//     let _ = env_logger::builder().is_test(true).try_init(); // Ensures logging works in tests
+//     let _ = env_logger::builder().is_test(true).try_init();
 
 //     let inflation = Inflation::default();
 

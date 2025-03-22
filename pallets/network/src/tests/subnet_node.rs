@@ -151,7 +151,7 @@ fn test_update_coldkey() {
       )
     );
 
-    let original_unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(1));
+    let original_unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(1));
     let original_ledger_balance: u128 = original_unbondings.values().copied().sum();
     assert_eq!(original_unbondings.len() as u32, 1);  
     assert_eq!(original_ledger_balance, amount);  
@@ -173,13 +173,13 @@ fn test_update_coldkey() {
     );
 
     // check old coldkey balance is now removed because it was swapped to the new one
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(1));
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(1));
     let ledger_balance: u128 = unbondings.values().copied().sum();
     assert_eq!(unbondings.len() as u32, 0);  
     assert_eq!(ledger_balance, 0);  
 
     // check new coldkey balance matches original
-    let new_unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let new_unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
     let new_ledger_balance: u128 = new_unbondings.values().copied().sum();
     assert_eq!(new_unbondings.len() as u32, original_unbondings.len() as u32);  
     assert_eq!(new_ledger_balance, original_ledger_balance);  
@@ -375,6 +375,7 @@ fn test_update_hotkey() {
 #[test]
 fn test_register_subnet_node_subnet_registering_or_activated_error() {
   new_test_ext().execute_with(|| {
+    let _ = env_logger::builder().is_test(true).try_init();
 
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
@@ -383,7 +384,7 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(1), cost+1000);
   
@@ -402,8 +403,8 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -452,7 +453,7 @@ fn test_register_subnet_node_then_activate() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(1), cost+deposit_amount);
   
@@ -471,8 +472,8 @@ fn test_register_subnet_node_then_activate() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -566,7 +567,7 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+    let cost = Network::registration_cost(epoch);
   
     let _ = Balances::deposit_creating(&account(1), cost+1000+deposit_amount);
   
@@ -585,8 +586,8 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
     let epoch_length = EpochLength::get();
     let block_number = System::block_number();
     let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+    increase_epochs(next_registration_epoch - epoch);
 
     // --- Register subnet for activation
     assert_ok!(
@@ -802,7 +803,7 @@ fn test_get_classification_subnet_nodes() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
   
-    let submittable = Network::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
+    let submittable = Network::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Validator, epoch);
 
     assert_eq!(submittable.len() as u32, total_subnet_nodes);
   })
@@ -1861,7 +1862,7 @@ fn test_claim_stake_unbondings() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
 
     assert_eq!(unbondings.len(), 1);
     let (first_key, first_value) = unbondings.iter().next().unwrap();
@@ -1882,7 +1883,7 @@ fn test_claim_stake_unbondings() {
 
     assert_eq!(post_balance, starting_balance);
 
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
 
     assert_eq!(unbondings.len(), 0);
   });
@@ -1952,7 +1953,7 @@ fn test_remove_stake_twice_in_epoch() {
       )
     );
 
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
     let ledger_balance: u128 = unbondings.values().copied().sum();
     assert_eq!(unbondings.len() as u32, 1);  
     assert_eq!(ledger_balance, amount);  
@@ -1966,7 +1967,7 @@ fn test_remove_stake_twice_in_epoch() {
       )
     );
 
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
     let ledger_balance: u128 = unbondings.values().copied().sum();
     assert_eq!(unbondings.len() as u32, 1);  
     assert_eq!(ledger_balance, amount*2);
@@ -1982,7 +1983,7 @@ fn test_remove_stake_twice_in_epoch() {
       )
     );
 
-    let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
     let ledger_balance: u128 = unbondings.values().copied().sum();
     assert_eq!(unbondings.len() as u32, 2);  
     assert_eq!(ledger_balance, amount*3);
@@ -2104,7 +2105,7 @@ fn test_remove_to_stake_max_unlockings_reached_err() {
           )
         );
 
-        let unbondings: BTreeMap<u64, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+        let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
 
         assert_eq!(unbondings.len() as u32, n);  
       }
@@ -2242,8 +2243,8 @@ fn test_deactivation_ledger_as_attestor() {
     let epoch = System::block_number() / epoch_length;
 
     // insert node as validator to place them into the ledger
-    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch);
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id.unwrap()).unwrap();
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
@@ -2337,7 +2338,7 @@ fn test_deactivation_ledger_as_chosen_validator() {
     let epoch = System::block_number() / epoch_length;
 
     // insert node as validator to place them into the ledger
-    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
 
     let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(1)).unwrap();
 

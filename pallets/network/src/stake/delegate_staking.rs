@@ -62,7 +62,7 @@ impl<T: Config> Pallet<T> {
   
     // to-do: add AddStakeRateLimit instead of universal rate limiter
     //        this allows peers to come in freely
-    let block: u64 = Self::get_current_block_as_u64();
+    let block: u32 = Self::get_current_block_as_u32();
     ensure!(
       !Self::exceeds_tx_rate_limit(Self::get_last_tx_block(&account_id), block),
       Error::<T>::TxRateLimitExceeded
@@ -148,7 +148,7 @@ impl<T: Config> Pallet<T> {
       Error::<T>::CouldNotConvertToBalance
     );
 
-    let block: u64 = Self::get_current_block_as_u64();
+    let block: u32 = Self::get_current_block_as_u32();
     ensure!(
       !Self::exceeds_tx_rate_limit(Self::get_last_tx_block(&account_id), block),
       Error::<T>::TxRateLimitExceeded
@@ -194,7 +194,7 @@ impl<T: Config> Pallet<T> {
       Error::<T>::NotEnoughStakeToWithdraw
     );
     
-    let block: u64 = Self::get_current_block_as_u64();
+    let block: u32 = Self::get_current_block_as_u32();
 
     // --- Logic
     ensure!(

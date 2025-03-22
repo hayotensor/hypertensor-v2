@@ -43,20 +43,20 @@ impl<T: Config> Pallet<T> {
     false
   }
   
-  pub fn get_tx_rate_limit() -> u64 {
+  pub fn get_tx_rate_limit() -> u32 {
     TxRateLimit::<T>::get()
   }
 
-  pub fn set_last_tx_block(key: &T::AccountId, block: u64) {
+  pub fn set_last_tx_block(key: &T::AccountId, block: u32) {
     LastTxBlock::<T>::insert(key, block)
   }
 
-  pub fn get_last_tx_block(key: &T::AccountId) -> u64 {
+  pub fn get_last_tx_block(key: &T::AccountId) -> u32 {
     LastTxBlock::<T>::get(key)
   }
 
-  pub fn exceeds_tx_rate_limit(prev_tx_block: u64, current_block: u64) -> bool {
-    let rate_limit: u64 = Self::get_tx_rate_limit();
+  pub fn exceeds_tx_rate_limit(prev_tx_block: u32, current_block: u32) -> bool {
+    let rate_limit: u32 = Self::get_tx_rate_limit();
     if rate_limit == 0 || prev_tx_block == 0 {
       return false;
     }
