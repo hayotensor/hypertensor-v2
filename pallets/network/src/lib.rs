@@ -877,6 +877,7 @@ pub mod pallet {
 	}
 	#[pallet::type_value]
 	pub fn DefaultSubnetRegistrationInterval() -> u32 {
+		// Based on blocks
 		// 1 week based on 6s blocks using epochs
 		// 1008
 		// Testnet:
@@ -899,6 +900,14 @@ pub mod pallet {
 	}
 	#[pallet::type_value]
 	pub fn DefaultInflationAdjFactor() -> u128 {
+		150_000_000
+	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetInflationAdjFactor() -> u128 {
+		150_000_000
+	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetNodeInflationAdjFactor() -> u128 {
 		150_000_000
 	}
 
@@ -1559,7 +1568,13 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type InflationAdjFactor<T> = StorageValue<_, u128, ValueQuery, DefaultInflationAdjFactor>;
 
+	// Exponent used for subnet utilization
+	#[pallet::storage]
+	pub type SubnetInflationAdjFactor<T> = StorageValue<_, u128, ValueQuery, DefaultSubnetInflationAdjFactor>;
 
+	// Exponent used for subnet node utilization
+	#[pallet::storage]
+	pub type SubnetNodeInflationAdjFactor<T> = StorageValue<_, u128, ValueQuery, DefaultSubnetNodeInflationAdjFactor>;
 
 
 	/// The pallet's dispatchable functions ([`Call`]s).
@@ -2960,12 +2975,12 @@ pub mod pallet {
 
 			// Ensure max subnets not reached
 			// Get total live subnets
-			let total_subnets: u32 = (SubnetsData::<T>::iter().count()).try_into().unwrap();
-			let max_subnets: u32 = MaxSubnets::<T>::get();
-			ensure!(
-				total_subnets < max_subnets,
-				Error::<T>::MaxSubnets
-			);
+			// let total_subnets: u32 = (SubnetsData::<T>::iter().count()).try_into().unwrap();
+			// let max_subnets: u32 = MaxSubnets::<T>::get();
+			// ensure!(
+			// 	total_subnets < max_subnets,
+			// 	Error::<T>::MaxSubnets
+			// );
 
 			// --- Ensure registration time period is allowed
 			ensure!(

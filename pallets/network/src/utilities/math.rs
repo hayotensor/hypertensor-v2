@@ -19,6 +19,7 @@
 // @to-do: Increase precision to 100.0000
 
 use super::*;
+use libm::pow;
 
 impl<T: Config> Pallet<T> {
   // Percentages are defined by default with 2 decimals of precision (100.00). 
@@ -92,6 +93,10 @@ impl<T: Config> Pallet<T> {
   /// Get percentage in decimal format that uses `PERCENTAGE_FACTOR` as f64
   pub fn get_percent_as_f64(v: u128) -> f64 {
     v as f64 / Self::PERCENTAGE_FACTOR as f64
+  }
+
+  pub fn pow(x: f64, exp: f64) -> f64 {
+    pow(x, exp)
   }
 
 

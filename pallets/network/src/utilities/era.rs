@@ -27,38 +27,49 @@ impl<T: Config> Pallet<T> {
     let mut subnet_delegate_stake: Vec<(Vec<u8>, u128)> = Vec::new();
 
     for (subnet_id, data) in subnets {
-
-      //
-      //
-      // TODO: Check Registration and Enactment period separately:
-      //       Registration Period:
-      //         - Can exist no matter what
-      //       Enactment Period:
-      //         - Once out of registration, if must have min nodes and min delegate stake.
-      //       Out of Enactment Period:
-      //         - Remove if not activated, althought should be automatically removed in Enactment if it didn't
-      //           meet HT requirements.
-      // let max_registration_block = data.registered + data.registration_blocks;
-      // let max_enactment_block = max_registration_block + subnet_activation_enactment_period;
-
-      // --- Ensure subnet is active is able to submit consensus
-      let max_registration_block = data.registered + data.registration_blocks + subnet_activation_enactment_period;
+      // ==========================
+      // # Logic
+      // *Registration Period:
+      //  - Can exist no matter what
+      // *Enactment Period:
+      //  - Once out of registration, if must have min nodes.
+      //  - We allow being under min delegate stake to allow delegate stake condition to be met before
+      //    the end of the enactment period.
+      // *Out of Enactment Period:
+      //  - Remove if not activated.
+      // ==========================
+      let max_registration_block = data.registered + data.registration_blocks;
+      let max_enactment_block = max_registration_block + subnet_activation_enactment_period;
+      
       if data.activated == 0 && block <= max_registration_block {
-        // We check if the subnet is still in registration phase and not yet out of the enactment phase
+        // --- Registration Period
+        // If in registration period, do nothing
         continue
-      } else if data.activated == 0 && block > max_registration_block {
-        // --- Ensure subnet is in registration period and hasn't passed enactment period
-        // If subnet hasn't been activated after the enacement period, then remove subnet
-				Self::deactivate_subnet(
+      } else if data.activated == 0 && block <= max_enactment_block {
+        // --- Enactment Period
+        // If in enactment period, ensure min nodes
+        let subnet_node_ids: Vec<u32> = Self::get_classified_subnet_node_ids(subnet_id, &SubnetNodeClass::Validator, epoch as u64);
+        let subnet_nodes_count = subnet_node_ids.len();  
+        if (subnet_nodes_count as u32) < MinSubnetNodes::<T>::get() {
+          Self::deactivate_subnet(
+            data.path,
+            SubnetRemovalReason::MinSubnetNodes,
+          );
+        }
+        continue
+      } else if data.activated == 0 && block > max_enactment_block {
+        // --- Out of Enactment Period
+        // If out of enactment period, ensure activated
+        Self::deactivate_subnet(
 					data.path,
 					SubnetRemovalReason::EnactmentPeriod,
 				);
         continue
-			}
+      }
 
       // --- All subnets are now activated and passed the registration period
       // Must have:
-      //  - Minimum nodes (increases penalties if less than)
+      //  - Minimum nodes (increases penalties if less than - later removed if over max penalties)
       //  - Minimum delegate stake balance (remove subnet if less than)
 
       let min_subnet_nodes = MinSubnetNodes::<T>::get();
@@ -108,6 +119,7 @@ impl<T: Config> Pallet<T> {
       );
     }
 
+    // --- If over max subnets, remove the subnet with the lowest delegate stake
     if excess_subnets {
       subnet_delegate_stake.sort_by_key(|&(_, value)| value);
       Self::deactivate_subnet(

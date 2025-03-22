@@ -44,15 +44,15 @@ fn test_inflation_total() {
   });
 }
 
-#[test]
-fn test_inflation_test() {
-  new_test_ext().execute_with(|| {
-    let inflation = Inflation::default();
-    let x1 = Network::test(1.0);
-    log::error!("test_inflation_test x1 {:?}", x1);
-    // assert!(false);
-  });
-}
+// #[test]
+// fn test_inflation_test() {
+//   new_test_ext().execute_with(|| {
+//     let inflation = Inflation::default();
+//     let x1 = Network::test(1.0);
+//     log::error!("test_inflation_test x1 {:?}", x1);
+//     // assert!(false);
+//   });
+// }
 
 #[test]
 fn test_get_epoch_emissions() {

@@ -145,53 +145,68 @@ impl<T: Config> Pallet<T> {
       total_activate_subnets = max_subnets;
     }
 
+    // ==========================
     // --- Get subnet utilization
+    // ==========================
     let subnet_utilization_rate: f64 = total_activate_subnets as f64 / max_subnets as f64;
+    let adj_subnet_utilization_rate: f64 = Self::pow(
+      subnet_utilization_rate, 
+      Self::get_percent_as_f64(SubnetInflationAdjFactor::<T>::get())
+    ).min(1.0);
 
     // Max subnet nodes per subnet
-    let max_subnet_nodes: u32 = MaxSubnetNodes::<T>::get();
-    let max_nodes: u32 = max_subnets.saturating_mul(max_subnet_nodes);
+    let max_nodes: u32 = max_subnets.saturating_mul(MaxSubnetNodes::<T>::get());
     let total_active_nodes: u32 = TotalActiveNodes::<T>::get();
 
+    // ==========================
     // --- Get subnet node utilization
+    // ==========================
     let node_utilization_rate: f64 = total_active_nodes as f64 / max_nodes as f64;
+    let adj_node_utilization_rate: f64 = Self::pow(
+      node_utilization_rate, 
+      Self::get_percent_as_f64(SubnetNodeInflationAdjFactor::<T>::get())
+    ).min(1.0);
 
+    // ==========================
     // --- Get final utilization factors
+    // ==========================
     let sif: f64 = Self::get_percent_as_f64(SubnetInflationFactor::<T>::get());
     let snif: f64 = 1.0 - sif;
 
     let adj_subnet_utilization_rate: f64 = subnet_utilization_rate * sif;
     let adj_node_utilization_rate: f64 = node_utilization_rate * snif;
 
-    let inflation_factor: f64 = Self::test2(snif + adj_node_utilization_rate);
+    // --- Get percentage of inflation to use in current epoch
+    let inflation_factor: f64 = Self::get_inflation_factor(snif + adj_node_utilization_rate);
 
+    // ==========================
+    // --- Get current epochs total inflation
+    //
+    // * Adjusts the inflation based on network activity using `let inflation_factor`
+    // ==========================
     let total_issuance: f64 = Self::get_total_network_issuance() as f64;
     let epochs_per_year: f64 = T::EpochsPerYear::get() as f64;
 
     let inflation = Inflation::default();
+
     let year: f64 = epoch as f64 / epochs_per_year;
 
+    // --- Get current yearly inflation
     let apr: f64 = inflation.total(year);
 
     (total_issuance * apr * inflation_factor) as u128
   }
 
-  pub fn test(x: f64) -> f64 {
+  pub fn get_inflation_factor(x: f64) -> f64 {
     if x >= 1.0 {
       return 1.0
     }
-    (1.0 - exp(-5.0 * x)).min(1.0)
-  }
-
-  pub fn test2(x: f64) -> f64 {
-    if x >= 1.0 {
-      return 1.0
-    }
-    let k: f64 = 0.15;
+    
+    let k: f64 = Self::get_percent_as_f64(InflationAdjFactor::<T>::get());
     if k == 0.0 {
       return 1.0
     }
 
-    pow(x, Self::get_percent_as_f64(InflationAdjFactor::<T>::get())).min(1.0)
+    pow(x, k).min(1.0)
   }
 }
