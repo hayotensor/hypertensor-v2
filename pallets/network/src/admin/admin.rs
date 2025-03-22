@@ -19,38 +19,38 @@ use sp_std::vec::Vec;
 impl<T: Config> Pallet<T> {
   // TODO: update this for a smoother line
   pub fn do_set_min_nodes_slope_parameters(mut params: CurveParametersSet) -> DispatchResult {
-    let x_curve_start = params.x_curve_start;
-    let y_end = params.y_end;
-    let y_start = params.y_start;
-    let x_rise = Self::PERCENTAGE_FACTOR / 100;
+    // let x_curve_start = params.x_curve_start;
+    // let y_end = params.y_end;
+    // let y_start = params.y_start;
+    // let x_rise = Self::PERCENTAGE_FACTOR / 100;
 
-    ensure!(
-      y_start > y_end,
-      Error::<T>::InvalidCurveParameters
-    );
+    // ensure!(
+    //   y_start > y_end,
+    //   Error::<T>::InvalidCurveParameters
+    // );
 
-    // --- Linear Slope check
-    let x_start_plus_1 = x_curve_start + x_rise;
-    let x_start_plus_1_adj = (x_start_plus_1 - x_curve_start) * Self::PERCENTAGE_FACTOR / 
-      (Self::PERCENTAGE_FACTOR - x_curve_start);
-    let y_start_minus_1 = (y_start - y_end) * (Self::PERCENTAGE_FACTOR - x_start_plus_1_adj) / 
-      Self::PERCENTAGE_FACTOR + y_end; 
-    let y_rise = y_start - y_start_minus_1;
-    let slope = y_rise * Self::PERCENTAGE_FACTOR / x_rise;
-    let j = slope * Self::TWO_HUNDRED_PERCENT_FACTOR / Self::PERCENTAGE_FACTOR;
-    let q = Self::PERCENTAGE_FACTOR * Self::PERCENTAGE_FACTOR / j * y_start / Self::PERCENTAGE_FACTOR;
-    let max_x = 
-      Self::PERCENTAGE_FACTOR * Self::PERCENTAGE_FACTOR / j * y_start / Self::PERCENTAGE_FACTOR + 
-      (x_curve_start * Self::PERCENTAGE_FACTOR / Self::TWO_HUNDRED_PERCENT_FACTOR);
+    // // --- Linear Slope check
+    // let x_start_plus_1 = x_curve_start + x_rise;
+    // let x_start_plus_1_adj = (x_start_plus_1 - x_curve_start) * Self::PERCENTAGE_FACTOR / 
+    //   (Self::PERCENTAGE_FACTOR - x_curve_start);
+    // let y_start_minus_1 = (y_start - y_end) * (Self::PERCENTAGE_FACTOR - x_start_plus_1_adj) / 
+    //   Self::PERCENTAGE_FACTOR + y_end; 
+    // let y_rise = y_start - y_start_minus_1;
+    // let slope = y_rise * Self::PERCENTAGE_FACTOR / x_rise;
+    // let j = slope * Self::TWO_HUNDRED_PERCENT_FACTOR / Self::PERCENTAGE_FACTOR;
+    // let q = Self::PERCENTAGE_FACTOR * Self::PERCENTAGE_FACTOR / j * y_start / Self::PERCENTAGE_FACTOR;
+    // let max_x = 
+    //   Self::PERCENTAGE_FACTOR * Self::PERCENTAGE_FACTOR / j * y_start / Self::PERCENTAGE_FACTOR + 
+    //   (x_curve_start * Self::PERCENTAGE_FACTOR / Self::TWO_HUNDRED_PERCENT_FACTOR);
     
-    ensure!(
-      max_x >= Self::PERCENTAGE_FACTOR,
-      Error::<T>::SubnetNotExist
-    );
+    // ensure!(
+    //   max_x >= Self::PERCENTAGE_FACTOR,
+    //   Error::<T>::SubnetNotExist
+    // );
 
-    params.max_x = max_x;
+    // params.max_x = max_x;
 
-    MinNodesCurveParameters::<T>::put(params);
+    // MinNodesCurveParameters::<T>::put(params);
 
     Ok(())
   }

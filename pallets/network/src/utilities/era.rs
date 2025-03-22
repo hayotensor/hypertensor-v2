@@ -164,8 +164,8 @@ impl<T: Config> Pallet<T> {
 
   pub fn do_epoch_preliminaries_v2(block: u32, epoch: u32, epoch_length: u32) {
     let max_subnet_penalty_count = MaxSubnetPenaltyCount::<T>::get();
-    let subnet_activation_enactment_epochs = SubnetActivationEnactmentEpochs::<T>::get();
     let subnet_registration_epochs = SubnetRegistrationEpochs::<T>::get();
+    let subnet_activation_enactment_epochs = SubnetActivationEnactmentEpochs::<T>::get();
 
     let subnets: Vec<_> = SubnetsData::<T>::iter().collect();
     let total_subnets: u32 = subnets.len() as u32;
@@ -181,15 +181,16 @@ impl<T: Config> Pallet<T> {
       //
       // *Enactment Period:
       //  - Must have min nodes.
-      //  - We allow being under min delegate stake to allow delegate stake condition to be met before
+      //  *We don't check on min delegate stake balance here.
+      //  - We allow being under min delegate stake to allow delegate stake conditions to be met before
       //    the end of the enactment period.
       //
       // *Out of Enactment Period:
       //  - Remove if not activated.
       //
       // ==========================
-      let activated_epoch: u32 = 0;
-      let registered_epoch: u32 = 0;
+      let activated_epoch: u32 = data.activated;
+      let registered_epoch: u32 = data.registered;
       let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
       let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
       

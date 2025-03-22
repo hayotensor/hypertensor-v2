@@ -140,18 +140,21 @@ pub const MILLISECS_PER_BLOCK: u64 = 6000;
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 
 // Time is measured by number of blocks.
-pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
-pub const HOURS: BlockNumber = MINUTES * 60;
-pub const DAYS: BlockNumber = HOURS * 24;
-pub const YEAR: BlockNumber = DAYS * 365;
+// e.g. How many blocks in a minutes, hours, day, year
+pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber); // 10
+pub const HOURS: BlockNumber = MINUTES * 60; // 600
+pub const DAYS: BlockNumber = HOURS * 24; // 14400
+pub const YEAR: BlockNumber = DAYS * 365; // 5256000
+
+// Rewards pallet variables
 pub const BLOCKS_PER_HALVING: BlockNumber = YEAR * 2;
 pub const TARGET_MAX_TOTAL_SUPPLY: u128 = 2_800_000_000_000_000_000_000_000;
 pub const INITIAL_REWARD_PER_BLOCK: u128 = (TARGET_MAX_TOTAL_SUPPLY / 2) / BLOCKS_PER_HALVING as u128;
 
-pub const SECS_PER_BLOCK: u32 = 6000 / 1000;
+pub const SECS_PER_BLOCK: u32 = (MILLISECS_PER_BLOCK as BlockNumber) / 1000; // 6
 
-pub const EPOCH_LENGTH: u32 = 10;
-pub const BLOCKS_PER_EPOCH: u32 = SECS_PER_BLOCK * EPOCH_LENGTH;
+// Blocks per epoch
+pub const BLOCKS_PER_EPOCH: u32 = 10;
 pub const EPOCHS_PER_YEAR: u32 = YEAR as u32 / BLOCKS_PER_EPOCH;
 
 /// The version information used to identify this runtime when compiled natively.
@@ -496,7 +499,7 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 
 parameter_types! {
 	pub const InitialTxRateLimit: u32 = 0;
-	pub const EpochLength: u32 = EPOCH_LENGTH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
+	pub const EpochLength: u32 = BLOCKS_PER_EPOCH; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const EpochsPerYear: u32 = EPOCHS_PER_YEAR; // Testnet 600 blocks per erpoch / 69 mins per epoch, Local 10
 	pub const NetworkPalletId: PalletId = PalletId(*b"/network");
 	pub const MinProposalStake: u128 = 1_000_000_000_000_000_000; // 1 * 1e18

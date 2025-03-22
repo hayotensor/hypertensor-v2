@@ -616,6 +616,18 @@ pub mod pallet {
 		pub subnet_node: SubnetNode<AccountId>,
 	}
 
+	/// Subnet node deactivation parameters
+	///
+	/// # Arguments
+	///
+	/// * `subnet_id` - Subnet ID.
+	/// * `subnet_node_id` - Subnet node ID
+	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo, PartialOrd, Ord)]
+	pub struct SubnetNodeDeactivation {
+		pub subnet_id: u32,
+		pub subnet_node_id: u32,
+	}
+
 	/// Subnet data
 	///
 	/// # Arguments
@@ -854,6 +866,16 @@ pub mod pallet {
 		43_200
 	}
 	#[pallet::type_value]
+	pub fn DefaultSubnetRegistrationEpochs<T: Config>() -> u32 {
+		T::EpochsPerYear::get() / 52
+	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetActivationEnactmentEpochs<T: Config>() -> u32 {
+		T::EpochsPerYear::get() / 52
+	}
+	
+	
+	#[pallet::type_value]
 	pub fn DefaultMinNodesCurveParameters() -> CurveParametersSet {
 		// math.rs PERCENT_FACTOR format
 		return CurveParametersSet {
@@ -919,10 +941,91 @@ pub mod pallet {
 	pub fn DefaultSubnetNodeInflationAdjFactor() -> u128 {
 		150_000_000
 	}
+	#[pallet::type_value]
+	pub fn DefaultDeactivationLedger<T: Config>() -> BTreeSet<SubnetNodeDeactivation> {
+		BTreeSet::new()
+	}
+	#[pallet::type_value]
+	pub fn DefaultMaxDeactivations() -> u32 {
+		512
+	}
+	#[pallet::type_value]
+	pub fn DefaultSubnetNodeNonUniqueParamUpdateInterval() -> u32 {
+		1
+	}
+	#[pallet::type_value]
+	pub fn DefaultRewardRateUpdatePeriod() -> u32 {
+		// 1 day at 6 seconds a block (86,000s per day)
+		14400
+	}
+	#[pallet::type_value]
+	pub fn DefaultMaxRewardRateDecrease() -> u128 {
+		// 1%
+		10_000_000
+	}
+	#[pallet::type_value]
+	pub fn DefaultNodeAttestationRemovalThreshold() -> u128 {
+		// 8500
+		850000000
+	}
+	#[pallet::type_value]
+	pub fn DefaultProposalParams<T: Config>() -> ProposalParams {
+		return ProposalParams {
+			subnet_id: 0,
+			plaintiff_id: 0,
+			defendant_id: 0,
+			plaintiff_bond: 0,
+			defendant_bond: 0,
+			eligible_voters: BTreeSet::new(),
+			votes: VoteParams {
+				yay: BTreeSet::new(),
+				nay: BTreeSet::new(),
+			},
+			start_block: 0,
+			challenge_block: 0,
+			plaintiff_data: Vec::new(),
+			defendant_data: Vec::new(),
+			complete: false,
+		};
+	}
+	#[pallet::type_value]
+	pub fn DefaultProposalMinSubnetNodes() -> u32 {
+		16
+	}
+	#[pallet::type_value]
+	pub fn DefaultVotingPeriod() -> u32 {
+		// 7 days
+		100800
+	}
+	#[pallet::type_value]
+	pub fn DefaultChallengePeriod() -> u32 {
+		// 7 days in blocks
+		100800
+	}
+	#[pallet::type_value]
+	pub fn DefaultProposalQuorum() -> u128 {
+		// 75.0%
+		750000000
+	}
+	#[pallet::type_value]
+	pub fn DefaultProposalConsensusThreshold() -> u128 {
+		// 66.0%
+		660000000
+	}
+	#[pallet::type_value]
+	pub fn DefaultProposalsCount() -> u32 {
+		0
+	}
+	#[pallet::type_value]
+	pub fn DefaultProposalBidAmount() -> u128 {
+		1e+18 as u128
+	}
 
 	
 	
-	
+	// 
+	// Subnet elements
+	//
 
 	/// Count of subnets
 	#[pallet::storage]
@@ -940,6 +1043,14 @@ pub mod pallet {
 	// Stores subnet data by a unique id
 	#[pallet::storage] // subnet_id => data struct
 	pub type SubnetsData<T: Config> = StorageMap<_, Identity, u32, SubnetData>;
+
+	// Ensures no duplicate subnet paths within the network at one time
+	// If a subnet path is voted out, it can be voted up later on and any
+	// stakes attached to the subnet_id won't impact the re-initialization
+	// of the subnet path.
+	#[pallet::storage]
+	#[pallet::getter(fn subnet_paths)]
+	pub type SubnetPaths<T: Config> = StorageMap<_, Blake2_128Concat, Vec<u8>, u32>;
 
 	// Owner of subnet (registerer)
 	#[pallet::storage] // subnet_id => AccountId
@@ -965,18 +1076,15 @@ pub mod pallet {
 	#[pallet::storage] // subnet_id => block
 	pub type LastSubnetEntry<T: Config> = StorageMap<_, Identity, u32, u32, ValueQuery, DefaultZeroU32>;
 
-	// Ensures no duplicate subnet paths within the network at one time
-	// If a subnet path is voted out, it can be voted up later on and any
-	// stakes attached to the subnet_id won't impact the re-initialization
-	// of the subnet path.
-	#[pallet::storage]
-	#[pallet::getter(fn subnet_paths)]
-	pub type SubnetPaths<T: Config> = StorageMap<_, Blake2_128Concat, Vec<u8>, u32>;
-
 	/// Subnet registration blocks
 	/// Total blocks subnet is in registration to reach conditions to activate
 	#[pallet::storage]
-	pub type SubnetRegistrationEpochs<T> = StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
+	pub type SubnetRegistrationEpochs<T: Config> = StorageValue<_, u32, ValueQuery, DefaultSubnetRegistrationEpochs<T>>;
+
+
+	//
+	// REMOVE DOWN
+	//
 
 	/// Minimum blocks required from subnet registration to activation
 	#[pallet::storage]
@@ -986,26 +1094,17 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type MaxSubnetRegistrationBlocks<T> = StorageValue<_, u32, ValueQuery, DefaultMaxSubnetRegistrationBlocks>;
 
+	//
+	// REMOVE UP
+	//
+
+
 	/// Time period allowable for subnet activation following registration period
 	#[pallet::storage]
 	pub type SubnetActivationEnactmentBlocks<T> = StorageValue<_, u32, ValueQuery, DefaultSubnetActivationEnactmentPeriod>;
 
 	#[pallet::storage]
-	pub type SubnetActivationEnactmentEpochs<T> = StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
-
-	// Minimum amount of nodes required per subnet
-	// required for subnet activity
-	#[pallet::storage]
-	#[pallet::getter(fn min_subnet_nodes)]
-	pub type MinSubnetNodes<T> = StorageValue<_, u32, ValueQuery, DefaultMinSubnetNodes>;
-
-	#[pallet::storage]
-	pub type MinNodesCurveParameters<T> = StorageValue<_, CurveParametersSet, ValueQuery, DefaultMinNodesCurveParameters>;
-
-	// Maximim nodes in a subnet at any given time
-	#[pallet::storage]
-	#[pallet::getter(fn max_subnet_nodes)]
-	pub type MaxSubnetNodes<T> = StorageValue<_, u32, ValueQuery, DefaultMaxSubnetNodes>;
+	pub type SubnetActivationEnactmentEpochs<T: Config> = StorageValue<_, u32, ValueQuery, DefaultSubnetActivationEnactmentEpochs<T>>;
 
 	// Max epochs where consensus isn't formed before subnet being removed
 	#[pallet::storage]
@@ -1020,7 +1119,40 @@ pub mod pallet {
 		u32,
 		ValueQuery,
 	>;
-	
+
+	// Lower bound of registration fee
+	#[pallet::storage]
+	pub type MinSubnetRegistrationFee<T> = StorageValue<_, u128, ValueQuery, DefaultMinSubnetRegistrationFee>;
+
+	// Upper bound of registration fee
+	#[pallet::storage]
+	pub type MaxSubnetRegistrationFee<T> = StorageValue<_, u128, ValueQuery, DefaultMaxSubnetRegistrationFee>;
+
+	// Last epoch a subnet was registered
+	#[pallet::storage]
+	pub type LastSubnetRegistrationEpoch<T> = StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
+
+	// Epochs per subnet registration
+	// Also used for calculating the fee between the max and min registration fee
+	// e.g. Amount of epochs required to go by after a subnet registers before another can
+	#[pallet::storage]
+	pub type SubnetRegistrationInterval<T> = StorageValue<_, u32, ValueQuery, DefaultSubnetRegistrationInterval>;
+
+	//
+	// Subnet node elements
+	//
+
+	// Minimum amount of nodes required per subnet
+	// required for subnet activity
+	#[pallet::storage]
+	#[pallet::getter(fn min_subnet_nodes)]
+	pub type MinSubnetNodes<T> = StorageValue<_, u32, ValueQuery, DefaultMinSubnetNodes>;
+
+	// Maximim nodes in a subnet at any given time
+	#[pallet::storage]
+	#[pallet::getter(fn max_subnet_nodes)]
+	pub type MaxSubnetNodes<T> = StorageValue<_, u32, ValueQuery, DefaultMaxSubnetNodes>;
+
 	#[pallet::storage] // subnet_uid --> u32
 	#[pallet::getter(fn total_subnet_nodes)]
 	pub type TotalSubnetNodes<T: Config> =
@@ -1028,42 +1160,6 @@ pub mod pallet {
 
 	#[pallet::storage]
 	pub type TotalActiveNodes<T: Config> = StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
-	
-	// #[pallet::storage]
-	// #[pallet::getter(fn pending_actions)]
-	// pub type PendingActionsStorage<T: Config> = StorageValue<_, Option<PendingActions<T::AccountId>>, ValueQuery>;
-
-	#[pallet::type_value]
-	pub fn DefaultDeactivationLedger<T: Config>() -> BTreeSet<SubnetNodeDeactivation> {
-		BTreeSet::new()
-	}
-
-	#[pallet::type_value]
-	pub fn DefaultMaxDeactivations() -> u32 {
-		512
-	}
-	#[pallet::type_value]
-	pub fn DefaultSubnetNodeNonUniqueParamUpdateInterval() -> u32 {
-		1
-	}
-	#[pallet::type_value]
-	pub fn DefaultRewardRateUpdatePeriod() -> u32 {
-		// 1 day at 6 seconds a block (86,000s per day)
-		14400
-	}
-	#[pallet::type_value]
-	pub fn DefaultMaxRewardRateDecrease() -> u128 {
-		// 1%
-		10_000_000
-	}
-
-	
-
-	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo, PartialOrd, Ord)]
-	pub struct SubnetNodeDeactivation {
-		pub subnet_id: u32,
-		pub subnet_node_id: u32,
-	}
 
 	#[pallet::storage]
 	pub type MaxDeactivations<T: Config> = 
@@ -1159,7 +1255,10 @@ pub mod pallet {
 		DefaultZeroU32,
 	>;
 
-	// Rate limit
+	//
+	// Network utility elements
+	//
+
 	#[pallet::storage] // ( tx_rate_limit )
 	pub type TxRateLimit<T> = StorageValue<_, u32, ValueQuery, DefaultTxRateLimit<T>>;
 
@@ -1200,7 +1299,7 @@ pub mod pallet {
 	pub type MinVastMajorityAttestationPercentage<T> = StorageValue<_, u128, ValueQuery, DefaultMinVastMajorityAttestationPercentage>;
 
 	//
-	// Rewards (validator, scoring consensus)
+	// Rewards (validator, incentives)
 	//
 
 	// Base reward per epoch for validators
@@ -1232,16 +1331,9 @@ pub mod pallet {
 		DefaultZeroU32,
 	>;
 
-	#[pallet::type_value]
-	pub fn DefaultNodeAttestationRemovalThreshold() -> u128 {
-		// 8500
-		850000000
-	}
-
 	// Attestion percentage required to increment a nodes penalty count up
 	#[pallet::storage]
 	pub type NodeAttestationRemovalThreshold<T: Config> = StorageValue<_, u128, ValueQuery, DefaultNodeAttestationRemovalThreshold>;
-
 
 	//
 	// Staking
@@ -1428,26 +1520,6 @@ pub mod pallet {
 	//
 	// Props
 	//
-	#[pallet::type_value]
-	pub fn DefaultProposalParams<T: Config>() -> ProposalParams {
-		return ProposalParams {
-			subnet_id: 0,
-			plaintiff_id: 0,
-			defendant_id: 0,
-			plaintiff_bond: 0,
-			defendant_bond: 0,
-			eligible_voters: BTreeSet::new(),
-			votes: VoteParams {
-				yay: BTreeSet::new(),
-				nay: BTreeSet::new(),
-			},
-			start_block: 0,
-			challenge_block: 0,
-			plaintiff_data: Vec::new(),
-			defendant_data: Vec::new(),
-			complete: false,
-		};
-	}
 
 	#[pallet::storage] // subnet => proposal_id => proposal
 	pub type Proposals<T> = StorageDoubleMap<
@@ -1461,10 +1533,6 @@ pub mod pallet {
 		DefaultProposalParams<T>,
 	>;
 	
-	#[pallet::type_value]
-	pub fn DefaultProposalMinSubnetNodes() -> u32 {
-		16
-	}
 
 	/// The minimum subnet nodes for a subnet to have to be able to use the proposal mechanism
 	// Because of slashing of funds is possible, we ensure the subnet is well decentralized
@@ -1473,80 +1541,29 @@ pub mod pallet {
 	#[pallet::storage] 
 	pub type ProposalMinSubnetNodes<T> = StorageValue<_, u32, ValueQuery, DefaultProposalMinSubnetNodes>;
 
-	#[pallet::type_value]
-	pub fn DefaultProposalsCount() -> u32 {
-		0
-	}
-
 	#[pallet::storage] 
 	pub type ProposalsCount<T> = StorageValue<_, u32, ValueQuery, DefaultProposalsCount>;
-
-	#[pallet::type_value]
-	pub fn DefaultProposalBidAmount() -> u128 {
-		1e+18 as u128
-	}
 
 	// Amount required to put up as a proposer and challenger
 	#[pallet::storage] 
 	pub type ProposalBidAmount<T> = StorageValue<_, u128, ValueQuery, DefaultProposalBidAmount>;
 
-	#[pallet::type_value]
-	pub fn DefaultVotingPeriod() -> u32 {
-		// 7 days
-		100800
-	}
-
 	#[pallet::storage] // Period in blocks for votes after challenge
 	pub type VotingPeriod<T> = StorageValue<_, u32, ValueQuery, DefaultVotingPeriod>;
-
-	#[pallet::type_value]
-	pub fn DefaultChallengePeriod() -> u32 {
-		// 7 days in blocks
-		100800
-	}
 
 	#[pallet::storage] // Period in blocks after proposal to challenge proposal
 	pub type ChallengePeriod<T> = StorageValue<_, u32, ValueQuery, DefaultChallengePeriod>;
 
-	#[pallet::type_value]
-	pub fn DefaultProposalQuorum() -> u128 {
-		// 75.0%
-		750000000
-	}
-
 	#[pallet::storage] // How many voters are needed in a subnet proposal
 	pub type ProposalQuorum<T> = StorageValue<_, u128, ValueQuery, DefaultProposalQuorum>;
-
-	#[pallet::type_value]
-	pub fn DefaultProposalConsensusThreshold() -> u128 {
-		// 66.0%
-		660000000
-	}
 
 	// Consensus required to pass proposal
 	#[pallet::storage]
 	pub type ProposalConsensusThreshold<T> = StorageValue<_, u128, ValueQuery, DefaultProposalConsensusThreshold>;
 
-	// Lower bound of registration fee
-	#[pallet::storage]
-	pub type MinSubnetRegistrationFee<T> = StorageValue<_, u128, ValueQuery, DefaultMinSubnetRegistrationFee>;
-
-	// Upper bound of registration fee
-	#[pallet::storage]
-	pub type MaxSubnetRegistrationFee<T> = StorageValue<_, u128, ValueQuery, DefaultMaxSubnetRegistrationFee>;
-
-	// Last epoch a subnet was registered
-	#[pallet::storage]
-	pub type LastSubnetRegistrationEpoch<T> = StorageValue<_, u32, ValueQuery, DefaultZeroU32>;
-
-	// Epochs per subnet registration
-	// Also used for calculating the fee between the max and min registration fee
-	// e.g. Amount of epochs required to go by after a subnet registers before another can
-	#[pallet::storage]
-	pub type SubnetRegistrationInterval<T> = StorageValue<_, u32, ValueQuery, DefaultSubnetRegistrationInterval>;
 
 	// 
-	// Inflation helpers
+	// Inflation helpers elements
 	//
 
 	// Factor of subnet utilization to help get the overall inflation on an epoch

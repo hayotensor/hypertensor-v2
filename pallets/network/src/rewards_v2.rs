@@ -599,6 +599,14 @@ impl<T: Config> Pallet<T> {
 
           let score = subnet_node_data.score;
 
+          // --- Validators are allowed to submit scores of 0
+          // This is useful if a subnet wants to keep a node around but not give them rewards
+          // This can be used in scenarios when the max subnet nodes are reached and they don't
+          // want to kick them out as a way to have a waitlist.
+          if score == 0 {
+            continue
+          }
+
           // --- Decrease subnet node penalty count by one if in consensus and attested consensus
           // Don't hit the db unless we have to
           if penalties != 0 {
