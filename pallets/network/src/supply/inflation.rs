@@ -170,13 +170,16 @@ impl<T: Config> Pallet<T> {
     // ==========================
     // --- Get final utilization factors
     // ==========================
+    // Subnet inflation factor
     let sif: f64 = Self::get_percent_as_f64(SubnetInflationFactor::<T>::get());
+    // Subnet node inflation factor
     let snif: f64 = 1.0 - sif;
 
     let adj_subnet_utilization_rate: f64 = subnet_utilization_rate * sif;
     let adj_node_utilization_rate: f64 = node_utilization_rate * snif;
 
     // --- Get percentage of inflation to use in current epoch
+    // This is the network activity factor
     let inflation_factor: f64 = Self::get_inflation_factor(snif + adj_node_utilization_rate);
 
     // ==========================

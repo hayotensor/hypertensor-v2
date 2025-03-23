@@ -52,41 +52,6 @@ impl<T: Config> Pallet<T> {
     cost.max(fee_min)
   }
 
-  // pub fn registration_cost(epoch: u32) -> u128 {
-  //   let last_registration_epoch = LastSubnetRegistrationEpoch::<T>::get();
-  //   let fee_min: u128 = MinSubnetRegistrationFee::<T>::get();
-
-  //   // First registration is min fee (possibly fix this)
-  //   if last_registration_epoch == 0 {
-  //     return fee_min
-  //   }
-
-  //   // --- Get the nexr registration epoch based on the last subnet registered epoch
-  //   // This can be lower than the current epoch if no registrations were in the previous period or prior to the previous period
-  //   let next_registration_lower_bound_epoch = Self::get_next_registration_epoch(last_registration_epoch);
-  //   let period: u32 = SubnetRegistrationInterval::<T>::get();
-  //   let next_registration_upper_bound_epoch = next_registration_lower_bound_epoch + period;
-
-  //   // If no registration within period or previous periods, keep at `fee_min`
-  //   // # Example
-  //   // *`epoch`: 100
-  //   // *`next_registration_upper_bound_epoch`: 200
-  //   // *`period`: 100
-  //   if next_registration_upper_bound_epoch <= epoch {
-  //     return fee_min
-  //   }
-
-  //   let fee_max: u128 = MaxSubnetRegistrationFee::<T>::get();
-
-  //   // Epoch within the cycle
-  //   let cycle_epoch = epoch % period;
-  //   let decrease_per_epoch = (fee_max.saturating_sub(fee_min)).saturating_div(period as u128);
-  //   let cost = fee_max.saturating_sub(decrease_per_epoch.saturating_mul(cycle_epoch as u128));
-
-  //   // Ensures cost doesn't go below min
-  //   cost.max(fee_min)
-  // }
-
   fn get_registration_cost(
     current_epoch: u32, 
     last_registration_epoch: u32, 
@@ -112,5 +77,41 @@ impl<T: Config> Pallet<T> {
     last_registration_epoch.saturating_add(
       period.saturating_sub(last_registration_epoch % period)
     )
+  }
+
+  pub fn is_subnet_registering(subnet_data: SubnetData, epoch: u32) -> bool {
+    let subnet_registration_epochs = SubnetRegistrationEpochs::<T>::get();
+    let is_registered: bool = subnet_data.state == SubnetState::Registered;
+    let registered_epoch: u32 = subnet_data.registered;
+    let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+
+    if is_registered && epoch <= max_registration_epoch {
+      return true
+    }
+    false
+  }
+
+  pub fn is_subnet_in_enactment(subnet_data: SubnetData, epoch: u32) -> bool {
+    let subnet_registration_epochs = SubnetRegistrationEpochs::<T>::get();
+    let subnet_activation_enactment_epochs = SubnetActivationEnactmentEpochs::<T>::get();
+
+    let is_registered: bool = subnet_data.state == SubnetState::Registered;
+    let registered_epoch: u32 = subnet_data.registered;
+    let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+    let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
+
+    if is_registered && epoch <= max_registration_epoch {
+      return false
+    } else if is_registered && epoch <= max_enactment_epoch {
+      return true
+    }
+    false
+  }
+
+  pub fn is_subnet_owner(account_id: &T::AccountId, subnet_id: u32) -> bool {
+    match SubnetOwner::<T>::try_get(subnet_id) {
+      Ok(owner) => &owner == account_id,
+      Err(()) => false,
+    }
   }
 }

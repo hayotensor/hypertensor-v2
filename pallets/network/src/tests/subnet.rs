@@ -20,6 +20,7 @@ use crate::{
   MaxSubnetRegistrationBlocks, 
   SubnetActivationEnactmentBlocks,
   HotkeySubnetNodeId,
+  SubnetRegistrationEpochs,
 };
 
 //
@@ -236,58 +237,58 @@ fn test_register_subnet_exists_error() {
   })
 }
 
-#[test]
-fn test_register_subnet_registration_blocks_err() {
-  new_test_ext().execute_with(|| {
-    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+// #[test]
+// fn test_register_subnet_registration_blocks_err() {
+//   new_test_ext().execute_with(|| {
+//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-    let epoch_length = EpochLength::get();
-    let block_number = System::block_number();
-    let epoch = System::block_number().saturating_div(epoch_length);
+//     let epoch_length = EpochLength::get();
+//     let block_number = System::block_number();
+//     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch);
+//     let cost = Network::registration_cost(epoch);
   
-    let _ = Balances::deposit_creating(&account(0), cost+1000);
+//     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let add_subnet_data = RegistrationSubnetData {
-      path: subnet_path.clone().into(),
-      registration_blocks: MinSubnetRegistrationBlocks::<Test>::get() - 1,
-      entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
-    };
+//     let add_subnet_data = RegistrationSubnetData {
+//       path: subnet_path.clone().into(),
+//       registration_blocks: MinSubnetRegistrationBlocks::<Test>::get() - 1,
+//       entry_interval: 0,
+//       // coldkey_whitelist: Some(BTreeSet::new()),
+//       coldkey_whitelist: None,
+//     };
     
-    let epoch_length = EpochLength::get();
-    let block_number = System::block_number();
-    let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch);
-    increase_epochs(next_registration_epoch - epoch);
+//     let epoch_length = EpochLength::get();
+//     let block_number = System::block_number();
+//     let epoch = System::block_number().saturating_div(epoch_length);
+//     let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+//     increase_epochs(next_registration_epoch - epoch);
 
-    assert_err!(
-      Network::register_subnet(
-        RuntimeOrigin::signed(account(0)),
-        add_subnet_data,
-      ),
-      Error::<Test>::InvalidSubnetRegistrationBlocks
-    );
+//     assert_err!(
+//       Network::register_subnet(
+//         RuntimeOrigin::signed(account(0)),
+//         add_subnet_data,
+//       ),
+//       Error::<Test>::InvalidSubnetRegistrationBlocks
+//     );
 
-    let add_subnet_data = RegistrationSubnetData {
-      path: subnet_path.clone().into(),
-      registration_blocks: MaxSubnetRegistrationBlocks::<Test>::get() + 1,
-      entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
-    };
+//     let add_subnet_data = RegistrationSubnetData {
+//       path: subnet_path.clone().into(),
+//       registration_blocks: MaxSubnetRegistrationBlocks::<Test>::get() + 1,
+//       entry_interval: 0,
+//       // coldkey_whitelist: Some(BTreeSet::new()),
+//       coldkey_whitelist: None,
+//     };
 
-    assert_err!(
-      Network::register_subnet(
-        RuntimeOrigin::signed(account(0)),
-        add_subnet_data,
-      ),
-      Error::<Test>::InvalidSubnetRegistrationBlocks
-    );
-  })
-}
+//     assert_err!(
+//       Network::register_subnet(
+//         RuntimeOrigin::signed(account(0)),
+//         add_subnet_data,
+//       ),
+//       Error::<Test>::InvalidSubnetRegistrationBlocks
+//     );
+//   })
+// }
 
 // #[test]
 // fn test_register_subnet_max_total_subnet_mem_err() {
@@ -424,7 +425,6 @@ fn test_activate_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
     // --- Add subnet nodes
@@ -459,8 +459,9 @@ fn test_activate_subnet() {
     );
 
     // --- Increase blocks to max registration block
-    System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-    let current_block_number = System::block_number();
+    let epochs = SubnetRegistrationEpochs::<Test>::get();
+    increase_epochs(epochs + 1);
+    let current_epoch = get_epoch();
 
     assert_ok!(
       Network::activate_subnet(
@@ -477,9 +478,8 @@ fn test_activate_subnet() {
     assert_eq!(subnet.id, id);
     assert_eq!(subnet.path, path);
     assert_eq!(subnet.registered, registered);
-    assert_eq!(subnet.registration_blocks, registration_blocks);
     // ensure activated block updated
-    assert_eq!(subnet.activated, current_block_number);
+    assert_eq!(subnet.activated, current_epoch);
   })
 }
 
@@ -527,7 +527,6 @@ fn test_activate_subnet_invalid_subnet_id_error() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
     // --- Add subnet nodes
@@ -605,7 +604,6 @@ fn test_activate_subnet_already_activated_err() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
     // --- Add subnet nodes
@@ -640,8 +638,9 @@ fn test_activate_subnet_already_activated_err() {
     );
 
     // --- Increase blocks to max registration block
-    System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-    let current_block_number = System::block_number();
+    let epochs = SubnetRegistrationEpochs::<Test>::get();
+    increase_epochs(epochs + 1);
+    let current_epoch = get_epoch();
 
     assert_ok!(
       Network::activate_subnet(
@@ -704,7 +703,6 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
     // --- Add subnet nodes
@@ -741,8 +739,9 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     );
 
     // --- Increase blocks to max registration block
-    System::set_block_number(System::block_number() + subnet.registration_blocks + SubnetActivationEnactmentBlocks::<Test>::get() + 1);
-    let current_block_number = System::block_number();
+    let registration_epochs = SubnetRegistrationEpochs::<Test>::get();
+    let enactment_epochs = SubnetActivationEnactmentBlocks::<Test>::get();
+    increase_epochs(registration_epochs + enactment_epochs + 1);
 
     assert_ok!(
       Network::activate_subnet(
@@ -814,7 +813,6 @@ fn test_activate_subnet_initializing_error() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
     // --- Add subnet nodes
@@ -847,10 +845,6 @@ fn test_activate_subnet_initializing_error() {
         min_subnet_delegate_stake,
       ) 
     );
-
-    // --- Increase blocks to max registration block
-    // System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-    // let current_block_number = System::block_number();
 
     assert_err!(
       Network::activate_subnet(
@@ -966,12 +960,11 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
-    // --- Increase blocks to max registration block
-    System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-    let current_block_number = System::block_number();
+    // --- Increase epochs to max registration epoch
+    let epochs = SubnetRegistrationEpochs::<Test>::get();
+    increase_epochs(epochs + 1);
 
     assert_ok!(
       Network::activate_subnet(
@@ -1039,7 +1032,6 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let registration_blocks = subnet.registration_blocks;
 		let activated = subnet.activated;
 
     // --- Add subnet nodes
@@ -1063,9 +1055,9 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
       );
     }
   
-    // --- Increase blocks to max registration block
-    System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-    let current_block_number = System::block_number();
+    // --- Increase epochs to max registration epoch
+    let epochs = SubnetRegistrationEpochs::<Test>::get();
+    increase_epochs(epochs + 1);
 
     assert_ok!(
       Network::activate_subnet(

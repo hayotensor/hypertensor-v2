@@ -1075,9 +1075,6 @@ fn test_reward_subnets_account_penalty_count() {
 //     let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(0);
 //     let _ = Balances::deposit_creating(&account(1), min_subnet_delegate_stake+1000);
   
-//     let registration_blocks = subnet.registration_blocks;
-//     let max_registration_block = subnet.registered + subnet.registration_blocks;
-
 //     let mut subnet_registering = true;
 //     let subnet_activation_enactment_blocks = SubnetActivationEnactmentBlocks::<Test>::get();
 

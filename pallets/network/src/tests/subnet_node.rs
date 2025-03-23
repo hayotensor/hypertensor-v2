@@ -32,7 +32,8 @@ use crate::{
   DeactivationLedger, 
   SubnetNodeDeactivation, 
   MaxRewardRateDecrease,
-  RewardRateUpdatePeriod
+  RewardRateUpdatePeriod,
+  SubnetRegistrationEpochs,
 };
 
 ///
@@ -417,12 +418,9 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
     
-    log::error!("subnet.activated {:?}",subnet.activated );
-    log::error!("subnet.registered {:?}",subnet.registered );
-    log::error!("subnet.registration_blocks {:?}",subnet.registration_blocks );
-
-    System::set_block_number(System::block_number() + subnet.registered + subnet.registration_blocks + 1);
-  
+    // push out of registration period and into enactment period
+    let epochs = SubnetRegistrationEpochs::<Test>::get();
+    increase_epochs(epochs + 1);
 
     assert_err!(
       Network::register_subnet_node(
@@ -465,7 +463,6 @@ fn test_register_subnet_node_then_activate() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
       coldkey_whitelist: None,
     };
   

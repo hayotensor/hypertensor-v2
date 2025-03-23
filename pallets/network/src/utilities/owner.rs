@@ -16,13 +16,34 @@
 use super::*;
 
 impl<T: Config> Pallet<T> {
-  pub fn do_update_entry_interval(subnet_id: u32, value: u32) -> u32 {
+  pub fn do_owner_remove_subnet_node(origin: T::RuntimeOrigin, subnet_id: u32, subnet_node_id: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+
+    Ok(())
+  }
+
+  pub fn do_update_entry_interval(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
     SubnetEntryInterval::<T>::insert(subnet_id, value);
 
     Self::deposit_event(Event::SubnetEntryIntervalUpdate { 
-      subnet_id: subnet_id 
-      owner: owner, 
+      subnet_id: subnet_id,
+      owner: coldkey, 
       value: value 
     });
+
+    Ok(())
   }
 }

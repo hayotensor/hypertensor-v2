@@ -34,6 +34,7 @@ use crate::{
   SubnetNodeNonUniqueParamLastSet,
   SubnetNodePenalties,
   SubnetEntryInterval,
+  SubnetRegistrationEpochs,
 };
 use frame_support::traits::{OnInitialize, Currency};
 use sp_std::collections::btree_set::BTreeSet;
@@ -181,10 +182,10 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
   // 1000 is for inflation attack mitigation
   assert_eq!(min_subnet_delegate_stake - 1000, delegate_shares);
 
-  // --- Increase blocks to max registration block
-  System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-  let current_block_number = System::block_number();
-  
+  // --- Increase epochs to max registration epoch
+  let epochs = SubnetRegistrationEpochs::<Test>::get();
+  increase_epochs(epochs + 1);
+
   assert_ok!(
     Network::activate_subnet(
       RuntimeOrigin::signed(account(0)),
@@ -312,9 +313,9 @@ pub fn build_activated_subnet_with_delegator_rewards(
   // 1000 is for inflation attack mitigation
   assert_eq!(min_subnet_delegate_stake - 1000, delegate_shares);
 
-  // --- Increase blocks to max registration block
-  System::set_block_number(System::block_number() + subnet.registration_blocks + 1);
-  let current_block_number = System::block_number();
+  // --- Increase epochs to max registration epoch
+  let epochs = SubnetRegistrationEpochs::<Test>::get();
+  increase_epochs(epochs + 1);
   
   assert_ok!(
     Network::activate_subnet(
@@ -443,16 +444,12 @@ pub fn increase_epochs(epochs: u32) {
   if epochs == 0 {
     return
   }
-  log::error!("increase_epochs epochs {:?}", epochs);
 
   let block = System::block_number();
-  log::error!("increase_epochs block {:?}", block);
 
   let epoch_length = EpochLength::get();
-  log::error!("increase_epochs epoch_length {:?}", epoch_length);
 
   let next_epoch_start_block = (epoch_length * epochs) + block - (block % (epoch_length * epochs));
-  log::error!("increase_epochs next_epoch_start_block {:?}", next_epoch_start_block);
   System::set_block_number(next_epoch_start_block);
 }
 
@@ -461,6 +458,11 @@ pub fn set_epoch(epoch: u32) {
   System::set_block_number(epoch * epoch_length);
 }
 
+pub fn get_epoch() -> u32 {
+  let current_block = System::block_number();
+  let epoch_length: u32 = EpochLength::get();
+  current_block.saturating_div(epoch_length)
+}
 
 pub fn make_subnet_submittable() {
   // increase blocks
