@@ -103,7 +103,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_minimum_delegate_stake(memory_mb: u128) -> u128 {
-    Self::get_min_subnet_delegate_stake_balance(MinSubnetNodes::<T>::get())
+    Self::get_min_subnet_delegate_stake_balance()
   }
 
   pub fn get_subnet_node_stake_by_peer_id(subnet_id: u32, peer_id: PeerId) -> u128 {
@@ -119,7 +119,14 @@ impl<T: Config> Pallet<T> {
   // TODO: Make this only return true is Validator subnet node
   pub fn is_subnet_node_by_peer_id(subnet_id: u32, peer_id: Vec<u8>) -> bool {
     match PeerIdSubnetNode::<T>::try_get(subnet_id, PeerId(peer_id)) {
-      Ok(account_id) => true,
+      Ok(_) => true,
+      Err(()) => false,
+    }
+  }
+
+  pub fn is_subnet_node_by_bootstrap_peer_id(subnet_id: u32, peer_id: Vec<u8>) -> bool {
+    match BootstrapPeerIdSubnetNode::<T>::try_get(subnet_id, PeerId(peer_id)) {
+      Ok(_) => true,
       Err(()) => false,
     }
   }

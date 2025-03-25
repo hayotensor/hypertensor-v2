@@ -168,7 +168,7 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
   assert_eq!(total_subnet_stake, amount_staked);
 
 
-  let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(min_nodes);
+  let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
   // --- Add the minimum required delegate stake balance to activate the subnet
   assert_ok!(
     Network::add_to_delegate_stake(
@@ -299,7 +299,7 @@ pub fn build_activated_subnet_with_delegator_rewards(
   assert_eq!(total_subnet_stake, amount_staked);
 
 
-  let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(min_nodes);
+  let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
   // --- Add the minimum required delegate stake balance to activate the subnet
   assert_ok!(
     Network::add_to_delegate_stake(

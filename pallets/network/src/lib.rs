@@ -216,9 +216,9 @@ pub mod pallet {
 		StakeAdded(u32, T::AccountId, T::AccountId, u128),
 		StakeRemoved(u32, T::AccountId, T::AccountId, u128),
 
-		DelegateStakeAdded(u32, T::AccountId, u128),
-		DelegateStakeRemoved(u32, T::AccountId, u128),
-		DelegateStakeSwitched(u32, u32, T::AccountId, u128),
+		SubnetDelegateStakeAdded(u32, T::AccountId, u128),
+		SubnetDelegateStakeRemoved(u32, T::AccountId, u128),
+		SubnetDelegateStakeSwitched(u32, u32, T::AccountId, u128),
 
 		DelegateNodeStakeAdded { account_id: T::AccountId, subnet_id: u32, subnet_node_id: u32, amount: u128 },
 		DelegateNodeStakeRemoved { account_id: T::AccountId, subnet_id: u32, subnet_node_id: u32, amount: u128 },
@@ -226,6 +226,20 @@ pub mod pallet {
 			account_id: T::AccountId, 
 			from_subnet_id: u32, 
 			from_subnet_node_id: u32, 
+			to_subnet_id: u32, 
+			to_subnet_node_id: u32, 
+			amount: u128 
+		},
+		DelegateNodeToSubnetDelegateStakeSwitched { 
+			account_id: T::AccountId, 
+			from_subnet_id: u32, 
+			from_subnet_node_id: u32, 
+			to_subnet_id: u32, 
+			amount: u128 
+		},
+		SubnetDelegateToNodeDelegateStakeSwitched { 
+			account_id: T::AccountId, 
+			from_subnet_id: u32, 
 			to_subnet_id: u32, 
 			to_subnet_node_id: u32, 
 			amount: u128 
@@ -238,6 +252,7 @@ pub mod pallet {
     SetMinStakeBalance(u128),
     SetTxRateLimit(u32),
 		SetSubnetInflationFactor(u128),
+		SetMinSubnetDelegateStakeFactor(u128),
 
 		// Proposals
 		Proposal { subnet_id: u32, proposal_id: u32, epoch: u32, plaintiff: T::AccountId, defendant: T::AccountId, plaintiff_data: Vec<u8> },
@@ -644,15 +659,14 @@ pub mod pallet {
 	///
 	/// * `id` - Unique identifier.
 	/// * `path` - Path to download the model, this can be HuggingFace, IPFS, anything.
+	/// * `state` - Registered or Active.
 	/// * `registered` - Epoch subnet registered.
-	/// * `activated` - Block subnet activated.
 	#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
 	pub struct SubnetData {
 		pub id: u32,
 		pub path: Vec<u8>,
 		pub state: SubnetState,
 		pub registered: u32,
-		pub activated: u32,
 	}
 
 	/// Mapping of votes of a subnet proposal
@@ -773,12 +787,17 @@ pub mod pallet {
 		1000000000
 	}
 	#[pallet::type_value]
-	pub fn DefaultMinSubnetDelegateStake() -> u128 {
-		1000e+18 as u128
+	pub fn DefaultMinSubnetDelegateStakeFactor() -> u128 {
+		// 0.001%
+		1_000_000
+	}
+	#[pallet::type_value]
+	pub fn DefaultMinDelegateStakeBalance() -> u128 {
+		1000
 	}
 	#[pallet::type_value]
 	pub fn DefaultMaxDelegateStakeBalance() -> u128 {
-		280000000000000000000000
+		1_000_000_000_000_000_000_000_000
 	}
 	#[pallet::type_value]
 	pub fn DefaultDelegateStakeTransferPeriod() -> u32 {
@@ -1393,17 +1412,12 @@ pub mod pallet {
 	// Delegate Staking
 	// 
 
-	/// The minimum delegate stake percentage for a subnet to have at any given time
-	// Based on the minimum subnet stake balance based on minimum nodes for a subnet
-	// i.e. if a subnet has a minimum node required of 10 and 100 TENSOR per node, and a MinSubnetDelegateStakePercentage of 100%
-	//			then the minimum delegate stake balance towards a subnet must be 1000 TENSOR
 	#[pallet::storage]
-	pub type MinSubnetDelegateStakePercentage<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMinSubnetDelegateStakePercentage>;
-
-	/// The absolute minimum delegate stake balance required for a subnet to stay activated
-	#[pallet::storage]
-	pub type MinSubnetDelegateStake<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMinSubnetDelegateStake>;
+	pub type MinSubnetDelegateStakeFactor<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMinSubnetDelegateStakeFactor>;
 	
+	#[pallet::storage]
+	pub type MinDelegateStakeBalance<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMinDelegateStakeBalance>;
+
 	#[pallet::storage]
 	pub type MaxDelegateStakeBalance<T: Config> = StorageValue<_, u128, ValueQuery, DefaultMaxDelegateStakeBalance>;
 
@@ -1645,6 +1659,8 @@ pub mod pallet {
 
 		/// Try removing a subnet.
 		///
+		/// This can be useful if there is no network activity on a span of epochs
+		///
 		/// # Arguments
 		///
 		/// * `subnet_id` - Subnet ID.
@@ -1669,14 +1685,14 @@ pub mod pallet {
 			
 			// --- Ensure the subnet has passed it's required period to begin consensus submissions
 			ensure!(
-				subnet.activated != 0,
+				subnet.state == SubnetState::Active,
 				Error::<T>::SubnetInitializing
 			);
 
 			let penalties = SubnetPenaltyCount::<T>::get(subnet_id);
 
 			let subnet_delegate_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
-			let min_subnet_delegate_stake_balance = Self::get_min_subnet_delegate_stake_balance(0);
+			let min_subnet_delegate_stake_balance = Self::get_min_subnet_delegate_stake_balance();
 
 			if penalties > MaxSubnetPenaltyCount::<T>::get() {
 				// --- If the subnet has reached max penalty, remove it
@@ -2435,6 +2451,42 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(22)]
+		#[pallet::weight({0})]
+		pub fn transfer_from_node_to_subnet(
+			origin: OriginFor<T>, 
+			from_subnet_id: u32,
+			from_subnet_node_id: u32,
+			to_subnet_id: u32,
+			node_delegate_stake_shares_to_be_switched: u128,
+		) -> DispatchResult {
+			Self::do_transfer_from_node_to_subnet(
+				origin,
+				from_subnet_id,
+				from_subnet_node_id,
+				to_subnet_id,
+				node_delegate_stake_shares_to_be_switched,
+			)		
+		}
+
+		#[pallet::call_index(23)]
+		#[pallet::weight({0})]
+		pub fn transfer_from_subnet_to_node(
+			origin: OriginFor<T>, 
+			from_subnet_id: u32,
+			to_subnet_id: u32,
+			to_subnet_node_id: u32,
+			delegate_stake_shares_to_be_switched: u128,
+		) -> DispatchResult {
+			Self::do_transfer_from_subnet_to_node(
+				origin,
+				from_subnet_id,
+				to_subnet_id,
+				to_subnet_node_id,
+				delegate_stake_shares_to_be_switched,
+			)
+		}
+
 		/// Validator extrinsic for submitting incentives protocol data of the validators view of of the subnet
 		/// This is used t oscore each subnet node for allocation of emissions
 		///
@@ -2444,7 +2496,7 @@ pub mod pallet {
 		/// * `data` - Vector of SubnetNodeData on each subnet node for scoring each
 		/// * `args` (Optional) - Data that can be used by the subnet 
 		/// 
-		#[pallet::call_index(22)]
+		#[pallet::call_index(24)]
 		#[pallet::weight({0})]
 		pub fn validate(
 			origin: OriginFor<T>, 
@@ -2475,7 +2527,7 @@ pub mod pallet {
 		///
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// 
-		#[pallet::call_index(23)]
+		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
 		pub fn attest(
 			origin: OriginFor<T>, 
@@ -2509,7 +2561,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(24)]
+		#[pallet::call_index(26)]
 		#[pallet::weight({0})]
 		pub fn propose(
 			origin: OriginFor<T>, 
@@ -2543,7 +2595,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(25)]
+		#[pallet::call_index(27)]
 		#[pallet::weight({0})]
 		pub fn attest_proposal(
 			origin: OriginFor<T>, 
@@ -2571,7 +2623,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - The proposers subnet node ID
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(26)]
+		#[pallet::call_index(28)]
 		#[pallet::weight({0})]
 		pub fn cancel_proposal(
 			origin: OriginFor<T>, 
@@ -2597,7 +2649,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposers subnet node ID
 		/// * `data` - Data used to justify challenge for subnet use
 		/// 
-		#[pallet::call_index(27)]
+		#[pallet::call_index(29)]
 		#[pallet::weight({0})]
 		pub fn challenge_proposal(
 			origin: OriginFor<T>, 
@@ -2624,7 +2676,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposal ID
 		/// * `vote` - YAY or NAY
 		/// 
-		#[pallet::call_index(28)]
+		#[pallet::call_index(30)]
 		#[pallet::weight({0})]
 		pub fn vote(
 			origin: OriginFor<T>, 
@@ -2653,7 +2705,7 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID.
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(29)]
+		#[pallet::call_index(31)]
 		#[pallet::weight({0})]
 		pub fn finalize_proposal(
 			origin: OriginFor<T>, 
@@ -2677,7 +2729,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - Callers subnet node ID
 		/// * `a` - The unique parameter
 		/// 
-		#[pallet::call_index(30)]
+		#[pallet::call_index(32)]
 		#[pallet::weight({0})]
 		pub fn register_subnet_node_a_parameter(
 			origin: OriginFor<T>, 
@@ -2726,7 +2778,7 @@ pub mod pallet {
 		/// * `b` (Optional) - The non-unique parameter
 		/// * `c` (Optional) - The non-unique parameter
 		/// 
-		#[pallet::call_index(31)]
+		#[pallet::call_index(33)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_node_non_unique_parameter(
 			origin: OriginFor<T>, 
@@ -2789,7 +2841,7 @@ pub mod pallet {
 		/// * `hotkey` - Current hotkey.
 		/// * `new_coldkey` - New coldkey
 		/// 
-		#[pallet::call_index(32)]
+		#[pallet::call_index(34)]
 		#[pallet::weight({0})]
 		pub fn update_coldkey(
 			origin: OriginFor<T>, 
@@ -2825,7 +2877,7 @@ pub mod pallet {
 		/// * `old_hotkey` - Old hotkey to be replaced.
 		/// * `new_hotkey` - New hotkey to replace the old hotkey.
 		/// 
-		#[pallet::call_index(33)]
+		#[pallet::call_index(35)]
 		#[pallet::weight({0})]
 		pub fn update_hotkey(
 			origin: OriginFor<T>, 
@@ -2886,7 +2938,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(34)]
+		#[pallet::call_index(36)]
 		#[pallet::weight({0})]
 		pub fn update_peer_id(
 			origin: OriginFor<T>, 
@@ -2943,7 +2995,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(35)]
+		#[pallet::call_index(37)]
 		#[pallet::weight({0})]
 		pub fn update_bootstrap_peer_id(
 			origin: OriginFor<T>, 
@@ -2997,7 +3049,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(36)]
+		#[pallet::call_index(38)]
 		#[pallet::weight({0})]
 		pub fn set_max_subnet_nodes(
 			origin: OriginFor<T>, 
@@ -3008,18 +3060,18 @@ pub mod pallet {
 			Self::do_set_max_subnet_nodes(value)
 		}
 
-		#[pallet::call_index(37)]
+		#[pallet::call_index(39)]
 		#[pallet::weight({0})]
-		pub fn set_min_stake_balance(
+		pub fn set_min_subnet_delegate_stake_factor(
 			origin: OriginFor<T>, 
 			value: u128
 		) -> DispatchResult {
 			T::SuperMajorityCollectiveOrigin::ensure_origin(origin)?;
 
-			Self::do_set_min_stake_balance(value)
+			Self::do_set_min_subnet_delegate_stake_factor(value)
 		}
 
-		#[pallet::call_index(38)]
+		#[pallet::call_index(40)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_owner_percentage(
 			origin: OriginFor<T>, 
@@ -3084,7 +3136,6 @@ pub mod pallet {
 				path: subnet_registration_data.path,
 				state: SubnetState::Registered,
 				registered: epoch,
-				activated: 0,
 			};
 
 			// Store owner
@@ -3161,7 +3212,7 @@ pub mod pallet {
 
 			// --- 2. Ensure minimum delegate stake achieved 
 			let subnet_delegate_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
-			let min_subnet_delegate_stake_balance = Self::get_min_subnet_delegate_stake_balance(0);
+			let min_subnet_delegate_stake_balance = Self::get_min_subnet_delegate_stake_balance();
 
 			// --- Ensure delegate stake balance is below minimum threshold required
 			if subnet_delegate_stake_balance < min_subnet_delegate_stake_balance {
@@ -3179,7 +3230,6 @@ pub mod pallet {
 				|maybe_params| -> DispatchResult {
 					let params = maybe_params.as_mut().ok_or(Error::<T>::InvalidSubnetId)?;
 					params.state = SubnetState::Active;
-					params.activated = epoch;
 					Ok(())
 				}
 			)?;
@@ -3219,7 +3269,7 @@ pub mod pallet {
 
 			SubnetRegistrationColdkeyWhitelist::<T>::remove(subnet_id);
 
-			if subnet.activated > 0 {
+			if subnet.state == SubnetState::Active {
 				// Dec total active subnets
 				TotalActiveSubnets::<T>::mutate(|n: &mut u32| n.saturating_dec());
 			}
@@ -3523,7 +3573,7 @@ pub mod pallet {
 					// --- Initial nodes before activation are entered as ``submittable`` nodes
 					// They initiate the first consensus epoch and are responsible for increasing classifications
 					// of other nodes that come in post activation
-					if subnet.activated == 0 {
+					if subnet.state == SubnetState::Registered {
 						class = SubnetNodeClass::Validator;
 						// --- Start node on current epoch for the next era
 						epoch_increase -= 1;
@@ -3827,7 +3877,6 @@ pub mod pallet {
 				path: self.subnet_path.clone(),
 				state: SubnetState::Active,
 				registered: 1,
-				activated: 0,
 			};
 
 			// Store unique path
@@ -3843,17 +3892,20 @@ pub mod pallet {
 			let min_stake_balance = MinStakeBalance::<T>::get();
 			// --- Get minimum subnet stake balance
 			let min_subnet_stake_balance = min_stake_balance;
-			// let min_subnet_stake_balance = min_stake_balance * min_subnet_nodes as u128;
-			// --- Get required delegate stake balance for a subnet to have to stay live
-			let mut min_subnet_delegate_stake_balance = (min_subnet_stake_balance as u128).saturating_mul(MinSubnetDelegateStakePercentage::<T>::get()).saturating_div(1000000000);
 
-			// --- Get absolute minimum required subnet delegate stake balance
-			let min_subnet_delegate_stake = MinSubnetDelegateStake::<T>::get();
-			// --- Return here if the absolute minimum required subnet delegate stake balance is greater
-			//     than the calculated minimum requirement
-			if min_subnet_delegate_stake > min_subnet_delegate_stake_balance {
-				min_subnet_delegate_stake_balance = min_subnet_delegate_stake
-			}	
+			let total_issuance_as_balance = T::Currency::total_issuance();
+			let total_issuance: u128 = total_issuance_as_balance.try_into().unwrap_or(0);
+			let total_staked: u128 = TotalStake::<T>::get();
+			let total_delegate_staked: u128 = TotalDelegateStake::<T>::get();
+			let total_node_delegate_staked: u128 = TotalNodeDelegateStake::<T>::get();
+			let total_network_issuance = total_issuance
+				.saturating_add(total_staked)
+				.saturating_add(total_delegate_staked)
+				.saturating_add(total_node_delegate_staked);
+	
+			let factor: u128 = MinSubnetDelegateStakeFactor::<T>::get();	
+			let min_subnet_delegate_stake_balance = total_network_issuance.saturating_mul(factor).saturating_div(1000000000);
+
 			TotalSubnetDelegateStakeBalance::<T>::insert(subnet_id, min_subnet_delegate_stake_balance);
 			
 			// --- Initialize subnet nodes

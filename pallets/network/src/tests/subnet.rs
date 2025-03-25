@@ -15,12 +15,12 @@ use crate::{
   SubnetsData,
   RegistrationSubnetData,
   SubnetRemovalReason,
-  MinSubnetDelegateStakePercentage, 
   MinSubnetRegistrationBlocks, 
   MaxSubnetRegistrationBlocks, 
   SubnetActivationEnactmentBlocks,
   HotkeySubnetNodeId,
   SubnetRegistrationEpochs,
+  SubnetState,
 };
 
 //
@@ -425,7 +425,6 @@ fn test_activate_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -448,7 +447,7 @@ fn test_activate_subnet() {
       );
     }
   
-    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(min_nodes);
+    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
     // --- Add the minimum required delegate stake balance to activate the subnet
     assert_ok!(
       Network::add_to_delegate_stake(
@@ -478,8 +477,7 @@ fn test_activate_subnet() {
     assert_eq!(subnet.id, id);
     assert_eq!(subnet.path, path);
     assert_eq!(subnet.registered, registered);
-    // ensure activated block updated
-    assert_eq!(subnet.activated, current_epoch);
+    assert_eq!(subnet.state, SubnetState::Active);
   })
 }
 
@@ -527,7 +525,6 @@ fn test_activate_subnet_invalid_subnet_id_error() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -604,7 +601,6 @@ fn test_activate_subnet_already_activated_err() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -627,7 +623,7 @@ fn test_activate_subnet_already_activated_err() {
       );
     }
   
-    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(min_nodes);
+    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
     // --- Add the minimum required delegate stake balance to activate the subnet
     assert_ok!(
       Network::add_to_delegate_stake(
@@ -703,7 +699,6 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -728,7 +723,7 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
   
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
 
-    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(min_nodes);
+    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
     // --- Add the minimum required delegate stake balance to activate the subnet
     assert_ok!(
       Network::add_to_delegate_stake(
@@ -813,7 +808,6 @@ fn test_activate_subnet_initializing_error() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -836,7 +830,7 @@ fn test_activate_subnet_initializing_error() {
       );
     }
   
-    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(min_nodes);
+    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
     // --- Add the minimum required delegate stake balance to activate the subnet
     assert_ok!(
       Network::add_to_delegate_stake(
@@ -960,7 +954,6 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Increase epochs to max registration epoch
     let epochs = SubnetRegistrationEpochs::<Test>::get();
@@ -1032,7 +1025,6 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
 		let registered = subnet.registered;
-		let activated = subnet.activated;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -1080,37 +1072,3 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     assert_eq!(subnet, Err(()));
   })
 }
-
-// #[test]
-// fn test_get_min_subnet_delegate_stake_balance() {
-//   new_test_ext().execute_with(|| {
-//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-//     let cost = Network::registration_cost(0);
-//     let _ = Balances::deposit_creating(&account(0), cost+1000);
-  
-//     let add_subnet_data = RegistrationSubnetData {
-//       path: subnet_path.clone().into(),
-//       registration_blocks: DEFAULT_REGISTRATION_BLOCKS,
-//       entry_interval: 0,
-//     };
-//     assert_ok!(
-//       Network::activate_subnet(
-//         RuntimeOrigin::signed(account(0)),
-//         account(0),
-//         add_subnet_data,
-//       )
-//     );
-  
-//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
-//     let min_stake_balance = get_min_stake_balance();
-//     let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
-//     let min_subnet_delegate_stake_percentage = MinSubnetDelegateStakePercentage::<Test>::get();
-
-//     let subnet_min_stake_supply = min_stake_balance * subnet.min_nodes as u128;
-//     let presumed_min = Network::percent_mul(subnet_min_stake_supply, min_subnet_delegate_stake_percentage);
-
-//     let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(subnet.min_nodes);
-
-//     assert_eq!(presumed_min, min_subnet_delegate_stake);
-//   })
-// }

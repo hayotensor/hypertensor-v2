@@ -1600,7 +1600,6 @@ fn genesis_build_panics_with_duplicate_members() {
 fn proposal_network_pallet_vote_2_3() {
 	ExtBuilder::default().build_and_execute(|| {
 		let value = pallet_network::MaxSubnetNodes::<Test>::get();
-		log::error!("value      {:?}", value);
 		let proposal = RuntimeCall::Network(pallet_network::Call::set_max_subnet_nodes {
 			value: 999,
 		});
@@ -1627,7 +1626,6 @@ fn proposal_network_pallet_vote_2_3() {
 			proposal_len
 		));
 		let value_call = pallet_network::MaxSubnetNodes::<Test>::get();
-		log::error!("value_call {:?}", value_call);
 		assert_ne!(value, value_call);
 	})
 }
@@ -1636,7 +1634,6 @@ fn proposal_network_pallet_vote_2_3() {
 fn proposal_network_pallet_vote_1_3() {
 	ExtBuilder::default().build_and_execute(|| {
 		let value = pallet_network::MaxSubnetNodes::<Test>::get();
-		log::error!("value      {:?}", value);
 		let proposal = RuntimeCall::Network(pallet_network::Call::set_max_subnet_nodes {
 			value: 999,
 		});
@@ -1663,7 +1660,6 @@ fn proposal_network_pallet_vote_1_3() {
 			proposal_len
 		));
 		let value_call = pallet_network::MaxSubnetNodes::<Test>::get();
-		log::error!("value_call {:?}", value_call);
 		assert_eq!(value, value_call);
 	})
 }
@@ -1671,10 +1667,9 @@ fn proposal_network_pallet_vote_1_3() {
 #[test]
 fn proposal_network_pallet_vote_4_5() {
 	ExtBuilder::default().build_and_execute(|| {
-		let value = pallet_network::MinStakeBalance::<Test>::get();
-		log::error!("value      {:?}", value);
-		let proposal = RuntimeCall::Network(pallet_network::Call::set_min_stake_balance {
-			value: 200_000_000_000_000_000_000,
+		let value = pallet_network::MinSubnetDelegateStakeFactor::<Test>::get();
+		let proposal = RuntimeCall::Network(pallet_network::Call::set_min_subnet_delegate_stake_factor {
+			value: 1000000000,
 		});
 		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
 		let proposal_weight = proposal.get_dispatch_info().weight;
@@ -1698,8 +1693,7 @@ fn proposal_network_pallet_vote_4_5() {
 			proposal_weight,
 			proposal_len
 		));
-		let value_call = pallet_network::MinStakeBalance::<Test>::get();
-		log::error!("value_call {:?}", value_call);
+		let value_call = pallet_network::MinSubnetDelegateStakeFactor::<Test>::get();
 		assert_ne!(value, value_call);
 	})
 }
@@ -1707,10 +1701,9 @@ fn proposal_network_pallet_vote_4_5() {
 #[test]
 fn proposal_network_pallet_vote_1_5() {
 	ExtBuilder::default().build_and_execute(|| {
-		let value = pallet_network::MinStakeBalance::<Test>::get();
-		log::error!("value      {:?}", value);
-		let proposal = RuntimeCall::Network(pallet_network::Call::set_min_stake_balance {
-			value: 200_000_000_000_000_000_000,
+		let value = pallet_network::MinSubnetDelegateStakeFactor::<Test>::get();
+		let proposal = RuntimeCall::Network(pallet_network::Call::set_min_subnet_delegate_stake_factor {
+			value: 1000000000,
 		});
 		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
 		let proposal_weight = proposal.get_dispatch_info().weight;
@@ -1734,8 +1727,7 @@ fn proposal_network_pallet_vote_1_5() {
 			proposal_weight,
 			proposal_len
 		));
-		let value_call = pallet_network::MinStakeBalance::<Test>::get();
-		log::error!("value_call {:?}", value_call);
+		let value_call = pallet_network::MinSubnetDelegateStakeFactor::<Test>::get();
 		assert_eq!(value, value_call);
 	})
 }

@@ -372,7 +372,7 @@ impl<T: Config> Pallet<T> {
 
   pub fn reward_subnets_v2(block: u32, epoch: u32) -> DispatchResultWithPostInfo {
     let subnets: Vec<_> = SubnetsData::<T>::iter()
-      .filter(|(_, subnet)| subnet.activated > 0)
+      .filter(|(_, subnet)| subnet.state == SubnetState::Active)
       .collect();
 
     let total_subnets: u32 = subnets.len() as u32;

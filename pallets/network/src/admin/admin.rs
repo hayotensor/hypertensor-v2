@@ -102,19 +102,6 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn do_set_min_stake_balance(value: u128) -> DispatchResult {
-    ensure!(
-      value > 0,
-      Error::<T>::InvalidMinStakeBalance
-    );
-
-    MinStakeBalance::<T>::set(value);
-
-    Self::deposit_event(Event::SetMinStakeBalance(value));
-
-    Ok(())
-  }
-
   pub fn do_set_tx_rate_limit(value: u32) -> DispatchResult {
     TxRateLimit::<T>::set(value);
 
@@ -149,4 +136,17 @@ impl<T: Config> Pallet<T> {
 
     Ok(())
   }
+
+  pub fn do_set_min_subnet_delegate_stake_factor(value: u128) -> DispatchResult {
+    ensure!(
+      value <= Self::PERCENTAGE_FACTOR,
+      Error::<T>::InvalidPercent
+    );
+
+    MinSubnetDelegateStakeFactor::<T>::set(value);
+
+    Self::deposit_event(Event::SetMinSubnetDelegateStakeFactor(value));
+
+    Ok(())
+  }  
 }

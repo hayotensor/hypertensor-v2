@@ -1072,7 +1072,7 @@ fn test_reward_subnets_account_penalty_count() {
 //     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 //     let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
 
-//     let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(0);
+//     let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
 //     let _ = Balances::deposit_creating(&account(1), min_subnet_delegate_stake+1000);
   
 //     let mut subnet_registering = true;

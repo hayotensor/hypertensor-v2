@@ -70,6 +70,19 @@ impl<T: Config> Pallet<T> {
     input.try_into().ok()
   }
 
+  /// Get total tokens in circulation
+  pub fn get_total_network_issuance() -> u128 {
+    let total_issuance_as_balance = T::Currency::total_issuance();
+    let total_issuance: u128 = total_issuance_as_balance.try_into().unwrap_or(0);
+    let total_staked: u128 = TotalStake::<T>::get();
+    let total_delegate_staked: u128 = TotalDelegateStake::<T>::get();
+    let total_node_delegate_staked: u128 = TotalNodeDelegateStake::<T>::get();
+    total_issuance
+      .saturating_add(total_staked)
+      .saturating_add(total_delegate_staked)
+      .saturating_add(total_node_delegate_staked)
+  }
+  
   pub fn send_to_treasury(
     who: &T::AccountId, 
     amount: <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance
