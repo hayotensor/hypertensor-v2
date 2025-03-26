@@ -16,6 +16,22 @@
 use super::*;
 
 impl<T: Config> Pallet<T> {
+  pub fn do_owner_deactivate_subnet(origin: T::RuntimeOrigin, subnet_id: u32, path: Vec<u8>) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    Self::deactivate_subnet(
+      path,
+      SubnetRemovalReason::Owner,
+    ).map_err(|e| e)?;
+
+    Ok(())
+  }
+
   pub fn do_owner_remove_subnet_node(origin: T::RuntimeOrigin, subnet_id: u32, subnet_node_id: u32) -> DispatchResult {
     let coldkey: T::AccountId = ensure_signed(origin)?;
 
@@ -28,7 +44,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn do_update_entry_interval(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+  pub fn do_owner_update_entry_interval(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
     let coldkey: T::AccountId = ensure_signed(origin)?;
 
     ensure!(

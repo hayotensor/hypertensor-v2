@@ -578,6 +578,7 @@ pub mod pallet {
 		Council,
 		EnactmentPeriod,
 		MaxSubnets,
+		Owner,
   }
 
 	/// Attests format for consensus
@@ -1714,15 +1715,25 @@ pub mod pallet {
 
 		#[pallet::call_index(3)]
 		#[pallet::weight({0})]
-		pub fn update_entry_interval(
+		pub fn owner_deactivate_subnet(
+			origin: OriginFor<T>, 
+			subnet_id: u32,
+			path: Vec<u8>
+		) -> DispatchResult {
+			Self::do_owner_deactivate_subnet(origin, subnet_id, path)
+		}
+
+		#[pallet::call_index(4)]
+		#[pallet::weight({0})]
+		pub fn owner_update_entry_interval(
 			origin: OriginFor<T>, 
 			subnet_id: u32,
 			value: u32
 		) -> DispatchResult {
-			Self::do_update_entry_interval(origin, subnet_id, value)
+			Self::do_owner_update_entry_interval(origin, subnet_id, value)
 		}
 
-		#[pallet::call_index(4)]
+		#[pallet::call_index(5)]
 		#[pallet::weight({0})]
 		pub fn owner_remove_subnet_node(
 			origin: OriginFor<T>, 
@@ -1753,7 +1764,7 @@ pub mod pallet {
 		/// 
 		/// * `stake_to_be_added` must be the minimum required stake balance
 		/// 
-		#[pallet::call_index(5)]
+		#[pallet::call_index(6)]
 		// #[pallet::weight(T::WeightInfo::add_subnet_node())]
 		#[pallet::weight({0})]
 		pub fn add_subnet_node(
@@ -1816,7 +1827,7 @@ pub mod pallet {
 		/// 
 		/// * `stake_to_be_added` must be the minimum required stake balance
 		/// 
-		#[pallet::call_index(6)]
+		#[pallet::call_index(7)]
 		#[pallet::weight({0})]
 		pub fn register_subnet_node(
 			origin: OriginFor<T>, 
@@ -1854,7 +1865,7 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID.
 		/// * `subnet_node_id` - Subnet node ID assigned during registration
 		/// 
-		#[pallet::call_index(7)]
+		#[pallet::call_index(8)]
 		#[pallet::weight({0})]
 		pub fn activate_subnet_node(
 			origin: OriginFor<T>, 
@@ -1889,7 +1900,7 @@ pub mod pallet {
 		/// 
 		/// * Must be a Validator class to deactivate, otherwise the subnet node must
 		/// 
-		#[pallet::call_index(8)]
+		#[pallet::call_index(9)]
 		#[pallet::weight({0})]
 		pub fn deactivate_subnet_node(
 			origin: OriginFor<T>, 
@@ -1914,7 +1925,7 @@ pub mod pallet {
 		///
 		/// * Caller must be owner of subnet node, hotkey or coldkey
 		///
-		#[pallet::call_index(9)]
+		#[pallet::call_index(10)]
 		// #[pallet::weight(T::WeightInfo::remove_subnet_node())]
 		#[pallet::weight({0})]
 		pub fn remove_subnet_node(
@@ -1949,7 +1960,7 @@ pub mod pallet {
 		/// * Caller must be coldkey owner of subnet node ID.
 		/// * If decreasing rate, new rate must not be more than a 1% decrease nominally (10_000_000 using 1e9)
 		///
-		#[pallet::call_index(10)]
+		#[pallet::call_index(11)]
 		#[pallet::weight({0})]
 		pub fn update_delegate_reward_rate(
 			origin: OriginFor<T>, 
@@ -2036,7 +2047,7 @@ pub mod pallet {
 		/// * Subnet must exist
 		/// * Must have amount free in wallet
 		///
-		#[pallet::call_index(11)]
+		#[pallet::call_index(12)]
 		// #[pallet::weight(T::WeightInfo::add_to_stake())]
 		#[pallet::weight({0})]
 		pub fn add_to_stake(
@@ -2090,7 +2101,7 @@ pub mod pallet {
 		/// * Coldkey caller only
 		/// * If subnet node, must have available staked balance greater than minimum required stake balance
 		///
-		#[pallet::call_index(12)]
+		#[pallet::call_index(13)]
 		#[pallet::weight({0})]
 		pub fn remove_stake(
 			origin: OriginFor<T>, 
@@ -2133,7 +2144,7 @@ pub mod pallet {
 		/// * Coldkey caller only
 		/// * Must be owner of stake balance
 		///
-		#[pallet::call_index(13)]
+		#[pallet::call_index(14)]
 		#[pallet::weight({0})]
 		pub fn claim_unbondings(
 			origin: OriginFor<T>, 
@@ -2160,7 +2171,7 @@ pub mod pallet {
 		///
 		/// * Subnet must exist
 		///
-		#[pallet::call_index(14)]
+		#[pallet::call_index(15)]
 		// #[pallet::weight(T::WeightInfo::add_to_delegate_stake())]
 		#[pallet::weight({0})]
 		pub fn add_to_delegate_stake(
@@ -2197,7 +2208,7 @@ pub mod pallet {
 		///
 		/// * `to_subnet_id` subnet must exist
 		///
-		#[pallet::call_index(15)]
+		#[pallet::call_index(16)]
 		#[pallet::weight({0})]
 		pub fn transfer_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2235,7 +2246,7 @@ pub mod pallet {
 		///
 		/// * Must have balance
 		///
-		#[pallet::call_index(16)]
+		#[pallet::call_index(17)]
 		// #[pallet::weight(T::WeightInfo::remove_delegate_stake())]
 		#[pallet::weight({0})]
 		pub fn remove_delegate_stake(
@@ -2263,7 +2274,7 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// * `amount` - Amount TENSOR to add to pool
 		///
-		#[pallet::call_index(17)]
+		#[pallet::call_index(18)]
 		#[pallet::weight({0})]
 		pub fn increase_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2313,7 +2324,7 @@ pub mod pallet {
 		/// * `node_account_id` - Subnet node ID
 		/// * `node_delegate_stake_to_be_added` - Amount TENSOR to delegate stake
 		///
-		#[pallet::call_index(18)]
+		#[pallet::call_index(19)]
 		#[pallet::weight({0})]
 		pub fn add_to_node_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2343,7 +2354,7 @@ pub mod pallet {
 		///
 		/// * `to_subnet_id` subnet must exist
 		///
-		#[pallet::call_index(19)]
+		#[pallet::call_index(20)]
 		#[pallet::weight({0})]
 		pub fn transfer_node_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2377,7 +2388,7 @@ pub mod pallet {
 		/// * `node_account_id` - Subnet node ID
 		/// * `node_delegate_stake_shares_to_be_removed` - Pool shares to remove
 		///
-		#[pallet::call_index(20)]
+		#[pallet::call_index(21)]
 		#[pallet::weight({0})]
 		pub fn remove_node_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2407,7 +2418,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - Subnet node ID.
 		/// * `amount` - Amount TENSOR to add to pool
 		///
-		#[pallet::call_index(21)]
+		#[pallet::call_index(22)]
 		#[pallet::weight({0})]
 		pub fn increase_node_delegate_stake(
 			origin: OriginFor<T>, 
@@ -2451,7 +2462,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(22)]
+		#[pallet::call_index(23)]
 		#[pallet::weight({0})]
 		pub fn transfer_from_node_to_subnet(
 			origin: OriginFor<T>, 
@@ -2469,7 +2480,7 @@ pub mod pallet {
 			)		
 		}
 
-		#[pallet::call_index(23)]
+		#[pallet::call_index(24)]
 		#[pallet::weight({0})]
 		pub fn transfer_from_subnet_to_node(
 			origin: OriginFor<T>, 
@@ -2496,7 +2507,7 @@ pub mod pallet {
 		/// * `data` - Vector of SubnetNodeData on each subnet node for scoring each
 		/// * `args` (Optional) - Data that can be used by the subnet 
 		/// 
-		#[pallet::call_index(24)]
+		#[pallet::call_index(25)]
 		#[pallet::weight({0})]
 		pub fn validate(
 			origin: OriginFor<T>, 
@@ -2527,7 +2538,7 @@ pub mod pallet {
 		///
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// 
-		#[pallet::call_index(25)]
+		#[pallet::call_index(26)]
 		#[pallet::weight({0})]
 		pub fn attest(
 			origin: OriginFor<T>, 
@@ -2561,7 +2572,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(26)]
+		#[pallet::call_index(27)]
 		#[pallet::weight({0})]
 		pub fn propose(
 			origin: OriginFor<T>, 
@@ -2595,7 +2606,7 @@ pub mod pallet {
 		/// * `peer_id` - The defendants subnet node peer ID
 		/// * `data` - Data used to justify dispute for subnet use
 		/// 
-		#[pallet::call_index(27)]
+		#[pallet::call_index(28)]
 		#[pallet::weight({0})]
 		pub fn attest_proposal(
 			origin: OriginFor<T>, 
@@ -2623,7 +2634,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - The proposers subnet node ID
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(28)]
+		#[pallet::call_index(29)]
 		#[pallet::weight({0})]
 		pub fn cancel_proposal(
 			origin: OriginFor<T>, 
@@ -2649,7 +2660,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposers subnet node ID
 		/// * `data` - Data used to justify challenge for subnet use
 		/// 
-		#[pallet::call_index(29)]
+		#[pallet::call_index(30)]
 		#[pallet::weight({0})]
 		pub fn challenge_proposal(
 			origin: OriginFor<T>, 
@@ -2676,7 +2687,7 @@ pub mod pallet {
 		/// * `proposal_id` - The proposal ID
 		/// * `vote` - YAY or NAY
 		/// 
-		#[pallet::call_index(30)]
+		#[pallet::call_index(31)]
 		#[pallet::weight({0})]
 		pub fn vote(
 			origin: OriginFor<T>, 
@@ -2705,7 +2716,7 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID.
 		/// * `proposal_id` - The proposal ID
 		/// 
-		#[pallet::call_index(31)]
+		#[pallet::call_index(32)]
 		#[pallet::weight({0})]
 		pub fn finalize_proposal(
 			origin: OriginFor<T>, 
@@ -2729,7 +2740,7 @@ pub mod pallet {
 		/// * `subnet_node_id` - Callers subnet node ID
 		/// * `a` - The unique parameter
 		/// 
-		#[pallet::call_index(32)]
+		#[pallet::call_index(33)]
 		#[pallet::weight({0})]
 		pub fn register_subnet_node_a_parameter(
 			origin: OriginFor<T>, 
@@ -2778,7 +2789,7 @@ pub mod pallet {
 		/// * `b` (Optional) - The non-unique parameter
 		/// * `c` (Optional) - The non-unique parameter
 		/// 
-		#[pallet::call_index(33)]
+		#[pallet::call_index(34)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_node_non_unique_parameter(
 			origin: OriginFor<T>, 
@@ -2841,7 +2852,7 @@ pub mod pallet {
 		/// * `hotkey` - Current hotkey.
 		/// * `new_coldkey` - New coldkey
 		/// 
-		#[pallet::call_index(34)]
+		#[pallet::call_index(35)]
 		#[pallet::weight({0})]
 		pub fn update_coldkey(
 			origin: OriginFor<T>, 
@@ -2877,7 +2888,7 @@ pub mod pallet {
 		/// * `old_hotkey` - Old hotkey to be replaced.
 		/// * `new_hotkey` - New hotkey to replace the old hotkey.
 		/// 
-		#[pallet::call_index(35)]
+		#[pallet::call_index(36)]
 		#[pallet::weight({0})]
 		pub fn update_hotkey(
 			origin: OriginFor<T>, 
@@ -2938,7 +2949,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(36)]
+		#[pallet::call_index(37)]
 		#[pallet::weight({0})]
 		pub fn update_peer_id(
 			origin: OriginFor<T>, 
@@ -2995,7 +3006,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(37)]
+		#[pallet::call_index(38)]
 		#[pallet::weight({0})]
 		pub fn update_bootstrap_peer_id(
 			origin: OriginFor<T>, 
@@ -3049,7 +3060,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(38)]
+		#[pallet::call_index(39)]
 		#[pallet::weight({0})]
 		pub fn set_max_subnet_nodes(
 			origin: OriginFor<T>, 
@@ -3060,7 +3071,7 @@ pub mod pallet {
 			Self::do_set_max_subnet_nodes(value)
 		}
 
-		#[pallet::call_index(39)]
+		#[pallet::call_index(40)]
 		#[pallet::weight({0})]
 		pub fn set_min_subnet_delegate_stake_factor(
 			origin: OriginFor<T>, 
@@ -3071,7 +3082,7 @@ pub mod pallet {
 			Self::do_set_min_subnet_delegate_stake_factor(value)
 		}
 
-		#[pallet::call_index(40)]
+		#[pallet::call_index(41)]
 		#[pallet::weight({0})]
 		pub fn set_subnet_owner_percentage(
 			origin: OriginFor<T>, 

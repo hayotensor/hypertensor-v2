@@ -36,7 +36,9 @@ impl<T: Config> Pallet<T> {
       true,
     );
 
-    let (result, balance, shares) = Self::perform_do_add_delegate_stake(
+    result?;
+
+    let (result, _, _) = Self::perform_do_add_delegate_stake(
       &account_id,
       to_subnet_id,
       balance_removed,
@@ -74,7 +76,7 @@ impl<T: Config> Pallet<T> {
 
     result?;
 
-    let (result, balance, shares) = Self::perform_do_add_node_delegate_stake(
+    let (result, _, _) = Self::perform_do_add_node_delegate_stake(
       &account_id,
       to_subnet_id,
       to_subnet_node_id,
