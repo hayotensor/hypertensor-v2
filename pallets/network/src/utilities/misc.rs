@@ -17,8 +17,8 @@ use super::*;
 
 impl<T: Config> Pallet<T> {
   // Loosely validates Node ID
-  pub fn validate_peer_id(peer_id: PeerId) -> bool {
-    let peer_id_0 = peer_id.0;
+  pub fn validate_peer_id(peer_id: &PeerId) -> bool {
+    let peer_id_0 = &peer_id.0;
     let len = peer_id_0.len();
 
     // PeerId must be equal to or greater than 32 chars

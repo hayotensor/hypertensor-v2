@@ -22,10 +22,10 @@ impl<T: Config> Pallet<T> {
     cooldown_epoch_length: u32,
     block: u32,
   ) -> DispatchResult {
-    let epoch_length: u32 = T::EpochLength::get();
-    let epoch: u32 = block / epoch_length;
+    let epoch = Self::get_current_epoch_as_u32();
+    let claim_epoch = cooldown_epoch_length.saturating_add(epoch);
 
-    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
+    let unbondings = StakeUnbondingLedger::<T>::get(&coldkey);
 
     // --- Ensure we don't surpass max unlockings by attempting to unlock unbondings
     if unbondings.len() as u32 == T::MaxStakeUnlockings::get() {
@@ -33,7 +33,7 @@ impl<T: Config> Pallet<T> {
     }
 
     // --- Get updated unbondings after claiming unbondings
-    let mut unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
+    let mut unbondings = StakeUnbondingLedger::<T>::get(&coldkey);
 
     // We're about to add another unbonding to the ledger - it must be n-1
     ensure!(
@@ -42,7 +42,7 @@ impl<T: Config> Pallet<T> {
     );
 
     StakeUnbondingLedger::<T>::mutate(&coldkey, |ledger| {
-      ledger.entry(epoch).and_modify(|v| v.saturating_accrue(amount)).or_insert(amount);
+      ledger.entry(claim_epoch).and_modify(|v| v.saturating_accrue(amount)).or_insert(amount);
     });
 
     Ok(())
@@ -50,17 +50,15 @@ impl<T: Config> Pallet<T> {
 
   // Infallible
   pub fn do_claim_unbondings(coldkey: &T::AccountId) -> u32 {
-    let block: u32 = Self::get_current_block_as_u32();
-    let epoch_length: u32 = T::EpochLength::get();
-    let epoch: u32 = block / epoch_length;
-    let unbondings = StakeUnbondingLedger::<T>::get(coldkey.clone());
+    let epoch = Self::get_current_epoch_as_u32();
+    let unbondings = StakeUnbondingLedger::<T>::get(&coldkey);
 
     let mut unbondings_copy = unbondings.clone();
 
     let mut successful_unbondings = 0;
 
     for (unbonding_epoch, amount) in unbondings.iter() {
-      if epoch <= unbonding_epoch.saturating_add(T::StakeCooldownEpochs::get()) {
+      if epoch <= *unbonding_epoch {
         continue
       }
 
@@ -77,7 +75,7 @@ impl<T: Config> Pallet<T> {
     }
 
     if unbondings.len() != unbondings_copy.len() {
-      StakeUnbondingLedger::<T>::insert(coldkey.clone(), unbondings_copy);
+      StakeUnbondingLedger::<T>::insert(&coldkey, unbondings_copy);
     }
     successful_unbondings
   }

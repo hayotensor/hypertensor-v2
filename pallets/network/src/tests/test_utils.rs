@@ -35,6 +35,8 @@ use crate::{
   SubnetNodePenalties,
   SubnetEntryInterval,
   SubnetRegistrationEpochs,
+  SubnetOwner,
+  SubnetRegistrationEpoch,
 };
 use frame_support::traits::{OnInitialize, Currency};
 use sp_std::collections::btree_set::BTreeSet;
@@ -88,12 +90,20 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
 
   let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
 
+  let min_nodes = MinSubnetNodes::<Test>::get();
+
+  if end == 0 {
+    end = min_nodes;
+  }
+
+  let whitelist = get_coldkey_whitelist(start, end);
+
   let add_subnet_data = RegistrationSubnetData {
     path: subnet_path.clone().into(),
     registration_blocks: registration_blocks,
     entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+    coldkey_whitelist: whitelist,
+    // coldkey_whitelist: None,
   };
 
   // --- Register subnet for activation
@@ -106,12 +116,8 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
 
   let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
   let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
-
-  let min_nodes = MinSubnetNodes::<Test>::get();
-
-  if end == 0 {
-    end = min_nodes;
-  }
+  let owner = SubnetOwner::<Test>::get(subnet_id).unwrap();
+  assert_eq!(owner, account(0));
 
   let epoch_length = EpochLength::get();
   let epoch = System::block_number() / epoch_length;
@@ -217,13 +223,20 @@ pub fn build_activated_subnet_with_delegator_rewards(
   let _ = Balances::deposit_creating(&account(0), cost+1000);
 
   let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+  let min_nodes = MinSubnetNodes::<Test>::get();
+
+  if end == 0 {
+    end = min_nodes;
+  }
+
+  let whitelist = get_coldkey_whitelist(start, end);
 
   let add_subnet_data = RegistrationSubnetData {
     path: subnet_path.clone().into(),
     registration_blocks: registration_blocks,
     entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+    coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
   };
 
   // --- Register subnet for activation
@@ -236,12 +249,8 @@ pub fn build_activated_subnet_with_delegator_rewards(
 
   let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
   let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
-
-  let min_nodes = MinSubnetNodes::<Test>::get();
-
-  if end == 0 {
-    end = min_nodes;
-  }
+  let owner = SubnetOwner::<Test>::get(subnet_id).unwrap();
+  assert_eq!(owner, account(0));
 
   let epoch_length = EpochLength::get();
   let epoch = System::block_number() / epoch_length;
@@ -325,6 +334,14 @@ pub fn build_activated_subnet_with_delegator_rewards(
   );
 }
 
+pub fn get_coldkey_whitelist(start: u32, end: u32) -> BTreeSet<AccountId> {
+  let mut whitelist = BTreeSet::new();
+  for n in start+1..end+1 {
+    whitelist.insert(account(n));
+  }
+  whitelist
+}
+
 // Returns total staked on subnet
 pub fn build_subnet_nodes(subnet_id: u32, start: u32, end: u32, deposit_amount: u128, amount: u128) -> u128 {
   let mut amount_staked = 0;
@@ -354,6 +371,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, path: Vec<u8>, start: u32, en
   assert_eq!(SubnetsData::<Test>::try_get(subnet_id), Err(()));
   assert_eq!(SubnetPaths::<Test>::try_get(path), Err(()));
   assert_eq!(LastSubnetEntry::<Test>::try_get(subnet_id), Err(()));
+  assert_eq!(SubnetRegistrationEpoch::<Test>::try_get(subnet_id), Err(()));
   assert_eq!(SubnetRegistrationColdkeyWhitelist::<Test>::try_get(subnet_id), Err(()));
   assert_eq!(SubnetNodesData::<Test>::iter_prefix(subnet_id).count(), 0);
   assert_eq!(TotalSubnetNodes::<Test>::contains_key(subnet_id), false);
@@ -370,6 +388,7 @@ pub fn post_subnet_removal_ensures(subnet_id: u32, path: Vec<u8>, start: u32, en
   assert_eq!(SubnetNodeNonUniqueParamLastSet::<Test>::iter_prefix(subnet_id).count(), 0);
   assert_eq!(SubnetNodePenalties::<Test>::iter_prefix(subnet_id).count(), 0);
   assert_eq!(SubnetEntryInterval::<Test>::contains_key(subnet_id), false);
+  
 
   for n in start+1..end+1 {
     assert_eq!(HotkeySubnetNodeId::<Test>::get(subnet_id, account(n)), None);

@@ -75,43 +75,50 @@ impl<T: Config> Pallet<T> {
       //  - Remove if not activated.
       //
       // ==========================
-      let is_registered = data.state == SubnetState::Registered;
-      let registered_epoch: u32 = data.registered;
-      let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
-      let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
-      
-      if is_registered && epoch <= max_registration_epoch {
-        // --- Registration Period
-        // If in registration period, do nothing
-        continue
-      } else if is_registered && epoch <= max_enactment_epoch {
-        // --- Enactment Period
-        // If in enactment period, ensure min nodes
-        let subnet_node_ids: Vec<u32> = Self::get_classified_subnet_node_ids(subnet_id, &SubnetNodeClass::Validator, epoch);
-        let subnet_nodes_count = subnet_node_ids.len();  
-        if (subnet_nodes_count as u32) < MinSubnetNodes::<T>::get() {
-          Self::deactivate_subnet(
-            data.path,
-            SubnetRemovalReason::MinSubnetNodes,
-          );
-        }
-        continue
-      } else if is_registered && epoch > max_enactment_epoch {
-        // --- Out of Enactment Period
-        // If out of enactment period, ensure activated
-        Self::deactivate_subnet(
-					data.path,
-					SubnetRemovalReason::EnactmentPeriod,
-				);
-        continue
+      let min_subnet_nodes = MinSubnetNodes::<T>::get();
+
+      let is_registering = data.state == SubnetState::Registered;
+      if is_registering {
+        match SubnetRegistrationEpoch::<T>::try_get(subnet_id) {
+          Ok(registered_epoch) => {
+            
+            let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+            let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
+
+            if is_registering && epoch <= max_registration_epoch {
+              // --- Registration Period
+              // If in registration period, do nothing
+              continue
+            } else if is_registering && epoch <= max_enactment_epoch {
+              // --- Enactment Period
+              // If in enactment period, ensure min nodes
+              let subnet_node_ids: Vec<u32> = Self::get_classified_subnet_node_ids(subnet_id, &SubnetNodeClass::Validator, epoch);
+              let subnet_nodes_count = subnet_node_ids.len();  
+              if (subnet_nodes_count as u32) < min_subnet_nodes {
+                Self::deactivate_subnet(
+                  data.path,
+                  SubnetRemovalReason::MinSubnetNodes,
+                );
+              }
+              continue
+            } else if is_registering && epoch > max_enactment_epoch {
+              // --- Out of Enactment Period
+              // If out of enactment period, ensure activated
+              Self::deactivate_subnet(
+                data.path,
+                SubnetRemovalReason::EnactmentPeriod,
+              );
+              continue
+            }
+          },
+          Err(()) => (),
+        };  
       }
 
       // --- All subnets are now activated and passed the registration period
       // Must have:
       //  - Minimum nodes (increases penalties if less than - later removed if over max penalties)
       //  - Minimum delegate stake balance (remove subnet if less than)
-
-      let min_subnet_nodes = MinSubnetNodes::<T>::get();
 			let subnet_delegate_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
 
       // --- Ensure min delegate stake balance is met
@@ -151,7 +158,7 @@ impl<T: Config> Pallet<T> {
       Self::choose_validator(
         block,
         subnet_id,
-        subnet_node_ids.clone(),
+        subnet_node_ids,
         min_subnet_nodes,
         epoch,
       );

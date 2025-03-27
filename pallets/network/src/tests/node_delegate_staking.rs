@@ -155,6 +155,8 @@ fn test_remove_node_delegate_stake() {
       total_node_delegate_stake_balance - expected_balance_to_be_removed
     );
 
+    let epoch = System::block_number() / EpochLength::get();
+
     assert_ok!(
       Network::remove_node_delegate_stake(
         RuntimeOrigin::signed(account(total_subnet_nodes+1)), 
@@ -177,6 +179,12 @@ fn test_remove_node_delegate_stake() {
     );
 
     assert_eq!(expected_post_balance, post_account_node_delegate_stake_balance);
+
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
+    assert_eq!(unbondings.len(), 1);
+    let (ledger_epoch, ledger_balance) = unbondings.iter().next().unwrap();
+    assert_eq!(*ledger_epoch, &epoch + NodeDelegateStakeCooldownEpochs::get());
+    assert_eq!(*ledger_balance, expected_balance_to_be_removed);
   })
 }
 
@@ -239,6 +247,7 @@ fn test_transfer_node_delegate_stake() {
     );
 
     let account_node_delegate_stake_shares_to_be_removed = account_node_delegate_stake_shares / 2;
+    let expected_node_delegate_stake_shares_balance = account_node_delegate_stake_shares - account_node_delegate_stake_shares_to_be_removed;
 
     let expected_balance_to_be_removed = Network::convert_to_balance(
       account_node_delegate_stake_shares_to_be_removed,
@@ -246,11 +255,14 @@ fn test_transfer_node_delegate_stake() {
       total_node_delegate_stake_balance
     );
 
-    // let expected_post_balance = Network::convert_to_balance(
-    //   account_node_delegate_stake_shares_to_be_removed,
-    //   total_node_delegate_stake_shares - account_node_delegate_stake_shares_to_be_removed,
-    //   total_node_delegate_stake_balance - expected_balance_to_be_removed
-    // );
+    let expected_post_balance = Network::convert_to_balance(
+      account_node_delegate_stake_shares_to_be_removed,
+      total_node_delegate_stake_shares - account_node_delegate_stake_shares_to_be_removed,
+      total_node_delegate_stake_balance - expected_balance_to_be_removed
+    );
+
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_from_subnet_nodes+1));
+    assert_eq!(unbondings.len(), 0);
 
     assert_ok!(
       Network::transfer_node_delegate_stake(
@@ -262,6 +274,20 @@ fn test_transfer_node_delegate_stake() {
         account_node_delegate_stake_shares_to_be_removed,
       )
     );
+
+    let account_node_delegate_stake_shares = AccountNodeDelegateStakeShares::<Test>::get((account(total_from_subnet_nodes+1), from_subnet_id, 1));
+    assert_eq!(expected_node_delegate_stake_shares_balance, account_node_delegate_stake_shares);
+
+    let total_node_delegate_stake_balance = TotalNodeDelegateStakeBalance::<Test>::get(to_subnet_id, 1);
+    let total_node_delegate_stake_shares = TotalNodeDelegateStakeShares::<Test>::get(to_subnet_id, 1);
+
+    let account_node_delegate_stake_balance = Network::convert_to_balance(
+      account_node_delegate_stake_shares,
+      total_node_delegate_stake_shares,
+      total_node_delegate_stake_balance
+    );
+
+    assert_eq!(account_node_delegate_stake_balance, expected_post_balance);
 
     let account_node_delegate_stake_shares = AccountNodeDelegateStakeShares::<Test>::get((account(total_from_subnet_nodes+1), to_subnet_id, 2));
     let total_node_delegate_stake_balance = TotalNodeDelegateStakeBalance::<Test>::get(to_subnet_id, 2);
@@ -279,6 +305,9 @@ fn test_transfer_node_delegate_stake() {
       (account_node_delegate_stake_balance >= Network::percent_mul(expected_balance_to_be_removed, 9999)) &&
       (account_node_delegate_stake_balance <= expected_balance_to_be_removed)
     );
+
+    let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_from_subnet_nodes+1));
+    assert_eq!(unbondings.len(), 0);
   })
 }
 

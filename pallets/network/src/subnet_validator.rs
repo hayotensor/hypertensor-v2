@@ -113,7 +113,7 @@ impl<T: Config> Pallet<T> {
     // --- Ensure subnet node exists under hotkey
     let subnet_node_id = match HotkeySubnetNodeId::<T>::try_get(
       subnet_id, 
-      hotkey.clone()
+      &hotkey
     ) {
       Ok(subnet_node_id) => subnet_node_id,
       Err(()) => return Err(Error::<T>::SubnetNodeNotExist.into()),
@@ -130,7 +130,7 @@ impl<T: Config> Pallet<T> {
 
     SubnetRewardsSubmission::<T>::try_mutate_exists(
       subnet_id,
-      epoch.clone(),
+      epoch,
       |maybe_params| -> DispatchResult {
         let params = maybe_params.as_mut().ok_or(Error::<T>::InvalidSubnetRewardsSubmission)?;
         let mut attests = &mut params.attests;
@@ -210,7 +210,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Get stake balance
     // This could be greater than the target stake balance
-    let account_subnet_stake: u128 = AccountSubnetStake::<T>::get(hotkey.clone(), subnet_id);
+    let account_subnet_stake: u128 = AccountSubnetStake::<T>::get(&hotkey, subnet_id);
 
     // --- Get slash amount up to max slash
     //
@@ -225,7 +225,7 @@ impl<T: Config> Pallet<T> {
     
     // --- Decrease account stake
     Self::decrease_account_stake(
-      &hotkey.clone(),
+      &hotkey,
       subnet_id, 
       slash_amount,
     );

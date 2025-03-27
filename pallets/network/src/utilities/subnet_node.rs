@@ -56,9 +56,9 @@ impl<T: Config> Pallet<T> {
       }
 
       // Remove all subnet node elements
-      PeerIdSubnetNode::<T>::remove(subnet_id, peer_id.clone());
+      PeerIdSubnetNode::<T>::remove(subnet_id, &peer_id);
       BootstrapPeerIdSubnetNode::<T>::remove(subnet_id, subnet_node.bootstrap_peer_id);
-      HotkeySubnetNodeId::<T>::remove(subnet_id, hotkey.clone());
+      HotkeySubnetNodeId::<T>::remove(subnet_id, &hotkey);
       SubnetNodeIdHotkey::<T>::remove(subnet_id, subnet_node_id);
 
       // Update total subnet peers by substracting 1
@@ -100,7 +100,7 @@ impl<T: Config> Pallet<T> {
       .map(|(subnet_node_id, subnet_node)| {
         SubnetNodeInfo {
           subnet_node_id: subnet_node_id,
-          coldkey: HotkeyOwner::<T>::get(subnet_node.hotkey.clone()),
+          coldkey: HotkeyOwner::<T>::get(&subnet_node.hotkey),
           hotkey: subnet_node.hotkey,
           peer_id: subnet_node.peer_id,
           classification: subnet_node.classification,
@@ -142,7 +142,7 @@ impl<T: Config> Pallet<T> {
     subnet_node_id: u32, 
   ) -> Option<(T::AccountId, T::AccountId)> {
     let hotkey = SubnetNodeIdHotkey::<T>::try_get(subnet_id, subnet_node_id).ok()?;
-    let coldkey = HotkeyOwner::<T>::try_get(hotkey.clone()).ok()?;
+    let coldkey = HotkeyOwner::<T>::try_get(&hotkey).ok()?;
 
     Some((hotkey, coldkey))
   }
@@ -195,5 +195,27 @@ impl<T: Config> Pallet<T> {
         };
       },
     );
+  }
+
+  pub fn is_owner_of_peer_or_ownerless(subnet_id: u32, subnet_node_id: u32, peer_id: &PeerId) -> bool {
+    let is_peer_owner_or_ownerless = match PeerIdSubnetNode::<T>::try_get(subnet_id, peer_id) {
+      Ok(peer_subnet_node_id) => {
+        if peer_subnet_node_id == subnet_node_id {
+          return true
+        }
+        false
+      },
+      Err(()) => true,
+    };
+
+    is_peer_owner_or_ownerless && match BootstrapPeerIdSubnetNode::<T>::try_get(subnet_id, peer_id) {
+      Ok(bootstrap_subnet_node_id) => {
+        if bootstrap_subnet_node_id == subnet_node_id {
+          return true
+        }
+        false
+      },
+      Err(()) => true,
+    }
   }
 }

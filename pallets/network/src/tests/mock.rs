@@ -211,6 +211,7 @@ parameter_types! {
   pub const NetworkPalletId: PalletId = PalletId(*b"/network");
   pub const MinProposalStake: u128 = 1_000_000_000_000_000_000;
   pub const DelegateStakeCooldownEpochs: u32 = 100;
+  pub const NodeDelegateStakeCooldownEpochs: u32 = 100; 
   pub const StakeCooldownEpochs: u32 = 100;
 	pub const DelegateStakeEpochsRemovalWindow: u32 = 10;
   pub const MaxDelegateStakeUnlockings: u32 = 32;
@@ -230,6 +231,7 @@ impl Config for Test {
   type Randomness = InsecureRandomnessCollectiveFlip;
 	type PalletId = NetworkPalletId;
   type DelegateStakeCooldownEpochs = DelegateStakeCooldownEpochs;
+  type NodeDelegateStakeCooldownEpochs = NodeDelegateStakeCooldownEpochs; 
   type StakeCooldownEpochs = DelegateStakeCooldownEpochs;
 	type DelegateStakeEpochsRemovalWindow = DelegateStakeEpochsRemovalWindow;
   type MaxDelegateStakeUnlockings = MaxDelegateStakeUnlockings;

@@ -33,7 +33,7 @@ impl<T: Config> Pallet<T> {
       from_subnet_id,
       from_subnet_node_id,
       node_delegate_stake_shares_to_be_switched,
-      true,
+      false,
     );
 
     result?;

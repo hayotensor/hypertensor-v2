@@ -62,4 +62,37 @@ impl<T: Config> Pallet<T> {
 
     Ok(())
   }
+
+  pub fn do_owner_add_to_coldkey_whitelist(origin: T::RuntimeOrigin, subnet_id: u32, coldkeys: BTreeSet<T::AccountId>) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    ensure!(
+      !Self::is_subnet_active(subnet_id),
+      Error::<T>::SubnetMustBeRegistering
+    );
+
+    Ok(())
+  }
+
+  pub fn do_owner_remove_from_coldkey_whitelist(origin: T::RuntimeOrigin, subnet_id: u32, coldkeys: BTreeSet<T::AccountId>) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    ensure!(
+      !Self::is_subnet_active(subnet_id),
+      Error::<T>::SubnetMustBeRegistering
+    );
+
+    Ok(())
+  }
+
 }

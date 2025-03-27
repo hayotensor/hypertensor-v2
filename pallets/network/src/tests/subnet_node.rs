@@ -393,12 +393,14 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
 
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
 
+    let whitelist = get_coldkey_whitelist(0, 1);
+
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -458,12 +460,13 @@ fn test_register_subnet_node_then_activate() {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let whitelist = get_coldkey_whitelist(0, 1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
     };
   
     let epoch_length = EpochLength::get();
@@ -571,13 +574,14 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let whitelist = get_coldkey_whitelist(0, 1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -1863,7 +1867,7 @@ fn test_claim_stake_unbondings() {
 
     assert_eq!(unbondings.len(), 1);
     let (first_key, first_value) = unbondings.iter().next().unwrap();
-    assert_eq!(first_key, &epoch);
+    assert_eq!(*first_key, &epoch + StakeCooldownEpochs::get());
     assert!(*first_value <= stake_balance);
 
     let stake_cooldown_epochs = StakeCooldownEpochs::get();

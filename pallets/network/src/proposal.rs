@@ -25,7 +25,7 @@ impl<T: Config> Pallet<T> {
     peer_id: PeerId,
     data: Vec<u8>,
   ) -> DispatchResult {
-    let proposer_subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone());
+    let proposer_subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, &hotkey);
     ensure!(
       proposer_subnet_node_id == Some(subnet_node_id),
       Error::<T>::NotUidOwner
@@ -51,7 +51,7 @@ impl<T: Config> Pallet<T> {
 
     // Unique subnet_id -> PeerId
     // Ensure peer ID exists within subnet
-    let defendant_subnet_node_id = match PeerIdSubnetNode::<T>::try_get(subnet_id, peer_id.clone()) {
+    let defendant_subnet_node_id = match PeerIdSubnetNode::<T>::try_get(subnet_id, &peer_id) {
       Ok(defendant_subnet_node_id) => defendant_subnet_node_id,
       Err(()) => return Err(Error::<T>::PeerIdNotExist.into()),
     };
@@ -105,7 +105,7 @@ impl<T: Config> Pallet<T> {
     let proposal_bid_amount_as_balance = Self::u128_to_balance(proposal_bid_amount);
 
     let can_withdraw: bool = Self::can_remove_balance_from_coldkey_account(
-      &hotkey.clone(),
+      &hotkey,
       proposal_bid_amount_as_balance.unwrap(),
     );
 
@@ -116,7 +116,7 @@ impl<T: Config> Pallet<T> {
 
     // --- Withdraw bid amount from proposer accounts
     let _ = T::Currency::withdraw(
-      &hotkey.clone(),
+      &hotkey,
       proposal_bid_amount_as_balance.unwrap(),
       WithdrawReasons::except(WithdrawReasons::TRANSFER),
       ExistenceRequirement::KeepAlive,
@@ -201,7 +201,7 @@ impl<T: Config> Pallet<T> {
         return Err(Error::<T>::ProposalInvalid.into()),
     };
 
-    let subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone());
+    let subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, &hotkey);
 
     // --- Ensure defendant
     ensure!(
@@ -284,7 +284,7 @@ impl<T: Config> Pallet<T> {
     proposal_id: u32,
     vote: VoteType
   ) -> DispatchResult {
-    let voter_subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone());
+    let voter_subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, &hotkey);
     ensure!(
       voter_subnet_node_id == Some(subnet_node_id),
       Error::<T>::NotUidOwner
@@ -386,7 +386,7 @@ impl<T: Config> Pallet<T> {
         return Err(Error::<T>::ProposalInvalid.into()),
     };
 
-    let canceler_subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, hotkey.clone());
+    let canceler_subnet_node_id = HotkeySubnetNodeId::<T>::get(subnet_id, &hotkey);
     ensure!(
       subnet_node_id == canceler_subnet_node_id.unwrap(),
       Error::<T>::NotUidOwner

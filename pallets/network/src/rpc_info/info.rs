@@ -107,7 +107,7 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn get_subnet_node_stake_by_peer_id(subnet_id: u32, peer_id: PeerId) -> u128 {
-    match PeerIdSubnetNode::<T>::try_get(subnet_id, peer_id.clone()) {
+    match PeerIdSubnetNode::<T>::try_get(subnet_id, &peer_id) {
       Ok(subnet_node_id) => {
         let hotkey = SubnetNodeIdHotkey::<T>::get(subnet_id, subnet_node_id).unwrap(); // TODO: error fallback
         AccountSubnetStake::<T>::get(hotkey, subnet_id)

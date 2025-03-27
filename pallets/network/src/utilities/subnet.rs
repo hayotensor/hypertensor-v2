@@ -79,33 +79,64 @@ impl<T: Config> Pallet<T> {
     )
   }
 
-  pub fn is_subnet_registering(subnet_data: SubnetData, epoch: u32) -> bool {
+  pub fn is_subnet_registering(subnet_id: u32, state: SubnetState, epoch: u32) -> bool {
     let subnet_registration_epochs = SubnetRegistrationEpochs::<T>::get();
-    let is_registered: bool = subnet_data.state == SubnetState::Registered;
-    let registered_epoch: u32 = subnet_data.registered;
-    let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+    let is_registering: bool = state == SubnetState::Registered;
 
-    if is_registered && epoch <= max_registration_epoch {
-      return true
+    match SubnetRegistrationEpoch::<T>::try_get(subnet_id) {
+      Ok(registered_epoch) => {
+        let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+        if is_registering && epoch <= max_registration_epoch {
+          return true
+        }
+        false
+      },
+      Err(()) => false,
     }
-    false
   }
 
-  pub fn is_subnet_in_enactment(subnet_data: SubnetData, epoch: u32) -> bool {
+  pub fn is_subnet_in_enactment(subnet_id: u32, state: SubnetState, epoch: u32) -> bool {
     let subnet_registration_epochs = SubnetRegistrationEpochs::<T>::get();
     let subnet_activation_enactment_epochs = SubnetActivationEnactmentEpochs::<T>::get();
 
-    let is_registered: bool = subnet_data.state == SubnetState::Registered;
-    let registered_epoch: u32 = subnet_data.registered;
-    let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
-    let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
+    let is_registering: bool = state == SubnetState::Registered;
 
-    if is_registered && epoch <= max_registration_epoch {
-      return false
-    } else if is_registered && epoch <= max_enactment_epoch {
-      return true
+    match SubnetRegistrationEpoch::<T>::try_get(subnet_id) {
+      Ok(registered_epoch) => {
+        let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+        let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
+    
+        if is_registering && epoch <= max_registration_epoch {
+          return false
+        } else if is_registering && epoch <= max_enactment_epoch {
+          return true
+        }
+        false
+      },
+      Err(()) => false,
     }
-    false
+
+
+
+
+
+    // let registered_epoch: u32 = subnet_data.registered;
+    // let max_registration_epoch = registered_epoch.saturating_add(subnet_registration_epochs);
+    // let max_enactment_epoch = max_registration_epoch.saturating_add(subnet_activation_enactment_epochs);
+
+    // if is_registering && epoch <= max_registration_epoch {
+    //   return false
+    // } else if is_registering && epoch <= max_enactment_epoch {
+    //   return true
+    // }
+    // false
+  }
+
+  pub fn is_subnet_active(subnet_id: u32) -> bool {
+    match SubnetsData::<T>::try_get(subnet_id) {
+      Ok(subnet) => subnet.state == SubnetState::Active,
+      Err(()) => false,
+    }
   }
 
   pub fn is_subnet_owner(account_id: &T::AccountId, subnet_id: u32) -> bool {

@@ -52,6 +52,18 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
+  /// Add to the subnet delegate stake balance of a user
+  ///
+  /// # Arguments
+  ///
+  /// * `account_id` - Account adding to balance of subnet.
+  /// * `subnet_id` - Subnet ID.
+  /// * `subnet_node_id` - Subnet node ID adding stake to.
+  /// * `node_delegate_stake_to_be_added` - Balance to add or switch.
+  /// * `switch` - If we are switching between subnets or nodes.
+  ///              - True: Don't remove balance from users account
+  ///              - False: Check user balance is withdrawable and withdraw balance
+  ///
   pub fn perform_do_add_node_delegate_stake(
     account_id: &T::AccountId,
     subnet_id: u32,
@@ -165,6 +177,18 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
+  /// Remove the node delegate stake balance of a user
+  ///
+  /// # Arguments
+  ///
+  /// * `account_id` - Account adding to balance of subnet.
+  /// * `subnet_id` - Subnet ID.
+  /// * `subnet_node_id` - Subnet Node ID removing stake from.
+  /// * `node_delegate_stake_shares_to_be_removed` - Shares of pool to remove.
+  /// * `add_to_ledger` - If we are unstaking from network and not switching between staking options.
+  ///              - True: Unstake user to unstaking ledger.
+  ///              - False: Don't add balance to unstaking ledger.
+  ///
   pub fn perform_do_remove_node_delegate_stake(
     account_id: &T::AccountId, 
     subnet_id: u32,
@@ -220,7 +244,7 @@ impl<T: Config> Pallet<T> {
       let result = Self::add_balance_to_unbonding_ledger(
         &account_id, 
         node_delegate_stake_to_be_removed, 
-        T::DelegateStakeCooldownEpochs::get(),
+        T::NodeDelegateStakeCooldownEpochs::get(),
         block
       );
       

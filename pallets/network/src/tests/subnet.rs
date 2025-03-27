@@ -53,13 +53,16 @@ fn test_register_subnet() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
+    let min_nodes = MinSubnetNodes::<Test>::get();
+  
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
+  
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -102,13 +105,16 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist.clone(),
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -134,8 +140,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist.clone(),
+      // coldkey_whitelist: None,
     };
 
     assert_err!(
@@ -175,8 +181,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist.clone(),
+      // coldkey_whitelist: None,
     };
 
     assert_err!(
@@ -203,13 +209,16 @@ fn test_register_subnet_exists_error() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -357,12 +366,16 @@ fn test_register_subnet_not_enough_balance_err() {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
 
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
+
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
 
     let epoch_length = EpochLength::get();
@@ -395,13 +408,16 @@ fn test_activate_subnet() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -424,7 +440,6 @@ fn test_activate_subnet() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -476,7 +491,6 @@ fn test_activate_subnet() {
     // ensure subnet exists and nothing changed but the activation block
     assert_eq!(subnet.id, id);
     assert_eq!(subnet.path, path);
-    assert_eq!(subnet.registered, registered);
     assert_eq!(subnet.state, SubnetState::Active);
   })
 }
@@ -495,13 +509,16 @@ fn test_activate_subnet_invalid_subnet_id_error() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -524,7 +541,6 @@ fn test_activate_subnet_invalid_subnet_id_error() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -571,13 +587,16 @@ fn test_activate_subnet_already_activated_err() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -600,7 +619,6 @@ fn test_activate_subnet_already_activated_err() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -669,13 +687,16 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -698,7 +719,6 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -778,13 +798,16 @@ fn test_activate_subnet_initializing_error() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -807,7 +830,6 @@ fn test_activate_subnet_initializing_error() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
@@ -924,13 +946,16 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -953,7 +978,6 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Increase epochs to max registration epoch
     let epochs = SubnetRegistrationEpochs::<Test>::get();
@@ -995,13 +1019,16 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
+    let min_nodes = MinSubnetNodes::<Test>::get();
+
+    let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
       entry_interval: 0,
-      // coldkey_whitelist: Some(BTreeSet::new()),
-      coldkey_whitelist: None,
+      coldkey_whitelist: whitelist,
+      // coldkey_whitelist: None,
     };
   
     let epoch_length = EpochLength::get();
@@ -1024,7 +1051,6 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     let id = subnet.id;
 		let path = subnet.path;
 		let min_nodes = MinSubnetNodes::<Test>::get();
-		let registered = subnet.registered;
 
     // --- Add subnet nodes
     let deposit_amount: u128 = 10000000000000000000000;
