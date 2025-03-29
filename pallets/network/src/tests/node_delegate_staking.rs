@@ -31,6 +31,7 @@ use crate::{
   SubnetNodeClass,
   AccountNodeDelegateStakeShares,
   TotalNodeDelegateStakeBalance,
+  MinStakeBalance,
 };
 
 //
@@ -55,13 +56,14 @@ fn test_add_to_node_delegate_stake() {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
 
     build_activated_subnet_with_delegator_rewards(
       subnet_path.clone(), 
       0, 
       16, 
       deposit_amount, 
-      amount,
+      stake_amount,
       DEFAULT_DELEGATE_REWARD_RATE,
     );
 
@@ -103,12 +105,14 @@ fn test_remove_node_delegate_stake() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 =         1000000000000000000000;
 
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
     build_activated_subnet_with_delegator_rewards(
       subnet_path.clone(), 
       0, 
       16, 
       deposit_amount, 
-      amount,
+      stake_amount,
       DEFAULT_DELEGATE_REWARD_RATE,
     );
 
@@ -194,13 +198,14 @@ fn test_transfer_node_delegate_stake() {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 =         1000000000000000000000;
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
 
     build_activated_subnet_with_delegator_rewards(
       subnet_path.clone(), 
       0, 
       16, 
       deposit_amount, 
-      amount,
+      stake_amount,
       DEFAULT_DELEGATE_REWARD_RATE,
     );
 
@@ -214,7 +219,7 @@ fn test_transfer_node_delegate_stake() {
       0, 
       16, 
       deposit_amount, 
-      amount,
+      stake_amount,
       DEFAULT_DELEGATE_REWARD_RATE,
     );
 
@@ -317,13 +322,14 @@ fn test_transfer_node_delegate_stake() {
 //     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 //     let deposit_amount: u128 = 10000000000000000000000;
 //     let amount: u128 = 1000000000000000000000;
+// let stake_amount: u128 = MinStakeBalance::<Test>::get();
 
 //     build_activated_subnet_with_delegator_rewards(
 //       subnet_path.clone(), 
 //       0, 
 //       16, 
 //       deposit_amount, 
-//       amount,
+//       stake_amount,
 //       DEFAULT_DELEGATE_REWARD_RATE,
 //     );
 

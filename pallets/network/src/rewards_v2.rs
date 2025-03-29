@@ -395,6 +395,7 @@ impl<T: Config> Pallet<T> {
 
     let mut stake_weights_normalized: BTreeMap<&u32, u128> = BTreeMap::new();
 
+    // --- Normalize delegate stake weights from `sqrt`
     for (subnet_id, weight) in stake_weights {
       let weight_normalized: u128 = (weight / stake_weight_sum * Self::PERCENTAGE_FACTOR as f64) as u128;
       stake_weights_normalized.insert(subnet_id, weight_normalized);

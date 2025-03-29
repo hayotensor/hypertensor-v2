@@ -98,4 +98,14 @@ impl<T: Config> Pallet<T> {
 
     Ok(())
   }
+
+  // pub fn calculate_registration_delay(
+  //   subnet_id: u32,
+  //   base_delay: u32, 
+  //   scaling_factor: f64, 
+  //   current_nodes: u32
+  // ) -> u32 {
+  //   let delay = base_delay as f64 / (1.0 + scaling_factor * (1.0 + current_nodes as f64).log2());
+  //   delay.round() as u32
+  // }
 }

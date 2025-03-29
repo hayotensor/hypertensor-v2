@@ -44,7 +44,7 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
-  pub fn do_owner_update_entry_interval(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+  pub fn do_owner_update_registration_interval(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
     let coldkey: T::AccountId = ensure_signed(origin)?;
 
     ensure!(
@@ -52,7 +52,36 @@ impl<T: Config> Pallet<T> {
       Error::<T>::NotSubnetOwner
     );
 
-    SubnetEntryInterval::<T>::insert(subnet_id, value);
+    ensure!(
+      value <= MaxSubnetRegistrationInterval::<T>::get(),
+      Error::<T>::MaxSubnetRegistration
+    );
+
+    SubnetNodeRegistrationInterval::<T>::insert(subnet_id, value);
+
+    Self::deposit_event(Event::SubnetEntryIntervalUpdate { 
+      subnet_id: subnet_id,
+      owner: coldkey, 
+      value: value 
+    });
+
+    Ok(())
+  }
+
+  pub fn do_owner_update_activation_interval(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    ensure!(
+      value <= MaxSubnetActivationInterval::<T>::get(),
+      Error::<T>::MaxSubnetActivation
+    );
+
+    SubnetNodeActivationInterval::<T>::insert(subnet_id, value);
 
     Self::deposit_event(Event::SubnetEntryIntervalUpdate { 
       subnet_id: subnet_id,

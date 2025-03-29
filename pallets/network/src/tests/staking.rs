@@ -15,6 +15,7 @@ use crate::{
   TotalSubnetStake,
   SubnetNode,
   HotkeySubnetNodeId,
+  MinStakeBalance,
 };
 
 // ///
@@ -55,7 +56,9 @@ fn test_add_to_stake_err() {
     let deposit_amount: u128 = 1000000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -83,7 +86,9 @@ fn test_add_to_stake() {
     let deposit_amount: u128 = 1000000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -131,7 +136,9 @@ fn test_add_to_stake() {
 
 // //     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-// //     build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+// //     let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+// //     build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
 // //     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 // //     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -166,7 +173,9 @@ fn test_remove_stake() {
     let deposit_amount: u128 = 1000000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);

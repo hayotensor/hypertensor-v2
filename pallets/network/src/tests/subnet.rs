@@ -21,6 +21,7 @@ use crate::{
   HotkeySubnetNodeId,
   SubnetRegistrationEpochs,
   SubnetState,
+  MinStakeBalance,
 };
 
 //
@@ -60,7 +61,8 @@ fn test_register_subnet() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -112,7 +114,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist.clone(),
       // coldkey_whitelist: None,
     };
@@ -139,7 +142,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist.clone(),
       // coldkey_whitelist: None,
     };
@@ -180,7 +184,8 @@ fn test_register_subnet_subnet_registration_cooldown() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist.clone(),
       // coldkey_whitelist: None,
     };
@@ -216,7 +221,8 @@ fn test_register_subnet_exists_error() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -262,7 +268,7 @@ fn test_register_subnet_exists_error() {
 //     let add_subnet_data = RegistrationSubnetData {
 //       path: subnet_path.clone().into(),
 //       registration_blocks: MinSubnetRegistrationBlocks::<Test>::get() - 1,
-//       entry_interval: 0,
+//       node_registration_interval: 0,
 //       // coldkey_whitelist: Some(BTreeSet::new()),
 //       coldkey_whitelist: None,
 //     };
@@ -284,7 +290,7 @@ fn test_register_subnet_exists_error() {
 //     let add_subnet_data = RegistrationSubnetData {
 //       path: subnet_path.clone().into(),
 //       registration_blocks: MaxSubnetRegistrationBlocks::<Test>::get() + 1,
-//       entry_interval: 0,
+//       node_registration_interval: 0,
 //       // coldkey_whitelist: Some(BTreeSet::new()),
 //       coldkey_whitelist: None,
 //     };
@@ -332,7 +338,7 @@ fn test_register_subnet_exists_error() {
 //       let add_subnet_data = RegistrationSubnetData {
 //         path: path,
 //         registration_blocks: registration_blocks,
-//         entry_interval: 0,
+//         node_registration_interval: 0,
       // coldkey_whitelist: Some(BTreeSet::new()),
       // coldkey_whitelist: None,
 //       };
@@ -373,7 +379,8 @@ fn test_register_subnet_not_enough_balance_err() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -415,7 +422,8 @@ fn test_activate_subnet() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -516,7 +524,8 @@ fn test_activate_subnet_invalid_subnet_id_error() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -594,7 +603,8 @@ fn test_activate_subnet_already_activated_err() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -694,7 +704,8 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -805,7 +816,8 @@ fn test_activate_subnet_initializing_error() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -879,7 +891,9 @@ fn test_not_subnet_node_owner() {
     let deposit_amount: u128 = 1000000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -953,7 +967,8 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -1026,7 +1041,8 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
       registration_blocks: registration_blocks,
-      entry_interval: 0,
+      node_registration_interval: 0,
+      node_activation_interval: 0,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
