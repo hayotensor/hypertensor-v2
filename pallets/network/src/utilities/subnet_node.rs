@@ -218,4 +218,16 @@ impl<T: Config> Pallet<T> {
       Err(()) => true,
     }
   }
+
+  pub fn calculate_max_activation_epoch(subnet_id: u32) -> u32 {
+    let prev_registration_epoch = 10;
+    0
+  }
+
+  pub fn get_subnet_churn_limit(subnet_id: u32) -> u32 {
+    let min_churn = 4;
+    let active_nodes = TotalActiveSubnetNodes::<T>::get(subnet_id);
+    let churn_denominator = ChurnDenominator::<T>::get(subnet_id);
+    min_churn.max(active_nodes.saturating_div(churn_denominator))
+  }
 }

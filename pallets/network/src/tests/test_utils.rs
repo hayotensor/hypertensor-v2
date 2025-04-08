@@ -86,8 +86,6 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
   let cost = Network::registration_cost(epoch);
   let _ = Balances::deposit_creating(&account(0), cost+1000);
 
-  let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
   let min_nodes = MinSubnetNodes::<Test>::get();
 
   if end == 0 {
@@ -98,9 +96,11 @@ pub fn build_activated_subnet(subnet_path: Vec<u8>, start: u32, mut end: u32, de
 
   let add_subnet_data = RegistrationSubnetData {
     path: subnet_path.clone().into(),
-    registration_blocks: registration_blocks,
+    max_node_registration_epochs: 16,
     node_registration_interval: 0,
     node_activation_interval: 0,
+    node_queue_period: 1,
+    max_node_penalties: 3,
     coldkey_whitelist: whitelist,
   };
 
@@ -241,7 +241,6 @@ pub fn build_activated_subnet_with_delegator_rewards(
   let cost = Network::registration_cost(0);
   let _ = Balances::deposit_creating(&account(0), cost+1000);
 
-  let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
   let min_nodes = MinSubnetNodes::<Test>::get();
 
   if end == 0 {
@@ -252,9 +251,11 @@ pub fn build_activated_subnet_with_delegator_rewards(
 
   let add_subnet_data = RegistrationSubnetData {
     path: subnet_path.clone().into(),
-    registration_blocks: registration_blocks,
+    max_node_registration_epochs: 16,
     node_registration_interval: 0,
     node_activation_interval: 0,
+    node_queue_period: 1,
+    max_node_penalties: 3,
     coldkey_whitelist: whitelist,
   };
 

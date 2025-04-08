@@ -53,16 +53,17 @@ fn test_register_subnet() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
   
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
   
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -106,16 +107,17 @@ fn test_register_subnet_subnet_registration_cooldown() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist.clone(),
       // coldkey_whitelist: None,
     };
@@ -141,9 +143,11 @@ fn test_register_subnet_subnet_registration_cooldown() {
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist.clone(),
       // coldkey_whitelist: None,
     };
@@ -183,9 +187,11 @@ fn test_register_subnet_subnet_registration_cooldown() {
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist.clone(),
       // coldkey_whitelist: None,
     };
@@ -213,16 +219,17 @@ fn test_register_subnet_exists_error() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -267,7 +274,7 @@ fn test_register_subnet_exists_error() {
   
 //     let add_subnet_data = RegistrationSubnetData {
 //       path: subnet_path.clone().into(),
-//       registration_blocks: MinSubnetRegistrationBlocks::<Test>::get() - 1,
+//       max_node_registration_epochs: 16,
 //       node_registration_interval: 0,
 //       // coldkey_whitelist: Some(BTreeSet::new()),
 //       coldkey_whitelist: None,
@@ -289,7 +296,7 @@ fn test_register_subnet_exists_error() {
 
 //     let add_subnet_data = RegistrationSubnetData {
 //       path: subnet_path.clone().into(),
-//       registration_blocks: MaxSubnetRegistrationBlocks::<Test>::get() + 1,
+//       max_node_registration_epochs: 16,
 //       node_registration_interval: 0,
 //       // coldkey_whitelist: Some(BTreeSet::new()),
 //       coldkey_whitelist: None,
@@ -333,11 +340,9 @@ fn test_register_subnet_exists_error() {
 
 //       let path: Vec<u8> = format!("model-name-{n}").into(); 
 
-//       let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
 //       let add_subnet_data = RegistrationSubnetData {
 //         path: path,
-//         registration_blocks: registration_blocks,
+//         max_node_registration_epochs: 16,
 //         node_registration_interval: 0,
       // coldkey_whitelist: Some(BTreeSet::new()),
       // coldkey_whitelist: None,
@@ -370,7 +375,6 @@ fn test_register_subnet_not_enough_balance_err() {
   new_test_ext().execute_with(|| {
     // let _ = Balances::deposit_creating(&account(0), cost+1000);  
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
 
     let min_nodes = MinSubnetNodes::<Test>::get();
 
@@ -378,9 +382,11 @@ fn test_register_subnet_not_enough_balance_err() {
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -414,16 +420,17 @@ fn test_activate_subnet() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -516,16 +523,17 @@ fn test_activate_subnet_invalid_subnet_id_error() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -595,16 +603,17 @@ fn test_activate_subnet_already_activated_err() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -696,16 +705,17 @@ fn test_activate_subnet_enactment_period_remove_subnet() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -808,16 +818,17 @@ fn test_activate_subnet_initializing_error() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -959,16 +970,17 @@ fn test_activate_subnet_min_subnet_nodes_remove_subnet() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -1033,16 +1045,17 @@ fn test_activate_subnet_min_delegate_balance_remove_subnet() {
   
     let _ = Balances::deposit_creating(&account(0), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let min_nodes = MinSubnetNodes::<Test>::get();
 
     let whitelist = get_coldkey_whitelist(0, min_nodes+1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };

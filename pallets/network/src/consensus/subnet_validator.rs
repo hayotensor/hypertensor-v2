@@ -49,7 +49,7 @@ impl<T: Config> Pallet<T> {
     // Remove duplicates based on peer_id
     data.dedup_by(|a, b| a.peer_id == b.peer_id);
 
-    // Remove idle classified entries
+    // Remove queue classified entries
     // Each peer must have an inclusion classification at minimum
     data.retain(|x| {
       match SubnetNodesData::<T>::try_get(
@@ -235,7 +235,7 @@ impl<T: Config> Pallet<T> {
     SubnetNodePenalties::<T>::insert(subnet_id, subnet_node_id, penalties + 1);
 
     // --- Ensure maximum sequential removal consensus threshold is reached
-    if penalties + 1 > MaxSubnetNodePenalties::<T>::get() {
+    if penalties + 1 > MaxSubnetNodePenalties::<T>::get(subnet_id) {
       // --- Increase account penalty count
       Self::perform_remove_subnet_node(block, subnet_id, subnet_node_id);
     } else {

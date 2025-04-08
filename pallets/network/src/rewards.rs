@@ -37,7 +37,7 @@
 //     // --- Get the percentage of the subnet rewards that go to subnet delegate stakers
 //     let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<T>::get();
 
-//     let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
+//     let max_subnet_node_registration_epochs = MaxSubnetNodeRegistrationEpochs::<T>::get();
 //     let subnet_owner_percentage = SubnetOwnerPercentage::<T>::get();
 
 //     for (subnet_id, data) in SubnetsData::<T>::iter() {
@@ -147,15 +147,15 @@
 //           };
       
 //           // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
-//           // --- (else if) Check if past Idle and can be included in validation data
+//           // --- (else if) Check if past Queue and can be included in validation data
 //           // Always continue if any of these are true
 //           // Note: Only ``included`` or above nodes can get emissions
 //           if subnet_node.classification.class <= SubnetNodeClass::Registered {
-//             if epoch as u64 > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
+//             if epoch as u64 > subnet_node.classification.start_epoch.saturating_add(max_subnet_node_registration_epochs) {
 //               Self::perform_remove_subnet_node(block, subnet_id, subnet_node_id);
 //             }
 //             continue
-//           } else if subnet_node.classification.class == SubnetNodeClass::Idle {
+//           } else if subnet_node.classification.class == SubnetNodeClass::Queue {
 //             // If not, upgrade classification and continue
 //             // --- Upgrade to included
 //             SubnetNodesData::<T>::mutate(
@@ -346,7 +346,7 @@
 //       // --- If subnet is past its max penalty count, remove
 //       let subnet_penalty_count = SubnetPenaltyCount::<T>::get(subnet_id);
 //       if subnet_penalty_count > max_subnet_penalty_count {
-//         Self::deactivate_subnet(
+//         Self::do_remove_subnet(
 //           data.path,
 //           SubnetRemovalReason::MaxPenalties,
 //         );

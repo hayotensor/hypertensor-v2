@@ -23,7 +23,7 @@ impl<T: Config> Pallet<T> {
       return Vec::new();
     }
     let epoch: u32 = Self::get_current_epoch_as_u32();
-    Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Idle, epoch)
+    Self::get_classified_subnet_nodes(subnet_id, &SubnetNodeClass::Queue, epoch)
   }
 
   pub fn get_subnet_nodes_included(

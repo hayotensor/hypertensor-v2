@@ -54,18 +54,6 @@ impl Default for Inflation {
 }
 
 impl Inflation {
-  // pub fn epoch(&self, epoch: u32) -> u128 {
-  //   let years_elapsed = epoch as f64 / self.epochs_per_year as f64;
-  //   // let rate = self.initial * (1.0 - self.terminal).powf(years_elapsed);
-  //   let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
-
-  //   // Ensure inflation does not go below the minimum taper rate
-  //   let final_rate = rate.max(self.taper);
-
-  //   // Convert to u128 with 1e18 scaling
-  //   (final_rate * 1e+18) as u128
-  // }
-
   pub fn epoch(&self, epoch: u32, epochs_per_year: u32, denominator: u128) -> f64 {
     let years_elapsed = epoch as f64 / epochs_per_year as f64;
     // let rate = self.initial * pow(1.0 - self.terminal, years_elapsed);
@@ -77,6 +65,20 @@ impl Inflation {
 
     // final_rate
     // final_rate as u128 * denominator
+  }
+
+  /// portion of total that goes to validators
+  pub fn validator(&self, year: f64) -> f64 {
+    self.total(year) - self.foundation(year)
+  }
+
+  /// portion of total that goes to foundation
+  pub fn foundation(&self, year: f64) -> f64 {
+    if year < self.foundation_term {
+      self.total(year) * self.foundation
+    } else {
+      0.0
+    }
   }
 
   /// inflation rate at year

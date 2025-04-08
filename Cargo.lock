@@ -5287,6 +5287,7 @@ dependencies = [
  "pallet-collective",
  "pallet-insecure-randomness-collective-flip",
  "pallet-treasury",
+ "pallet-tx-pause",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5487,6 +5488,24 @@ dependencies = [
  "scale-info",
  "serde",
  "sp-core 34.0.0",
+ "sp-runtime 39.0.5",
+]
+
+[[package]]
+name = "pallet-tx-pause"
+version = "18.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1971e3dafa67fb5149a5077a6a0218d9250854797ae689ec4a3a222bc6587cd"
+dependencies = [
+ "docify",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-proxy",
+ "pallet-utility",
+ "parity-scale-codec",
+ "scale-info",
  "sp-runtime 39.0.5",
 ]
 
@@ -8554,6 +8573,7 @@ dependencies = [
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-treasury",
+ "pallet-tx-pause",
  "pallet-utility",
  "parity-scale-codec",
  "scale-info",

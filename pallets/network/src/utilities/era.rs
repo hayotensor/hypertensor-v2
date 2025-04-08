@@ -95,7 +95,7 @@ impl<T: Config> Pallet<T> {
               let subnet_node_ids: Vec<u32> = Self::get_classified_subnet_node_ids(subnet_id, &SubnetNodeClass::Validator, epoch);
               let subnet_nodes_count = subnet_node_ids.len();  
               if (subnet_nodes_count as u32) < min_subnet_nodes {
-                Self::deactivate_subnet(
+                Self::do_remove_subnet(
                   data.path,
                   SubnetRemovalReason::MinSubnetNodes,
                 );
@@ -104,7 +104,7 @@ impl<T: Config> Pallet<T> {
             } else if is_registering && epoch > max_enactment_epoch {
               // --- Out of Enactment Period
               // If out of enactment period, ensure activated
-              Self::deactivate_subnet(
+              Self::do_remove_subnet(
                 data.path,
                 SubnetRemovalReason::EnactmentPeriod,
               );
@@ -123,7 +123,7 @@ impl<T: Config> Pallet<T> {
 
       // --- Ensure min delegate stake balance is met
       if subnet_delegate_stake_balance < min_subnet_delegate_stake_balance {
-        Self::deactivate_subnet(
+        Self::do_remove_subnet(
           data.path,
           SubnetRemovalReason::MinSubnetDelegateStake,
         );
@@ -144,7 +144,7 @@ impl<T: Config> Pallet<T> {
       // --- Check penalties and remove subnet is threshold is breached
       let penalties = SubnetPenaltyCount::<T>::get(subnet_id);
       if penalties > max_subnet_penalty_count {
-        Self::deactivate_subnet(
+        Self::do_remove_subnet(
           data.path,
           SubnetRemovalReason::MaxPenalties,
         );
@@ -167,7 +167,7 @@ impl<T: Config> Pallet<T> {
     // --- If over max subnets, remove the subnet with the lowest delegate stake
     if excess_subnets {
       subnet_delegate_stake.sort_by_key(|&(_, value)| value);
-      Self::deactivate_subnet(
+      Self::do_remove_subnet(
         subnet_delegate_stake[0].0.clone(),
         SubnetRemovalReason::MaxSubnets,
       );

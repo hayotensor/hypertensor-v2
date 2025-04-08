@@ -36,6 +36,7 @@ pallet-proxy.workspace = true
 pallet-preimage.workspace = true
 pallet-scheduler.workspace = true
 pallet-treasury.workspace = true
+pallet-tx-pause.workspace = true
 
 sp-api.workspace = true
 sp-block-builder.workspace = true
@@ -104,6 +105,7 @@ std = [
 	"pallet-treasury/std",
 	"pallet-collective/std",
 	"pallet-atomic-swap/std",
+	"pallet-tx-pause/std",
 
 	"sp-api/std",
 	"sp-block-builder/std",

@@ -25,7 +25,6 @@ impl<T: Config> Pallet<T> {
     let min_attestation_percentage = MinAttestationPercentage::<T>::get();
     let min_vast_majority_attestation_percentage = MinVastMajorityAttestationPercentage::<T>::get();
     // --- Get max epochs in a row a subnet node can be absent from consensus data
-    let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get();
     // --- Get the max penalties a subnet node can have before being removed from the network
     let max_subnet_penalty_count = MaxSubnetPenaltyCount::<T>::get();
     // --- Get the attestation percentage for a subnet node to be removed from the network
@@ -36,7 +35,7 @@ impl<T: Config> Pallet<T> {
     // --- Get the percentage of the subnet rewards that go to subnet delegate stakers
     let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<T>::get();
 
-    let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
+    // let max_subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
     let subnet_owner_percentage = SubnetOwnerPercentage::<T>::get();
 
     let total_delegate_stake = TotalDelegateStake::<T>::get();
@@ -163,6 +162,9 @@ impl<T: Config> Pallet<T> {
 
         // --- Get sum of subnet total scores for use of divvying rewards
         let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
+
+        let max_subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get(subnet_id);
+        let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get(subnet_id);
     
         // --- Reward validators
         for (subnet_node_id, subnet_node) in SubnetNodesData::<T>::iter_prefix(subnet_id) {
@@ -172,15 +174,15 @@ impl<T: Config> Pallet<T> {
           };
       
           // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
-          // --- (else if) Check if past Idle and can be included in validation data
+          // --- (else if) Check if past Queue and can be included in validation data
           // Always continue if any of these are true
           // Note: Only ``included`` or above nodes can get emissions
           if subnet_node.classification.class <= SubnetNodeClass::Registered {
-            if epoch > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
+            if epoch > subnet_node.classification.start_epoch.saturating_add(max_subnet_node_registration_epochs) {
               Self::perform_remove_subnet_node(block, subnet_id, subnet_node_id);
             }
             continue
-          } else if subnet_node.classification.class == SubnetNodeClass::Idle {
+          } else if subnet_node.classification.class == SubnetNodeClass::Queue {
             // If not, upgrade classification and continue
             // --- Upgrade to included
             Self::increase_class(
@@ -360,7 +362,7 @@ impl<T: Config> Pallet<T> {
       // --- If subnet is past its max penalty count, remove
       let subnet_penalty_count = SubnetPenaltyCount::<T>::get(subnet_id);
       if subnet_penalty_count > max_subnet_penalty_count {
-        Self::deactivate_subnet(
+        Self::do_remove_subnet(
           data.path,
           SubnetRemovalReason::MaxPenalties,
         );
@@ -371,6 +373,9 @@ impl<T: Config> Pallet<T> {
   }
 
   pub fn reward_subnets_v2(block: u32, epoch: u32) -> DispatchResultWithPostInfo {
+    // --- Get total rewards for this epoch
+    let rewards: u128 = Self::get_epoch_emissions(epoch);
+
     let subnets: Vec<_> = SubnetsData::<T>::iter()
       .filter(|(_, subnet)| subnet.state == SubnetState::Active)
       .collect();
@@ -406,13 +411,8 @@ impl<T: Config> Pallet<T> {
     let min_attestation_percentage = MinAttestationPercentage::<T>::get();
     let min_vast_majority_attestation_percentage = MinVastMajorityAttestationPercentage::<T>::get();
     let min_subnet_nodes = MinSubnetNodes::<T>::get();
-    let subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get();
     let node_attestation_removal_threshold = NodeAttestationRemovalThreshold::<T>::get();
-    let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get();
     let max_subnet_penalty_count = MaxSubnetPenaltyCount::<T>::get();
-
-    // --- Get total rewards for this epoch
-    let rewards: u128 = Self::get_epoch_emissions(epoch);
 
     for (subnet_id, data) in &subnets {
       let mut attestation_percentage: u128 = 0;
@@ -517,6 +517,9 @@ impl<T: Config> Pallet<T> {
         // --- Get sum of subnet total scores for use of divvying rewards
         let sum = submission.data.iter().fold(0, |acc, x| acc.saturating_add(x.score));
 
+        let max_subnet_node_registration_epochs = SubnetNodeRegistrationEpochs::<T>::get(subnet_id);
+        let max_subnet_node_penalties = MaxSubnetNodePenalties::<T>::get(subnet_id);
+
         for (subnet_node_id, subnet_node) in SubnetNodesData::<T>::iter_prefix(subnet_id) {
           let hotkey: T::AccountId = match SubnetNodeIdHotkey::<T>::try_get(subnet_id, subnet_node_id) {
             Ok(hotkey) => hotkey,
@@ -524,16 +527,16 @@ impl<T: Config> Pallet<T> {
           };
 
           // --- (if) Check if subnet node is past the max registration epochs to activate (if registered or deactivated)
-          // --- (else if) Check if past Idle and can be included in validation data
+          // --- (else if) Check if past Queue and can be included in validation data
           //
           // Note: Only ``included`` or above nodes can get emissions
           if subnet_node.classification.class <= SubnetNodeClass::Registered {
-            if epoch > subnet_node.classification.start_epoch.saturating_add(subnet_node_registration_epochs) {
+            if epoch > subnet_node.classification.start_epoch.saturating_add(max_subnet_node_registration_epochs) {
               Self::perform_remove_subnet_node(block, *subnet_id, subnet_node_id);
             }
             continue
-          } else if subnet_node.classification.class == SubnetNodeClass::Idle {
-            // --- Automatically upgrade to Inclusion if activated into Idle class
+          } else if subnet_node.classification.class == SubnetNodeClass::Queue {
+            // --- Automatically upgrade to Inclusion if activated into Queue class
             Self::increase_class(*subnet_id, subnet_node_id, epoch);
             continue
           }
@@ -686,7 +689,7 @@ impl<T: Config> Pallet<T> {
       // --- If subnet is past its max penalty count, remove
       let subnet_penalty_count = SubnetPenaltyCount::<T>::get(subnet_id);
       if subnet_penalty_count > max_subnet_penalty_count {
-        Self::deactivate_subnet(
+        Self::do_remove_subnet(
           data.path.clone(),
           SubnetRemovalReason::MaxPenalties,
         );

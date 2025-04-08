@@ -99,6 +99,14 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
+  pub fn is_paused() -> DispatchResult {
+    ensure!(
+      !TxPause::<T>::get(),
+      Error::<T>::Paused
+    );
+    Ok(())
+  }
+
   // pub fn calculate_registration_delay(
   //   subnet_id: u32,
   //   base_delay: u32, 

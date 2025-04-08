@@ -552,6 +552,20 @@ impl pallet_authorship::Config for Runtime {
 }
 
 parameter_types! {
+	pub const MaxNameLen: u32 = 50;
+}
+
+impl pallet_tx_pause::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PauseOrigin = EnsureRoot<AccountId>;
+	type UnpauseOrigin = EnsureRoot<AccountId>;
+	type WhitelistedCalls = ();
+	type MaxNameLen = MaxNameLen;
+	type WeightInfo = ();
+}
+
+parameter_types! {
 	pub const HalvingInterval: BlockNumber = BLOCKS_PER_HALVING;
 	pub const InitialBlockSubsidy: u128 = INITIAL_REWARD_PER_BLOCK;
 }
@@ -677,6 +691,8 @@ mod runtime {
 	#[runtime::pallet_index(18)]
 	pub type Treasury = pallet_treasury;
 
+	#[runtime::pallet_index(19)]
+	pub type TxPause = pallet_tx_pause;	
 }
 
 /// The address format for describing accounts.

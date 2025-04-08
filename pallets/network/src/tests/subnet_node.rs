@@ -401,15 +401,15 @@ fn test_register_subnet_node_subnet_registering_or_activated_error() {
   
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
     let whitelist = get_coldkey_whitelist(0, 1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -470,14 +470,15 @@ fn test_register_subnet_node_then_activate() {
   
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let whitelist = get_coldkey_whitelist(0, 1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
     };
   
@@ -587,14 +588,15 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
   
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
     let whitelist = get_coldkey_whitelist(0, 1);
 
     let add_subnet_data = RegistrationSubnetData {
       path: subnet_path.clone().into(),
-      registration_blocks: registration_blocks,
+      max_node_registration_epochs: 16,
       node_registration_interval: 0,
       node_activation_interval: 0,
+      node_queue_period: 1,
+      max_node_penalties: 3,
       coldkey_whitelist: whitelist,
       // coldkey_whitelist: None,
     };
@@ -632,8 +634,6 @@ fn test_activate_subnet_node_subnet_registering_or_activated_error() {
     );
 
     let subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(1)).unwrap();
-
-    System::set_block_number(System::block_number() + registration_blocks + 1);
 
     // assert_err!(
     //   Network::activate_subnet_node(
@@ -710,7 +710,7 @@ fn test_register_subnet_node_activate_subnet_node() {
 
     let subnet_node = SubnetNodesData::<Test>::get(subnet_id, subnet_node_id);
 
-    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Idle);
+    assert_eq!(subnet_node.classification.class, SubnetNodeClass::Queue);
     assert_eq!(subnet_node.classification.start_epoch, epoch + 1);
   })
 }
@@ -2228,8 +2228,8 @@ fn test_remove_subnet_node() {
       assert_eq!(subnet_node_data, Err(()));
     }
 
-    // let node_set = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Idle, epoch);
-    let node_set: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Idle, epoch);
+    // let node_set = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Queue, epoch);
+    let node_set: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Queue, epoch);
 
     assert_eq!(node_set.len(), (total_subnet_nodes - remove_n_peers) as usize);
     assert_eq!(Network::total_stake(), amount_staked);

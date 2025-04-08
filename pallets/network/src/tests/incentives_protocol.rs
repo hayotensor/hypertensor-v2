@@ -1070,12 +1070,11 @@ fn test_reward_subnets_account_penalty_count() {
   
 //     let _ = Balances::deposit_creating(&account(1), cost+1000);
   
-//     let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
 //     let add_subnet_data = RegistrationSubnetData {
 //       path: subnet_path.clone().into(),
-//       registration_blocks: registration_blocks,
+//       max_node_registration_epochs: 16,
 //       node_registration_interval: 0,
+//       node_queue_period: 1,
       // coldkey_whitelist: Some(BTreeSet::new()),
       // coldkey_whitelist: None,
 //     };
@@ -1273,7 +1272,7 @@ fn test_do_epoch_preliminaries_choose_validator() {
 // // //       ) 
 // // //     );
 
-// // //     let node_set = SubnetNodesClasses::<Test>::get(subnet_id, SubnetNodeClass::Idle);
+// // //     let node_set = SubnetNodesClasses::<Test>::get(subnet_id, SubnetNodeClass::Queue);
 // // //     assert_eq!(node_set.len(), n_peers as usize);
 
 // // //   })

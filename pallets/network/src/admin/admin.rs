@@ -55,16 +55,21 @@ impl<T: Config> Pallet<T> {
     Ok(())
   }
 
+  pub fn do_pause() -> DispatchResult {
+    TxPause::<T>::put(true);
+    Ok(())
+  }
+
+  pub fn do_unpause() -> DispatchResult {
+    TxPause::<T>::put(false);
+    Ok(())
+  }
+
   pub fn do_set_proposal_min_subnet_nodes(value: u32) -> DispatchResult {
     ProposalMinSubnetNodes::<T>::put(value);
     Ok(())
   }
   
-  pub fn do_set_subnet_node_registration_epochs(value: u32) -> DispatchResult {
-    SubnetNodeRegistrationEpochs::<T>::put(value);
-    Ok(())
-  }
-
   pub fn do_set_subnet_owner_percentage(value: u128) -> DispatchResult {
     SubnetOwnerPercentage::<T>::put(value);
     Ok(())

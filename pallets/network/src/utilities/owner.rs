@@ -24,7 +24,7 @@ impl<T: Config> Pallet<T> {
       Error::<T>::NotSubnetOwner
     );
 
-    Self::deactivate_subnet(
+    Self::do_remove_subnet(
       path,
       SubnetRemovalReason::Owner,
     ).map_err(|e| e)?;
@@ -119,6 +119,61 @@ impl<T: Config> Pallet<T> {
     ensure!(
       !Self::is_subnet_active(subnet_id),
       Error::<T>::SubnetMustBeRegistering
+    );
+
+    Ok(())
+  }
+
+  pub fn do_owner_set_max_subnet_registration_epochs(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    ensure!(
+      !Self::is_subnet_active(subnet_id),
+      Error::<T>::SubnetMustBeRegistering
+    );
+
+    SubnetNodeRegistrationEpochs::<T>::insert(subnet_id, value);
+
+    Ok(())
+  }
+
+  pub fn do_owner_update_queue_period(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    SubnetNodeQueuePeriod::<T>::insert(subnet_id, value);
+
+    Ok(())
+  }
+
+  pub fn do_owner_update_included_period(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
+    );
+
+    Ok(())
+  }
+
+  /// Gives owner the ability to rearrange the queue, for instance, the owner can order the queue based on
+  /// a validators performance
+  pub fn do_owner_rearrange_queue(origin: T::RuntimeOrigin, subnet_id: u32, value: u32) -> DispatchResult {
+    let coldkey: T::AccountId = ensure_signed(origin)?;
+
+    ensure!(
+      Self::is_subnet_owner(&coldkey, subnet_id),
+      Error::<T>::NotSubnetOwner
     );
 
     Ok(())

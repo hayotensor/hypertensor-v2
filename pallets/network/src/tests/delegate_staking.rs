@@ -189,7 +189,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     );
 
     assert_ok!(
-      Network::deactivate_subnet(
+      Network::do_remove_subnet(
         subnet_path.clone().into(),
         SubnetRemovalReason::MinSubnetDelegateStake,
       )
@@ -923,7 +923,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     let cooldown_epochs = DelegateStakeCooldownEpochs::get();
 
     assert_ok!(
-      Network::deactivate_subnet( 
+      Network::do_remove_subnet( 
         subnet_path.clone().into(),
         SubnetRemovalReason::MinSubnetDelegateStake,
       )
