@@ -520,18 +520,10 @@ pub mod pallet {
 	/// *Included: Subnet node automatically updates to Included from Queue on the first successful consensus epoch after being Queue
 	/// *Validator: Subnet node updates to Submittble from Included on the first successful consensus epoch they are included in consensus data
 	#[derive(Default, EnumIter, FromRepr, Copy, Encode, Decode, Clone, PartialOrd, PartialEq, Eq, RuntimeDebug, Ord, scale_info::TypeInfo)]
-	// pub enum SubnetNodeClass {
-	// 	Deactivated,
-	// 	#[default] Registered,
-  //   Queue,
-  //   Included,
-	// 	Validator,
-  // }
-
 	pub enum SubnetNodeClass {
 		Deactivated,
-		#[default] Queue,
-    Registered,
+		#[default] Registered,
+    Queue,
     Included,
 		Validator,
   }
