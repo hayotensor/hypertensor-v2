@@ -4027,13 +4027,15 @@ pub mod pallet {
 			// ========================
 			// Insert peer into storage
 			// ========================
-			let mut class: SubnetNodeClass = SubnetNodeClass::Registered;
-			if is_registering {
-				class = SubnetNodeClass::Validator;
-			}
-			let classification: SubnetNodeClassification = SubnetNodeClassification {
-				class: SubnetNodeClass::Registered,
-				start_epoch: epoch,
+			let classification: SubnetNodeClassification = match is_registering {
+				true => SubnetNodeClassification {
+					class: SubnetNodeClass::Validator,
+					start_epoch: epoch,
+				},
+				false => SubnetNodeClassification {
+					class: SubnetNodeClass::Queue,
+					start_epoch: epoch,
+				},
 			};
 
 			let block: u32 = Self::get_current_block_as_u32();
@@ -4371,7 +4373,11 @@ pub mod pallet {
 					QueuedSubnetNodes::<T>::mutate(subnet_id, |subnet_nodes| {
 						if let Some((uid, subnet_node)) = subnet_nodes.first_key_value() {
 							// --- Check if the first node in the tree can be activated (FIFO)
-							if &subnet_node.classification.start_epoch + queue_epochs >= current_epoch {
+							if current_epoch >= &subnet_node.classification.start_epoch + queue_epochs {
+								log::error!("do_queue start_epoch:   {:?}", &subnet_node.classification.start_epoch);
+								log::error!("do_queue start_epoch 2: {:?}", &subnet_node.classification.start_epoch + queue_epochs);
+								log::error!("do_queue current_epoch: {:?}", &subnet_node.classification.start_epoch);
+
 								// --- Update classification
 								let mut new_subnet_node = subnet_node.clone();
 								let new_classification: SubnetNodeClassification = SubnetNodeClassification {
@@ -4458,40 +4464,6 @@ pub mod pallet {
 		fn on_finalize(block_number: BlockNumberFor<T>) {
 			let block: u32 = Self::convert_block_as_u32(block_number);
 			Self::do_queue(block);
-			let current_epoch: u32 = Self::get_current_epoch_as_u32();
-			let epoch_length: u32 = T::EpochLength::get();
-			let queue_epochs: u32 = 16;
-
-			for (subnet_id, _) in SubnetsData::<T>::iter() {
-				let mut max_nodes_per_epoch = Self::get_subnet_churn_limit(subnet_id);
-				if max_nodes_per_epoch > epoch_length {
-					max_nodes_per_epoch = epoch_length;
-				}
-				let registration_interval = epoch_length / max_nodes_per_epoch;
-
-				if block >= registration_interval && block % registration_interval == 0 {
-					QueuedSubnetNodes::<T>::mutate(subnet_id, |subnet_nodes| {
-						if let Some((uid, subnet_node)) = subnet_nodes.first_key_value() {
-							if &subnet_node.classification.start_epoch + queue_epochs >= current_epoch {
-								// --- Update classification
-								let mut new_subnet_node = subnet_node.clone();
-								let new_classification: SubnetNodeClassification = SubnetNodeClassification {
-									class: SubnetNodeClass::Registered,
-									start_epoch: current_epoch,
-								};
-								new_subnet_node.classification = new_classification;
-
-								// --- Activate
-								SubnetNodesData::<T>::insert(subnet_id, subnet_node.id, new_subnet_node);	
-								TotalActiveSubnetNodes::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
-
-								// --- Remove from queue
-								subnet_nodes.remove(&uid.clone());
-							}
-						}
-					});
-				}
-			}
 		}
 
 		fn on_idle(block_number: BlockNumberFor<T>, remaining_weight: Weight) -> Weight {

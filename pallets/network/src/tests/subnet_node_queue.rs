@@ -110,7 +110,7 @@ fn test_register_subnet_node() {
       peer_id: peer(total_subnet_nodes+1),
       bootstrap_peer_id: peer(total_subnet_nodes+1),
 			classification: SubnetNodeClassification {
-				class: SubnetNodeClass::Registered,
+				class: SubnetNodeClass::Queue,
 				start_epoch: epoch,
 			},
       delegate_reward_rate: 0,
@@ -132,6 +132,8 @@ fn test_register_subnet_node() {
     assert_eq!(queue_subnet_node.bootstrap_peer_id, peer(total_subnet_nodes+1));
     assert_eq!(queue_subnet_node.delegate_reward_rate, 0);
     assert_eq!(queue_subnet_node.last_delegate_reward_rate_update, 0);
+    assert_eq!(queue_subnet_node.classification.class, SubnetNodeClass::Queue);
+    assert_eq!(queue_subnet_node.classification.start_epoch, epoch);
 
 
 
@@ -146,12 +148,29 @@ fn test_register_subnet_node() {
     let account_subnet_stake = AccountSubnetStake::<Test>::get(account(total_subnet_nodes+1), subnet_id);
     assert_eq!(account_subnet_stake, amount);
 
+
+    log::error!("start_epoch {:?}", epoch);
+
+    let queue_epochs: u32 = 16;
+    let epoch = get_epoch();
     let block = System::block_number();
+    log::error!("lastepoch {:?}", epoch);
+
+
     Network::do_queue(block);
 
     // no increase in blocks, should still be in queue
     let queue = QueuedSubnetNodes::<Test>::get(subnet_id);
     assert_eq!(queue.get_key_value(&hotkey_subnet_node_id), Some((&hotkey_subnet_node_id, &subnet_node)));
+
+
+    // let epoch_length: u32 = EpochLength::get();
+
+    // let mut max_nodes_per_epoch = Network::get_subnet_churn_limit(subnet_id);
+    // if max_nodes_per_epoch > epoch_length {
+    //   max_nodes_per_epoch = epoch_length;
+    // }
+    // let registration_interval = epoch_length / max_nodes_per_epoch;
 
   })
 }
