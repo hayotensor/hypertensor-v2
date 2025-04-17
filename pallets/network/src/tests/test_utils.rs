@@ -304,6 +304,7 @@ pub fn build_activated_subnet_with_delegator_rewards(
 
     let subnet_node_data = SubnetNodesData::<Test>::try_get(subnet_id, hotkey_subnet_node_id).unwrap();
     assert_eq!(subnet_node_data.hotkey, account(n));
+    assert_eq!(subnet_node_data.delegate_reward_rate, delegate_reward_rate);
 
     let key_owner = HotkeyOwner::<Test>::get(subnet_node_data.hotkey.clone());
     assert_eq!(key_owner, account(n));

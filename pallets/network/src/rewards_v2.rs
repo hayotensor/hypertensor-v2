@@ -84,6 +84,8 @@ impl<T: Config> Pallet<T> {
 
         // --- Ensure nodes are at min requirement to continue rewards operations
         if subnet_node_count < min_subnet_nodes as u128 {
+          // We don't give penalties here because they will be given in the next step operation when selecting a new
+          // validator
           continue
         }
 
@@ -375,6 +377,7 @@ impl<T: Config> Pallet<T> {
   pub fn reward_subnets_v2(block: u32, epoch: u32) -> DispatchResultWithPostInfo {
     // --- Get total rewards for this epoch
     let rewards: u128 = Self::get_epoch_emissions(epoch);
+    log::error!("v2 rewards              {:?}", rewards);
 
     let subnets: Vec<_> = SubnetsData::<T>::iter()
       .filter(|(_, subnet)| subnet.state == SubnetState::Active)
@@ -432,20 +435,26 @@ impl<T: Config> Pallet<T> {
           },
           None => continue,
         };
+        log::error!("v2 weight                {:?}", weight);
 
         let overall_subnet_reward: u128 = Self::percent_mul(rewards, weight);
+        log::error!("v2 overall_subnet_reward {:?}", overall_subnet_reward);
 
         // --- Get owner rewards
         let subnet_owner_reward: u128 = Self::percent_mul(overall_subnet_reward, subnet_owner_percentage);
+        log::error!("v2 subnet_owner_reward   {:?}", subnet_owner_reward);
 
         // --- Get subnet rewards minus owner cut
         let subnet_reward: u128 = overall_subnet_reward.saturating_sub(subnet_owner_reward);
+        log::error!("v2 subnet_reward         {:?}", subnet_reward);
 
         // --- Get delegators rewards
         let delegate_stake_reward: u128 = Self::percent_mul(subnet_reward, delegate_stake_rewards_percentage);
+        log::error!("v2 delegate_stake_reward {:?}", delegate_stake_reward);
 
-        // --- Get subnet nodes rewards
+        // --- Get subnet nodes rewards total
         let subnet_node_reward: u128 = subnet_reward.saturating_sub(delegate_stake_reward);
+        log::error!("v2 subnet_node_reward    {:?}", subnet_node_reward);
 
         // --- Get subnet nodes count to check against attestation count and make sure min nodes are present during time of rewards
         let subnet_nodes: Vec<T::AccountId> = Self::get_classified_hotkeys(*subnet_id, &SubnetNodeClass::Validator, epoch);
@@ -453,6 +462,8 @@ impl<T: Config> Pallet<T> {
 
         // --- Ensure nodes are at min requirement to continue rewards operations
         if subnet_node_count < min_subnet_nodes as u128 {
+          // We don't give penalties here because they will be given in the next step operation when selecting a new
+          // validator
           continue
         }
 
@@ -468,6 +479,7 @@ impl<T: Config> Pallet<T> {
         let validator_subnet_node_id: u32 = submission.validator_id;
 
         let data_len = submission.data.len();
+        log::error!("data_len {:?}", data_len);
 
         /* 
           - Ensures the subnet has enough nodes.
@@ -478,6 +490,10 @@ impl<T: Config> Pallet<T> {
         */
         // If the number of data points (data_len) is less than the required minimum subnet nodes
         if (data_len as u32) < min_subnet_nodes {
+          // --- Subnet no longer submitting consensus
+          //     Increase the penalty count
+          SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| *n += 1);
+          
           // Check if the attestation percentage is below the "vast majority" threshold
           if attestation_percentage < min_vast_majority_attestation_percentage {
             // If the attestation percentage is also below the minimum required threshold, slash the validator
@@ -487,7 +503,10 @@ impl<T: Config> Pallet<T> {
             // Skip further execution and continue to the next iteration
             continue;
           }
-          // Subnet agrees with validators submission, continue
+          // Subnet agrees with validators submission, continue unless results are None
+          if data_len == 0 {
+            continue
+          }
         }
 
         // --- If the minimum required attestation not reached, assume validator is dishonest, slash, and continue
@@ -619,13 +638,12 @@ impl<T: Config> Pallet<T> {
 
           // --- Calculate score percentage of peer versus sum
           let score_percentage: u128 = Self::percent_div(subnet_node_data.score, sum as u128);
+          log::error!("v2 score_percentage:      {:?}", score_percentage);
+
           // --- Calculate score percentage of total subnet generated epoch rewards
           let mut account_reward: u128 = Self::percent_mul(score_percentage, subnet_node_reward);
-
-          // --- Increase reward if validator
-          if subnet_node_id == validator_subnet_node_id {
-            account_reward += Self::get_validator_reward(attestation_percentage);    
-          }
+          log::error!("v2 account_reward:             {:?}", account_reward);
+          log::error!("v2 subnet_node_reward:         {:?}", subnet_node_reward);
 
           // --- Skip if no rewards to give
           // Unlikely to happen
@@ -633,12 +651,19 @@ impl<T: Config> Pallet<T> {
             continue
           }
 
-          let mut node_delegate_reward = 0;
           if subnet_node.delegate_reward_rate != 0 {
+            // --- Ensure users are staked to subnet node
             let total_node_delegated_stake_shares = TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id);
             if total_node_delegated_stake_shares != 0 {
-              node_delegate_reward = Self::percent_mul(account_reward, subnet_node.delegate_reward_rate);
+              log::error!("v2 subnet_node.delegate_reward_rate: {:?}", subnet_node.delegate_reward_rate);
+
+              let node_delegate_reward = Self::percent_mul(account_reward, subnet_node.delegate_reward_rate);
+              log::error!("v2 node_delegate_reward:    {:?}", node_delegate_reward);
+              log::error!("v2 b4 account_reward:       {:?}", account_reward);
+
               account_reward = account_reward - node_delegate_reward;
+              log::error!("v2 a4 account_reward:       {:?}", account_reward);
+
               Self::do_increase_node_delegate_stake(
                 *subnet_id,
                 subnet_node_id,
@@ -647,6 +672,14 @@ impl<T: Config> Pallet<T> {
             }
           }
 
+          // --- Increase reward if validator
+          if subnet_node_id == validator_subnet_node_id {
+            log::error!("attestation_percentage: {:?}", attestation_percentage);
+
+            account_reward += Self::get_validator_reward(attestation_percentage);    
+            log::error!("validator reward here:  {:?}", account_reward);
+          }
+          
           // --- Increase account stake and emit event
           Self::increase_account_stake(
             &hotkey,
@@ -660,8 +693,10 @@ impl<T: Config> Pallet<T> {
           delegate_stake_reward,
         );
 
-        // --- Increment down subnet penalty score on successful epochs
-        SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
+        // --- Increment down subnet penalty score on successful epochs if result were greater than or equal to the min required nodes
+        if data_len as u32 >= min_subnet_nodes {
+          SubnetPenaltyCount::<T>::mutate(subnet_id, |n: &mut u32| n.saturating_dec());
+        }
       } else if let Ok(validator_id) = SubnetRewardsValidator::<T>::try_get(subnet_id, epoch) {
         // --- If a validator has been chosen that means they are supposed to be submitting consensus data
         // --- If there is no submission but validator chosen, increase penalty on subnet and validator

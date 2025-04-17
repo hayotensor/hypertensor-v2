@@ -176,15 +176,91 @@ impl<T: Config> Pallet<T> {
     //
     // * Adjusts the inflation based on network activity using `let inflation_factor`
     // ==========================
-    let total_issuance: f64 = Self::get_total_network_issuance() as f64;
+    // let total_issuance: f64 = Self::get_total_network_issuance() as f64;
+    let total_issuance: f64 = 19536777003861893185536.0;
     let epochs_per_year: f64 = T::EpochsPerYear::get() as f64;
+
+    log::error!("inflation total_issuance: {:?}", total_issuance as u128);
 
     let inflation = Inflation::default();
 
     let year: f64 = epoch as f64 / epochs_per_year;
+    log::error!("inflation year: {:?}", year);
 
     // --- Get current yearly inflation
     let apr: f64 = inflation.total(year);
+    log::error!("inflation apr: {:?}", apr);
+
+    (total_issuance * apr * inflation_factor) as u128
+  }
+
+  pub fn get_epoch_emissions_adj(
+    epoch: u32, 
+    increase_issuance: u128,
+    decrease_issuance: u128,
+  ) -> u128 {
+    let max_subnets: u32 = MaxSubnets::<T>::get();
+    let mut total_activate_subnets: u32 = TotalActiveSubnets::<T>::get();
+    // There can be n+1 subnets at this time before 1 is removed in the epoch steps
+    if total_activate_subnets > max_subnets {
+      total_activate_subnets = max_subnets;
+    }
+
+    // ==========================
+    // --- Get subnet utilization
+    // ==========================
+    let subnet_utilization_rate: f64 = total_activate_subnets as f64 / max_subnets as f64;
+    let adj_subnet_utilization_rate: f64 = Self::pow(
+      subnet_utilization_rate, 
+      Self::get_percent_as_f64(SubnetInflationAdjFactor::<T>::get())
+    ).min(1.0);
+
+    // Max subnet nodes per subnet
+    let max_nodes: u32 = max_subnets.saturating_mul(MaxSubnetNodes::<T>::get());
+    let total_active_nodes: u32 = TotalActiveNodes::<T>::get();
+
+    // ==========================
+    // --- Get subnet node utilization
+    // ==========================
+    let node_utilization_rate: f64 = total_active_nodes as f64 / max_nodes as f64;
+    let adj_node_utilization_rate: f64 = Self::pow(
+      node_utilization_rate, 
+      Self::get_percent_as_f64(SubnetNodeInflationAdjFactor::<T>::get())
+    ).min(1.0);
+
+    // ==========================
+    // --- Get final utilization factors
+    // ==========================
+    // Subnet inflation factor
+    let sif: f64 = Self::get_percent_as_f64(SubnetInflationFactor::<T>::get());
+    // Subnet node inflation factor
+    let snif: f64 = 1.0 - sif;
+
+    let adj_subnet_utilization_rate: f64 = subnet_utilization_rate * sif;
+    let adj_node_utilization_rate: f64 = node_utilization_rate * snif;
+
+    // --- Get percentage of inflation to use in current epoch
+    // This is the network activity factor
+    let inflation_factor: f64 = Self::get_inflation_factor(snif + adj_node_utilization_rate);
+
+    // ==========================
+    // --- Get current epochs total inflation
+    //
+    // * Adjusts the inflation based on network activity using `let inflation_factor`
+    // ==========================
+    let total_issuance: f64 = Self::get_total_network_issuance() as f64 + increase_issuance as f64 - decrease_issuance as f64;
+    let epochs_per_year: f64 = T::EpochsPerYear::get() as f64;
+
+    log::error!("inflation total_issuance: {:?}", total_issuance);
+
+    let inflation = Inflation::default();
+
+    let year: f64 = epoch as f64 / epochs_per_year;
+    log::error!("inflation year: {:?}", year);
+
+    // --- Get current yearly inflation
+    let apr: f64 = inflation.total(year);
+    log::error!("inflation apr: {:?}", apr);
 
     (total_issuance * apr * inflation_factor) as u128
   }
