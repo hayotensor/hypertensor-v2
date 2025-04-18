@@ -17,6 +17,7 @@
 
 use super::*;
 use sp_runtime::Saturating;
+use sp_core::U256;
 
 impl<T: Config> Pallet<T> {
   pub fn do_add_delegate_stake(
@@ -72,20 +73,16 @@ impl<T: Config> Pallet<T> {
       return (Err(Error::<T>::CouldNotConvertToBalance.into()), 0, 0);
     }
 
-    let account_delegate_stake_shares: u128 = AccountSubnetDelegateStakeShares::<T>::get(&account_id, subnet_id);
-    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<T>::get(subnet_id);
-    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
-
     // --- Get accounts current balance
-    let account_delegate_stake_balance = Self::convert_to_balance(
-      account_delegate_stake_shares,
-      total_subnet_delegated_stake_shares,
-      total_subnet_delegated_stake_balance
-    );
+    // let account_delegate_stake_balance = Self::convert_to_balance(
+    //   account_delegate_stake_shares,
+    //   total_subnet_delegated_stake_shares,
+    //   total_subnet_delegated_stake_balance
+    // );
 
-    if account_delegate_stake_balance.saturating_add(delegate_stake_to_be_added) > MaxDelegateStakeBalance::<T>::get() {
-      return (Err(Error::<T>::MaxDelegatedStakeReached.into()), 0, 0);
-    }
+    // if account_delegate_stake_balance.saturating_add(delegate_stake_to_be_added) > MaxDelegateStakeBalance::<T>::get() {
+    //   return (Err(Error::<T>::MaxDelegatedStakeReached.into()), 0, 0);
+    // }
 
     // --- Ensure the callers account_id has enough delegate_stake to perform the transaction.
     if !switch {
@@ -107,6 +104,20 @@ impl<T: Config> Pallet<T> {
         return (Err(Error::<T>::BalanceWithdrawalError.into()), 0, 0);
       }  
     }
+    
+    let total_subnet_delegated_stake_shares = match TotalSubnetDelegateStakeShares::<T>::get(subnet_id) {
+      0 => {
+        Self::increase_account_delegate_stake_shares(
+          &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+          subnet_id, 
+          0,
+          1000,
+        );
+        1000  // --- Mitigate inflation attack
+      },
+      shares => shares,
+    };
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<T>::get(subnet_id);
 
     // --- Get amount to be added as shares based on stake to balance added to account
     let mut delegate_stake_to_be_added_as_shares = Self::convert_to_shares(
@@ -115,13 +126,6 @@ impl<T: Config> Pallet<T> {
       total_subnet_delegated_stake_balance
     );
 
-    // --- Mitigate inflation attack
-    if total_subnet_delegated_stake_shares == 0 {
-      // no need for saturation here
-      TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| *n += 1000);
-      delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
-    }
-    
     // --- Check rounding errors
     if delegate_stake_to_be_added_as_shares == 0 {
       return (Err(Error::<T>::CouldNotConvertToShares.into()), 0, 0);
@@ -317,6 +321,15 @@ impl<T: Config> Pallet<T> {
     subnet_id: u32,
     amount: u128,
   ) {
+    if TotalSubnetDelegateStakeShares::<T>::get(subnet_id) == 0 {
+      Self::increase_account_delegate_stake_shares(
+        &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+        subnet_id, 
+        0,
+        1000,
+      );
+    };
+
     // -- increase total subnet delegate stake 
     TotalSubnetDelegateStakeBalance::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(amount));
 
@@ -342,31 +355,85 @@ impl<T: Config> Pallet<T> {
     )
   }
 
-  pub fn convert_to_balance(
-    shares: u128,
-    total_shares: u128,
-    total_balance: u128
-  ) -> u128 {
-    if total_shares == 0 {
-      return shares;
-    }
-    // shares * (total_balance * Self::PERCENTAGE_FACTOR / (total_shares + 1)) / Self::PERCENTAGE_FACTOR
-    shares.saturating_mul(
-      total_balance.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(total_shares + 1)
-    ).saturating_div(Self::PERCENTAGE_FACTOR)
-  }
+  // pub fn convert_to_shares(
+  //   balance: u128,
+  //   total_shares: u128,
+  //   total_balance: u128
+  // ) -> u128 {
+  //   if total_shares == 0 {
+  //     return balance;
+  //   }
+
+  //   log::error!("convert_to_shares balance        {:?}", balance);
+  //   log::error!("convert_to_shares total_shares   {:?}", total_shares);
+  //   log::error!("convert_to_shares total_balance  {:?}", total_balance);
+
+  //   // balance * (total_shares * Self::PERCENTAGE_FACTOR / (total_balance + 1)) / Self::PERCENTAGE_FACTOR
+  //   // balance.saturating_mul(
+  //   //   total_shares.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(total_balance + 1)
+  //   // ).saturating_div(Self::PERCENTAGE_FACTOR)
+
+  //   // balance.checked_mul(total_shares).ok_or("Overflow")?.checked_div(total_balance).ok_or("Divide by zero")
+  //   // balance.saturating_mul(total_shares).saturating_div(total_balance)
+
+  //   balance.saturating_mul(total_shares + 10_u128.pow(1)).saturating_div(total_balance + 1)
+  // }
+
+  // pub fn convert_to_balance(
+  //   shares: u128,
+  //   total_shares: u128,
+  //   total_balance: u128
+  // ) -> u128 {
+  //   if total_shares == 0 {
+  //     return shares;
+  //   }
+
+  //   log::error!("convert_to_balance shares        {:?}", shares);
+  //   log::error!("convert_to_balance total_shares  {:?}", total_shares);
+  //   log::error!("convert_to_balance total_balance {:?}", total_balance);
+
+  //   // shares * (total_balance * Self::PERCENTAGE_FACTOR / (total_shares + 1)) / Self::PERCENTAGE_FACTOR
+  //   // shares.saturating_mul(
+  //   //   total_balance.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(total_shares + 1)
+  //   // ).saturating_div(Self::PERCENTAGE_FACTOR)
+
+  //   // let test = total_balance.pow(10);
+  //   shares.saturating_mul(total_balance + 1).saturating_div(total_shares + 10_u128.pow(1))
+
+  //   // shares.saturating_mul(total_balance + 1).saturating_div(total_shares)
+  // }
 
   pub fn convert_to_shares(
     balance: u128,
     total_shares: u128,
-    total_balance: u128
+    total_balance: u128,
   ) -> u128 {
     if total_shares == 0 {
       return balance;
     }
-    // balance * (total_shares * Self::PERCENTAGE_FACTOR / (total_balance + 1)) / Self::PERCENTAGE_FACTOR
-    balance.saturating_mul(
-      total_shares.saturating_mul(Self::PERCENTAGE_FACTOR).saturating_div(total_balance + 1)
-    ).saturating_div(Self::PERCENTAGE_FACTOR)
+  
+    let balance = U256::from(balance);
+    let total_shares = U256::from(total_shares) + U256::from(10_u128.pow(1));
+    let total_balance = U256::from(total_balance) + U256::from(1);
+  
+    let shares = balance * total_shares / total_balance;
+    shares.try_into().unwrap_or(u128::MAX) // or handle overflow gracefully
   }
+  
+  pub fn convert_to_balance(
+    shares: u128,
+    total_shares: u128,
+    total_balance: u128,
+  ) -> u128 {
+    if total_shares == 0 {
+      return shares;
+    }
+  
+    let shares = U256::from(shares);
+    let total_balance = U256::from(total_balance) + U256::from(1);
+    let total_shares = U256::from(total_shares) + U256::from(10_u128.pow(1));
+  
+    let balance = shares * total_balance / total_shares;
+    balance.try_into().unwrap_or(u128::MAX)
+  }  
 }

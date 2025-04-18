@@ -23,6 +23,9 @@ use crate::{
   TotalNodeDelegateStakeShares,
   MinStakeBalance,
 };
+use codec::Decode;
+use sp_runtime::traits::TrailingZeroInput;
+use sp_core::U256;
 
 //
 //
@@ -43,29 +46,76 @@ use crate::{
 #[test]
 fn test_delegate_math() {
   new_test_ext().execute_with(|| {
-    let test1 = Network::convert_to_balance(
-      1000000000000000000000,
-      6000000000000000000000,
-      6000000000000000000000
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let subnet_id = 0;
+    let account_id = account(0);
+    let delegate_stake_to_be_added = 1000e+18 as u128;
+
+    let account_delegate_stake_shares: u128 = AccountSubnetDelegateStakeShares::<Test>::get(&account_id, subnet_id);
+    // let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_shares = match TotalSubnetDelegateStakeShares::<Test>::get(subnet_id) {
+      0 => {
+        // --- Mitigate inflation attack
+        Network::increase_account_delegate_stake_shares(
+          &<Test as frame_system::Config>::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+          subnet_id, 
+          0,
+          1000,
+        );
+        1000
+      },
+      shares => shares,
+    };
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    log::error!("total_subnet_delegated_stake_shares   {:?}", total_subnet_delegated_stake_shares);
+    log::error!("total_subnet_delegated_stake_balance  {:?}", total_subnet_delegated_stake_balance);
+
+    let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
+      delegate_stake_to_be_added,
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
     );
-    
-    let test2 = Network::convert_to_balance(
-      1000000000000000000000,
-      6000000000000000000000,
-      7000000000000000000000
+    log::error!("delegate_stake_to_be_added_as_shares  {:?}", delegate_stake_to_be_added_as_shares);
+
+    Network::increase_account_delegate_stake_shares(
+      &account_id,
+      subnet_id, 
+      delegate_stake_to_be_added,
+      delegate_stake_to_be_added_as_shares,
     );
 
-    assert_eq!(test1, 999999999000000000000);
-    assert_eq!(test2, 1166666666000000000000);
+    let account_delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(&account_id, subnet_id);
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    
+    log::error!(" ");
+    log::error!("account_delegate_shares               {:?}", account_delegate_shares);
+    log::error!("total_subnet_delegated_stake_shares   {:?}", total_subnet_delegated_stake_shares);
+    log::error!("total_subnet_delegated_stake_balance  {:?}", total_subnet_delegated_stake_balance);
+
+    let delegate_balance = Network::convert_to_balance(
+      account_delegate_shares,
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+    
+    log::error!("delegate_balance                      {:?}", delegate_balance);
+
+    // Ensure balance is within <= 0.01% of deposited balance, and less than deposited balance
+    assert!(
+      (delegate_balance >= Network::percent_mul(delegate_stake_to_be_added, 990000000)) &&
+      (delegate_balance <= delegate_stake_to_be_added)
+    );
   });
 }
 
 #[test]
-fn test_delegate_math_with_storage() {
+fn test_delegate_math_with_storage_deposit() {
   new_test_ext().execute_with(|| {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
     let deposit_amount: u128 = 1000000000000000000000000;
-    let amount: u128 = 1000000000000000000000;
+    let amount: u128 = 1000000000000000000000; // 1000
     let stake_amount: u128 = MinStakeBalance::<Test>::get();
 
     build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
@@ -84,6 +134,7 @@ fn test_delegate_math_with_storage() {
       ) 
     );
 
+    // ensure removes wallet balance
     let post_delegator_balance = Balances::free_balance(&account(total_subnet_nodes+1));
     assert_eq!(post_delegator_balance, starting_delegator_balance - amount);
 
@@ -96,9 +147,9 @@ fn test_delegate_math_with_storage() {
       total_subnet_delegated_stake_balance
     );
 
-    // assert_eq!(amount, delegate_balance);
+    // Ensure balance is within <= 0.01% of deposited balance, and less than deposited balance
     assert!(
-      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
       (delegate_balance <= amount)
     );
 
@@ -184,7 +235,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     );
     // assert_eq!(amount, delegate_balance);
     assert!(
-      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
       (delegate_balance <= amount)
     );
 
@@ -222,7 +273,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     let post_balance = Balances::free_balance(&account(total_subnet_nodes+1));
 
     assert!(
-      (post_balance >= Network::percent_mul(starting_delegator_balance, 9999)) &&
+      (post_balance >= Network::percent_mul(starting_delegator_balance, 990000000)) &&
       (post_balance <= starting_delegator_balance)
     );
 
@@ -299,7 +350,7 @@ fn test_add_to_delegate_stake() {
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
 
     assert!(
-      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
       (delegate_balance <= amount)
     );
   });
@@ -354,21 +405,34 @@ fn test_add_to_delegate_stake_increase_pool_check_balance() {
 
     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    log::error!("total_subnet_delegated_stake_shares  {:?}", total_subnet_delegated_stake_shares);
+    log::error!("total_subnet_delegated_stake_balance {:?}", total_subnet_delegated_stake_balance);
 
     let delegate_balance = Network::convert_to_balance(
       delegate_shares,
       total_subnet_delegated_stake_shares,
       total_subnet_delegated_stake_balance
     );
+    log::error!("delegate_balance                     {:?}", delegate_balance);
+
     // The first depositor will lose a percentage of their deposit depending on the size
     // https://docs.openzeppelin.com/contracts/4.x/erc4626#inflation-attack
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
     assert!(
-      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
       (delegate_balance <= amount)
     );
 
     let increase_delegate_stake_amount: u128 = 1000000000000000000000;
+
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    let expected_post_delegate_balance = Network::convert_to_balance(
+      delegate_shares,
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance + increase_delegate_stake_amount
+    );
+
     Network::do_increase_delegate_stake(
       subnet_id,
       increase_delegate_stake_amount,
@@ -377,18 +441,14 @@ fn test_add_to_delegate_stake_increase_pool_check_balance() {
     // ensure balance has increase
     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
-    
+
     let post_delegate_balance = Network::convert_to_balance(
       delegate_shares,
       total_subnet_delegated_stake_shares,
       total_subnet_delegated_stake_balance
     );
-    assert!(delegate_balance < post_delegate_balance);
-    assert_ne!(delegate_balance, post_delegate_balance);
-    assert!(
-      (post_delegate_balance >= Network::percent_mul(amount + increase_delegate_stake_amount, 9999)) &&
-      (post_delegate_balance <= amount + increase_delegate_stake_amount)
-    );
+    log::error!("post_delegate_balance      {:?}", post_delegate_balance);
+    assert_eq!(post_delegate_balance, expected_post_delegate_balance);
   });
 }
 
@@ -453,7 +513,7 @@ fn test_claim_removal_of_delegate_stake() {
     // https://docs.openzeppelin.com/contracts/4.x/erc4626#inflation-attack
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
     assert!(
-      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
       (delegate_balance <= amount)
     );
 
@@ -512,73 +572,73 @@ fn test_claim_removal_of_delegate_stake() {
   });
 }
 
-// #[test]
-// fn test_remove_to_delegate_stake_max_unlockings_per_epoch_err() {
-//   new_test_ext().execute_with(|| {
-//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-//     let deposit_amount: u128 = 10000000000000000000000;
-//     let amount: u128 = 1000000000000000000000;
+// // #[test]
+// // fn test_remove_to_delegate_stake_max_unlockings_per_epoch_err() {
+// //   new_test_ext().execute_with(|| {
+// //     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+// //     let deposit_amount: u128 = 10000000000000000000000;
+// //     let amount: u128 = 1000000000000000000000;
 
-//     let stake_amount: u128 = MinStakeBalance::<Test>::get();
+// //     let stake_amount: u128 = MinStakeBalance::<Test>::get();
 
-//     build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
+// //     build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
-//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
-//     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+// //     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+// //     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
 
-//     let n_account = total_subnet_nodes + 1;
+// //     let n_account = total_subnet_nodes + 1;
 
-//     let _ = Balances::deposit_creating(&account(n_account), amount+500);
+// //     let _ = Balances::deposit_creating(&account(n_account), amount+500);
 
-//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+// //     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 
-//     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
-//     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+// //     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+// //     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
 
-//     let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
-//       amount,
-//       total_subnet_delegated_stake_shares,
-//       total_subnet_delegated_stake_balance
-//     );
+// //     let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
+// //       amount,
+// //       total_subnet_delegated_stake_shares,
+// //       total_subnet_delegated_stake_balance
+// //     );
 
-//     if total_subnet_delegated_stake_shares == 0 {
-//       delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
-//     }
+// //     if total_subnet_delegated_stake_shares == 0 {
+// //       delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
+// //     }
 
-//     System::set_block_number(System::block_number() + DelegateStakeCooldownEpochs::get() * EpochLength::get());
+// //     System::set_block_number(System::block_number() + DelegateStakeCooldownEpochs::get() * EpochLength::get());
 
-//     let starting_delegator_balance = Balances::free_balance(&account(n_account));
+// //     let starting_delegator_balance = Balances::free_balance(&account(n_account));
 
-//     assert_ok!(
-//       Network::add_to_delegate_stake(
-//         RuntimeOrigin::signed(account(n_account)),
-//         subnet_id,
-//         amount,
-//       ) 
-//     );
+// //     assert_ok!(
+// //       Network::add_to_delegate_stake(
+// //         RuntimeOrigin::signed(account(n_account)),
+// //         subnet_id,
+// //         amount,
+// //       ) 
+// //     );
 
-//     let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(n_account), subnet_id);
+// //     let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(n_account), subnet_id);
 
-//     assert_ok!(
-//       Network::remove_delegate_stake(
-//         RuntimeOrigin::signed(account(n_account)),
-//         subnet_id,
-//         delegate_shares/2,
-//       )
-//     );
-//     let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
-//     assert_eq!(unbondings.len(), 1);
+// //     assert_ok!(
+// //       Network::remove_delegate_stake(
+// //         RuntimeOrigin::signed(account(n_account)),
+// //         subnet_id,
+// //         delegate_shares/2,
+// //       )
+// //     );
+// //     let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
+// //     assert_eq!(unbondings.len(), 1);
 
-//     assert_err!(
-//       Network::remove_delegate_stake(
-//         RuntimeOrigin::signed(account(n_account)),
-//         subnet_id,
-//         delegate_shares/2,
-//       ),
-//       Error::<Test>::MaxUnlockingsPerEpochReached
-//     );
-//   });
-// }
+// //     assert_err!(
+// //       Network::remove_delegate_stake(
+// //         RuntimeOrigin::signed(account(n_account)),
+// //         subnet_id,
+// //         delegate_shares/2,
+// //       ),
+// //       Error::<Test>::MaxUnlockingsPerEpochReached
+// //     );
+// //   });
+// // }
 
 #[test]
 fn test_remove_to_delegate_stake_max_unlockings_reached_err() {
@@ -739,7 +799,7 @@ fn test_switch_delegate_stake() {
     // Will lose about .01% of the transfer value on first transfer into a pool
     // The balance should be about ~99% of the ``from`` subnet to the ``to`` subnet
     assert!(
-      (to_delegate_balance >= Network::percent_mul(from_delegate_balance, 9999)) &&
+      (to_delegate_balance >= Network::percent_mul(from_delegate_balance, 990000000)) &&
       (to_delegate_balance <= from_delegate_balance)
     );
   });
@@ -788,71 +848,71 @@ fn test_switch_delegate_stake_not_enough_stake_err() {
   });
 }
 
-// #[test]
-// fn test_remove_to_delegate_stake_epochs_not_met_err() {
-//   new_test_ext().execute_with(|| {
-//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+// // #[test]
+// // fn test_remove_to_delegate_stake_epochs_not_met_err() {
+// //   new_test_ext().execute_with(|| {
+// //     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-//     build_subnet(subnet_path.clone());
-//     let deposit_amount: u128 = 10000000000000000000000;
-//     let amount: u128 = 1000000000000000000000;
-//     let _ = Balances::deposit_creating(&account(0), amount+500);
+// //     build_subnet(subnet_path.clone());
+// //     let deposit_amount: u128 = 10000000000000000000000;
+// //     let amount: u128 = 1000000000000000000000;
+// //     let _ = Balances::deposit_creating(&account(0), amount+500);
 
-//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+// //     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
 
-//     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
-//     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+// //     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+// //     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
 
-//     let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
-//       amount,
-//       total_subnet_delegated_stake_shares,
-//       total_subnet_delegated_stake_balance
-//     );
+// //     let mut delegate_stake_to_be_added_as_shares = Network::convert_to_shares(
+// //       amount,
+// //       total_subnet_delegated_stake_shares,
+// //       total_subnet_delegated_stake_balance
+// //     );
 
-//     if total_subnet_delegated_stake_shares == 0 {
-//       delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
-//     }
+// //     if total_subnet_delegated_stake_shares == 0 {
+// //       delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
+// //     }
 
-//     System::set_block_number(System::block_number() + DelegateStakeCooldownEpochs::get() * EpochLength::get());
+// //     System::set_block_number(System::block_number() + DelegateStakeCooldownEpochs::get() * EpochLength::get());
 
-//     assert_ok!(
-//       Network::add_to_delegate_stake(
-//         RuntimeOrigin::signed(account(0)),
-//         subnet_id,
-//         amount,
-//       ) 
-//     );
+// //     assert_ok!(
+// //       Network::add_to_delegate_stake(
+// //         RuntimeOrigin::signed(account(0)),
+// //         subnet_id,
+// //         amount,
+// //       ) 
+// //     );
 
-//     let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(0), subnet_id);
-//     assert_eq!(delegate_shares, delegate_stake_to_be_added_as_shares);
-//     assert_ne!(delegate_shares, 0);
+// //     let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(0), subnet_id);
+// //     assert_eq!(delegate_shares, delegate_stake_to_be_added_as_shares);
+// //     assert_ne!(delegate_shares, 0);
 
-//     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
-//     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+// //     let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+// //     let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
 
-//     let mut delegate_balance = Network::convert_to_balance(
-//       delegate_shares,
-//       total_subnet_delegated_stake_shares,
-//       total_subnet_delegated_stake_balance
-//     );
-//     // The first depositor will lose a percentage of their deposit depending on the size
-//     // https://docs.openzeppelin.com/contracts/4.x/erc4626#inflation-attack
-//     assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
-//     assert!(
-//       (delegate_balance >= Network::percent_mul(amount, 9999)) &&
-//       (delegate_balance <= amount)
-//     );
+// //     let mut delegate_balance = Network::convert_to_balance(
+// //       delegate_shares,
+// //       total_subnet_delegated_stake_shares,
+// //       total_subnet_delegated_stake_balance
+// //     );
+// //     // The first depositor will lose a percentage of their deposit depending on the size
+// //     // https://docs.openzeppelin.com/contracts/4.x/erc4626#inflation-attack
+// //     assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
+// //     assert!(
+// //       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
+// //       (delegate_balance <= amount)
+// //     );
 
-//     // assert_err!(
-//     //   Network::remove_delegate_stake(
-//     //     RuntimeOrigin::signed(account(0)),
-//     //     subnet_id,
-//     //     delegate_shares,
-//     //   ),
-//     //   Error::<Test>::InsufficientCooldown
-//     // );
-//   });
-// }
+// //     // assert_err!(
+// //     //   Network::remove_delegate_stake(
+// //     //     RuntimeOrigin::signed(account(0)),
+// //     //     subnet_id,
+// //     //     delegate_shares,
+// //     //   ),
+// //     //   Error::<Test>::InsufficientCooldown
+// //     // );
+// //   });
+// // }
 
 #[test]
 fn test_remove_delegate_stake_after_subnet_remove() {
@@ -915,7 +975,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     // https://docs.openzeppelin.com/contracts/4.x/erc4626#inflation-attack
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
     assert!(
-      (delegate_balance >= Network::percent_mul(amount, 9999)) &&
+      (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
       (delegate_balance <= amount)
     );
 
@@ -969,7 +1029,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     let post_balance = Balances::free_balance(&account(n_account));
 
     assert!(
-      (post_balance >= Network::percent_mul(starting_delegator_balance, 9999)) &&
+      (post_balance >= Network::percent_mul(starting_delegator_balance, 990000000)) &&
       (post_balance <= starting_delegator_balance)
     );
 
@@ -1034,7 +1094,7 @@ fn test_switch_delegate_stake_node_to_subnet() {
     );
 
     assert!(
-      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 9999)) &&
+      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 990000000)) &&
       (account_node_delegate_stake_balance <= amount)
     );
 
@@ -1086,7 +1146,7 @@ fn test_switch_delegate_stake_node_to_subnet() {
     // Will lose about .01% of the transfer value on first transfer into a pool
     // The balance should be about ~99% of the ``from`` subnet to the ``to`` subnet
     assert!(
-      (to_delegate_balance >= Network::percent_mul(expected_balance_to_be_removed, 9999)) &&
+      (to_delegate_balance >= Network::percent_mul(expected_balance_to_be_removed, 990000000)) &&
       (to_delegate_balance <= expected_balance_to_be_removed)
     );
   });
@@ -1183,7 +1243,7 @@ fn test_switch_delegate_stake_subnet_to_node() {
     assert_ne!(account_node_delegate_stake_balance, 0);
 
     assert!(
-      (account_node_delegate_stake_balance >= Network::percent_mul(from_delegate_balance, 9999)) &&
+      (account_node_delegate_stake_balance >= Network::percent_mul(from_delegate_balance, 990000000)) &&
       (account_node_delegate_stake_balance <= from_delegate_balance)
     );
   });

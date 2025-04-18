@@ -2440,6 +2440,8 @@ pub mod pallet {
 		/// * `subnet_id` - Subnet ID to increase delegate pool balance of.
 		/// * `amount` - Amount TENSOR to add to pool
 		///
+		///
+		/// TODO: Change name of function to avoid delegate staking confusions
 		#[pallet::call_index(19)]
 		#[pallet::weight({0})]
 		pub fn increase_delegate_stake(

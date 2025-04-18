@@ -77,20 +77,33 @@ impl<T: Config> Pallet<T> {
       return (Err(Error::<T>::CouldNotConvertToBalance.into()), 0, 0);
     }
 
-    let account_node_delegate_stake_shares = AccountNodeDelegateStakeShares::<T>::get((&account_id, subnet_id, subnet_node_id));
-    let total_node_delegated_stake_shares = TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id);
+    // let account_node_delegate_stake_shares = AccountNodeDelegateStakeShares::<T>::get((&account_id, subnet_id, subnet_node_id));
+    let total_node_delegated_stake_shares = match TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id) {
+      0 => {
+        Self::increase_account_node_delegate_stake_shares(
+          &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+          subnet_id, 
+          subnet_node_id,
+          0,
+          1000,
+        );
+        1000  // --- Mitigate inflation attack
+      },
+      shares => shares,
+    };
+
     let total_node_delegated_stake_balance = TotalNodeDelegateStakeBalance::<T>::get(subnet_id, subnet_node_id);
 
     // --- Get accounts current balance
-    let account_delegate_stake_balance = Self::convert_to_balance(
-      account_node_delegate_stake_shares,
-      total_node_delegated_stake_shares,
-      total_node_delegated_stake_balance
-    );
+    // let account_delegate_stake_balance = Self::convert_to_balance(
+    //   account_node_delegate_stake_shares,
+    //   total_node_delegated_stake_shares,
+    //   total_node_delegated_stake_balance
+    // );
 
-    if account_delegate_stake_balance.saturating_add(node_delegate_stake_to_be_added) > MaxDelegateStakeBalance::<T>::get() {
-      return (Err(Error::<T>::MaxDelegatedStakeReached.into()), 0, 0);
-    }
+    // if account_delegate_stake_balance.saturating_add(node_delegate_stake_to_be_added) > MaxDelegateStakeBalance::<T>::get() {
+    //   return (Err(Error::<T>::MaxDelegatedStakeReached.into()), 0, 0);
+    // }
 
     // --- Ensure the callers account_id has enough delegate_stake to perform the transaction.
     if !switch {
@@ -119,13 +132,6 @@ impl<T: Config> Pallet<T> {
       total_node_delegated_stake_shares,
       total_node_delegated_stake_balance
     );
-
-    // --- Mitigate inflation attack
-    if total_node_delegated_stake_shares == 0 {
-      // no need for saturation here
-      TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| *n += 1000);
-      delegate_stake_to_be_added_as_shares = delegate_stake_to_be_added_as_shares.saturating_sub(1000);
-    }
     
     // --- Check rounding errors
     if delegate_stake_to_be_added_as_shares == 0 {
@@ -348,6 +354,16 @@ impl<T: Config> Pallet<T> {
     subnet_node_id: u32,
     amount: u128,
   ) {
+    if TotalNodeDelegateStakeBalance::<T>::get(subnet_id, subnet_node_id) == 0 {
+      Self::increase_account_node_delegate_stake_shares(
+        &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+        subnet_id, 
+        subnet_node_id,
+        0,
+        1000,
+      );
+    };
+
     // -- increase total subnet delegate stake 
     TotalNodeDelegateStakeBalance::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(amount));
 

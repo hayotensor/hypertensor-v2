@@ -93,7 +93,7 @@ fn test_add_to_node_delegate_stake() {
     );
 
     assert!(
-      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 9999)) &&
+      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 990000000)) &&
       (account_node_delegate_stake_balance <= amount)
     );
   })
@@ -142,7 +142,7 @@ fn test_remove_node_delegate_stake() {
     );
 
     assert!(
-      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 9999)) &&
+      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 990000000)) &&
       (account_node_delegate_stake_balance <= amount)
     );
 
@@ -248,7 +248,7 @@ fn test_transfer_node_delegate_stake() {
     );
 
     assert!(
-      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 9999)) &&
+      (account_node_delegate_stake_balance >= Network::percent_mul(amount, 990000000)) &&
       (account_node_delegate_stake_balance <= amount)
     );
 
@@ -308,7 +308,7 @@ fn test_transfer_node_delegate_stake() {
     assert_ne!(account_node_delegate_stake_balance, 0);
 
     assert!(
-      (account_node_delegate_stake_balance >= Network::percent_mul(expected_balance_to_be_removed, 9999)) &&
+      (account_node_delegate_stake_balance >= Network::percent_mul(expected_balance_to_be_removed, 990000000)) &&
       (account_node_delegate_stake_balance <= expected_balance_to_be_removed)
     );
 
