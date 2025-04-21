@@ -106,13 +106,9 @@ impl<T: Config> Pallet<T> {
     
     let total_subnet_delegated_stake_shares = match TotalSubnetDelegateStakeShares::<T>::get(subnet_id) {
       0 => {
-        Self::increase_account_delegate_stake_shares(
-          &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
-          subnet_id, 
-          0,
-          1000,
-        );
-        1000  // --- Mitigate inflation attack
+         // --- Mitigate inflation attack
+        TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(1000));
+        0
       },
       shares => shares,
     };
@@ -320,13 +316,10 @@ impl<T: Config> Pallet<T> {
     subnet_id: u32,
     amount: u128,
   ) {
-    if TotalSubnetDelegateStakeShares::<T>::get(subnet_id) == 0 {
-      Self::increase_account_delegate_stake_shares(
-        &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
-        subnet_id, 
-        0,
-        1000,
-      );
+    if TotalSubnetDelegateStakeBalance::<T>::get(subnet_id) == 0 || 
+      TotalSubnetDelegateStakeShares::<T>::get(subnet_id) == 0 
+    {
+      TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(1000));
     };
 
     // -- increase total subnet delegate stake 

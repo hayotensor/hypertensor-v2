@@ -57,13 +57,14 @@ fn test_delegate_math() {
     let total_subnet_delegated_stake_shares = match TotalSubnetDelegateStakeShares::<Test>::get(subnet_id) {
       0 => {
         // --- Mitigate inflation attack
-        Network::increase_account_delegate_stake_shares(
-          &<Test as frame_system::Config>::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
-          subnet_id, 
-          0,
-          1000,
-        );
-        1000
+        // Network::increase_account_delegate_stake_shares(
+        //   &<Test as frame_system::Config>::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
+        //   subnet_id, 
+        //   0,
+        //   1000,
+        // );
+        TotalSubnetDelegateStakeShares::<Test>::mutate(subnet_id, |mut n| *n += 10000);
+        0
       },
       shares => shares,
     };
@@ -105,8 +106,15 @@ fn test_delegate_math() {
     // Ensure balance is within <= 0.01% of deposited balance, and less than deposited balance
     assert!(
       (delegate_balance >= Network::percent_mul(delegate_stake_to_be_added, 990000000)) &&
-      (delegate_balance <= delegate_stake_to_be_added)
+      (delegate_balance < delegate_stake_to_be_added)
     );
+
+    let delegate_balance2 = Network::convert_to_balance(
+      account_delegate_shares,
+      total_subnet_delegated_stake_shares + 9000,
+      total_subnet_delegated_stake_balance
+    );
+    log::error!("delegate_balance2                     {:?}", delegate_balance2);
   });
 }
 
@@ -150,7 +158,7 @@ fn test_delegate_math_with_storage_deposit() {
     // Ensure balance is within <= 0.01% of deposited balance, and less than deposited balance
     assert!(
       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-      (delegate_balance <= amount)
+      (delegate_balance < amount)
     );
 
     let pre_balance = Balances::free_balance(&account(total_subnet_nodes+1));
@@ -236,7 +244,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
     // assert_eq!(amount, delegate_balance);
     assert!(
       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-      (delegate_balance <= amount)
+      (delegate_balance < amount)
     );
 
     assert_ok!(
@@ -274,7 +282,7 @@ fn test_remove_claim_delegate_stake_after_remove_subnet() {
 
     assert!(
       (post_balance >= Network::percent_mul(starting_delegator_balance, 990000000)) &&
-      (post_balance <= starting_delegator_balance)
+      (post_balance < starting_delegator_balance)
     );
 
     let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(total_subnet_nodes+1));
@@ -351,7 +359,7 @@ fn test_add_to_delegate_stake() {
 
     assert!(
       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-      (delegate_balance <= amount)
+      (delegate_balance < amount)
     );
   });
 }
@@ -420,7 +428,7 @@ fn test_add_to_delegate_stake_increase_pool_check_balance() {
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
     assert!(
       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-      (delegate_balance <= amount)
+      (delegate_balance < amount)
     );
 
     let increase_delegate_stake_amount: u128 = 1000000000000000000000;
@@ -514,7 +522,7 @@ fn test_claim_removal_of_delegate_stake() {
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
     assert!(
       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-      (delegate_balance <= amount)
+      (delegate_balance < amount)
     );
 
     let epoch_length = EpochLength::get();
@@ -800,7 +808,7 @@ fn test_switch_delegate_stake() {
     // The balance should be about ~99% of the ``from`` subnet to the ``to`` subnet
     assert!(
       (to_delegate_balance >= Network::percent_mul(from_delegate_balance, 990000000)) &&
-      (to_delegate_balance <= from_delegate_balance)
+      (to_delegate_balance < from_delegate_balance)
     );
   });
 }
@@ -900,7 +908,7 @@ fn test_switch_delegate_stake_not_enough_stake_err() {
 // //     assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
 // //     assert!(
 // //       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-// //       (delegate_balance <= amount)
+// //       (delegate_balance < amount)
 // //     );
 
 // //     // assert_err!(
@@ -976,7 +984,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
     // assert_eq!(delegate_balance, delegate_stake_to_be_added_as_shares);
     assert!(
       (delegate_balance >= Network::percent_mul(amount, 990000000)) &&
-      (delegate_balance <= amount)
+      (delegate_balance < amount)
     );
 
     let epoch_length = EpochLength::get();
@@ -1030,7 +1038,7 @@ fn test_remove_delegate_stake_after_subnet_remove() {
 
     assert!(
       (post_balance >= Network::percent_mul(starting_delegator_balance, 990000000)) &&
-      (post_balance <= starting_delegator_balance)
+      (post_balance < starting_delegator_balance)
     );
 
     let unbondings: BTreeMap<u32, u128> = StakeUnbondingLedger::<Test>::get(account(n_account));
@@ -1095,7 +1103,7 @@ fn test_switch_delegate_stake_node_to_subnet() {
 
     assert!(
       (account_node_delegate_stake_balance >= Network::percent_mul(amount, 990000000)) &&
-      (account_node_delegate_stake_balance <= amount)
+      (account_node_delegate_stake_balance < amount)
     );
 
     let account_node_delegate_stake_shares_to_be_removed = account_node_delegate_stake_shares / 2;
@@ -1147,7 +1155,7 @@ fn test_switch_delegate_stake_node_to_subnet() {
     // The balance should be about ~99% of the ``from`` subnet to the ``to`` subnet
     assert!(
       (to_delegate_balance >= Network::percent_mul(expected_balance_to_be_removed, 990000000)) &&
-      (to_delegate_balance <= expected_balance_to_be_removed)
+      (to_delegate_balance < expected_balance_to_be_removed)
     );
   });
 }
@@ -1244,7 +1252,7 @@ fn test_switch_delegate_stake_subnet_to_node() {
 
     assert!(
       (account_node_delegate_stake_balance >= Network::percent_mul(from_delegate_balance, 990000000)) &&
-      (account_node_delegate_stake_balance <= from_delegate_balance)
+      (account_node_delegate_stake_balance < from_delegate_balance)
     );
   });
 }

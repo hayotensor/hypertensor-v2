@@ -80,14 +80,9 @@ impl<T: Config> Pallet<T> {
     // let account_node_delegate_stake_shares = AccountNodeDelegateStakeShares::<T>::get((&account_id, subnet_id, subnet_node_id));
     let total_node_delegated_stake_shares = match TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id) {
       0 => {
-        Self::increase_account_node_delegate_stake_shares(
-          &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
-          subnet_id, 
-          subnet_node_id,
-          0,
-          1000,
-        );
-        1000  // --- Mitigate inflation attack
+        // --- Mitigate inflation attack
+        TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(1000));
+        0
       },
       shares => shares,
     };
@@ -262,6 +257,16 @@ impl<T: Config> Pallet<T> {
     (Ok(()), node_delegate_stake_to_be_removed, node_delegate_stake_shares_to_be_removed)
   }
 
+  /// Switch delegate staking between subnet nodes
+  ///
+  /// # Arguments
+  ///
+  /// * `from_subnet_id` - Subnet ID unstaking from in relation to subnet node ID.
+  /// * `from_subnet_node_id` - Subnet node ID unstaking from .
+  /// * `to_subnet_id` - Subnet ID adding staking to from in relation to subnet node ID.
+  /// * `to_subnet_node_id` - Subnet node ID adding stake to.
+  /// * `node_delegate_stake_shares_to_be_switched` - Shares to remove to then be added as converted balance
+  ///
   pub fn do_switch_node_delegate_stake(
     origin: T::RuntimeOrigin, 
     from_subnet_id: u32,
@@ -272,6 +277,7 @@ impl<T: Config> Pallet<T> {
   ) -> DispatchResult {
     let account_id: T::AccountId = ensure_signed(origin)?;
 
+    // --- Remove
     let (result, node_delegate_stake_to_be_transferred, _) = Self::perform_do_remove_node_delegate_stake(
       &account_id,
       from_subnet_id,
@@ -354,14 +360,10 @@ impl<T: Config> Pallet<T> {
     subnet_node_id: u32,
     amount: u128,
   ) {
-    if TotalNodeDelegateStakeBalance::<T>::get(subnet_id, subnet_node_id) == 0 {
-      Self::increase_account_node_delegate_stake_shares(
-        &T::AccountId::decode(&mut TrailingZeroInput::zeroes()).unwrap(),
-        subnet_id, 
-        subnet_node_id,
-        0,
-        1000,
-      );
+    if TotalNodeDelegateStakeBalance::<T>::get(subnet_id, subnet_node_id) == 0 || 
+      TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id) == 0 
+    {
+      TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(1000));
     };
 
     // -- increase total subnet delegate stake 
