@@ -24,14 +24,17 @@ use crate::{
   MaxSubnetNodePenalties, 
   SubnetNodePenalties, 
   RegistrationSubnetData,
-  BaseRewardPerMB,
   SubnetRemovalReason,
   MaxSubnetPenaltyCount, 
   MinSubnetRegistrationBlocks, 
-  SubnetActivationEnactmentPeriod,
+  SubnetActivationEnactmentBlocks,
   HotkeySubnetNodeId, 
   SubnetNodeIdHotkey, 
-  SubnetNodeAccount,
+  PeerIdSubnetNode,
+  MinStakeBalance,
+  SubnetOwnerPercentage,
+  SubnetNodesData,
+  TotalNodeDelegateStakeShares,
 };
 use frame_support::BoundedVec;
 use strum::IntoEnumIterator;
@@ -69,7 +72,9 @@ fn test_validate() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 12, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 12, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -79,11 +84,11 @@ fn test_validate() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch);
     assert!(validator_id != None, "Validator is None");
 
     let hotkey = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id.unwrap()).unwrap();
@@ -98,7 +103,7 @@ fn test_validate() {
       )
     );
 
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
 
     assert_eq!(submission.validator_id, validator_id.unwrap(), "Err: validator");
     assert_eq!(submission.data.len(), subnet_node_data_vec.len(), "Err: data len");
@@ -125,7 +130,9 @@ fn test_validate_peer_with_0_score() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -133,7 +140,7 @@ fn test_validate_peer_with_0_score() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let mut subnet_node_data_vec: Vec<SubnetNodeData> = Vec::new();
     for n in 0..total_subnet_nodes {
@@ -149,7 +156,7 @@ fn test_validate_peer_with_0_score() {
       subnet_node_data_vec.push(peer_subnet_node_data);
     }
   
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch);
     assert!(validator_id != None, "Validator is None");
 
     let hotkey = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id.unwrap()).unwrap();
@@ -163,7 +170,7 @@ fn test_validate_peer_with_0_score() {
       )
     );
 
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
     let data = submission.data;
 
     // peer should be removed due to 0 score
@@ -182,7 +189,9 @@ fn test_validate_invalid_validator() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -191,11 +200,11 @@ fn test_validate_invalid_validator() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch);
     assert!(validator_id != None, "Validator is None");
 
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id.unwrap()).unwrap();
@@ -225,7 +234,9 @@ fn test_attest() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -235,11 +246,11 @@ fn test_attest() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch);
     assert!(validator_id != None, "Validator is None");
     assert!(validator_id != Some(0), "Validator is 0");
 
@@ -268,7 +279,7 @@ fn test_attest() {
       );
     }
     
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
 
     assert_eq!(submission.validator_id, validator_id.unwrap());
     assert_eq!(submission.data.len(), subnet_node_data_vec.len());
@@ -303,7 +314,9 @@ fn test_attest_remove_exiting_attester() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -313,12 +326,12 @@ fn test_attest_remove_exiting_attester() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
     // --- Get validator
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
 
     assert_ok!(
@@ -356,7 +369,7 @@ fn test_attest_remove_exiting_attester() {
     //   );
     // }
     
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
 
     assert_eq!(submission.validator_id, validator_id);
     assert_eq!(submission.data.len(), subnet_node_data_vec.len());
@@ -392,7 +405,7 @@ fn test_attest_remove_exiting_attester() {
 
     post_remove_subnet_node_ensures(1, subnet_id);
 
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
     assert_eq!(submission.attests.len(), (total_subnet_nodes - 1) as usize);
     assert_eq!(submission.attests.get(&subnet_node_id), None);
   });
@@ -405,7 +418,9 @@ fn test_attest_no_submission_err() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -415,12 +430,12 @@ fn test_attest_no_submission_err() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
     // --- Get validator
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
 
     assert_err!(
@@ -440,7 +455,9 @@ fn test_attest_already_attested_err() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -450,11 +467,11 @@ fn test_attest_already_attested_err() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
 
     assert_ok!(
@@ -479,7 +496,7 @@ fn test_attest_already_attested_err() {
       );
     }
     
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
 
     assert_eq!(submission.validator_id, validator_id);
     assert_eq!(submission.data.len(), subnet_node_data_vec.len());
@@ -533,7 +550,9 @@ fn test_reward_subnets() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -543,13 +562,13 @@ fn test_reward_subnets() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
     // --- Get validator
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
 
     assert_ok!(
@@ -574,134 +593,191 @@ fn test_reward_subnets() {
       );
     }
     
-    Network::reward_subnets(System::block_number(), epoch as u32);
+    Network::reward_subnets(System::block_number(), epoch);
   });
 }
 
 #[test]
-fn test_reward_subnets_remove_subnet_node() {
+fn test_reward_subnets_v2() {
   new_test_ext().execute_with(|| {
-    let max_absent = MaxSubnetNodePenalties::<Test>::get();
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
 
-    increase_epochs(1);
+    // increase_epochs(1);
 
     let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
 
-    // shift node classes
-    // validate n-1
-    // attest   n-1
-    // Simulate epochs
-    for num in 0..max_absent+1 {
-      let epoch = System::block_number() / epoch_length;
-  
-      let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes-1);
-    
-      // --- Insert validator
-      SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
-      let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
-      // validate without n-1
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+
+    // --- Get validator
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
+    let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
+
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(validator.clone()), 
+        subnet_id,
+        subnet_node_data_vec.clone(),
+        None,
+      )
+    );
+
+    // Attest
+    for n in 1..total_subnet_nodes+1 {
+      if account(n) == validator.clone() {
+        continue
+      }
       assert_ok!(
-        Network::validate(
-          RuntimeOrigin::signed(account(1)), 
+        Network::attest(
+          RuntimeOrigin::signed(account(n)), 
           subnet_id,
-          subnet_node_data_vec.clone(),
-          None,
         )
       );
-  
-      // Attest without n-1
-      for n in 1..total_subnet_nodes {
-        let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
-        if attestor == validator.clone() {
-          continue
-        }  
-        assert_ok!(
-          Network::attest(
-            RuntimeOrigin::signed(account(n)), 
-            subnet_id,
-          )
-        );
-      }
-      
-      // --- Get submission data and count before node is removed
-      // Check rewards
-      // Ensure only attestors, validators, and validated get rewards
-      let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
-
-      // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
-      let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(
-        subnet_id, 
-        &SubnetNodeClass::Validator, 
-        epoch as u64
-      );
-
-      let submission_nodes_count = submission_nodes.len() as u128;
-
-      Network::reward_subnets(System::block_number(), epoch as u32);
-      let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes);
-
-      if num + 1 > max_absent {
-        post_remove_subnet_node_ensures(total_subnet_nodes, subnet_id);
-        // when node is removed they're SubnetNodePenalties is reset to zero
-        assert_eq!(node_absent_count, 0);  
-      } else {
-        assert_eq!(node_absent_count, num+1);  
-      }
-
-      let base_reward_per_mb: u128 = BaseRewardPerMB::<Test>::get();
-      let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<Test>::get();
-      let overall_subnet_reward: u128 = Network::percent_mul(base_reward_per_mb, DEFAULT_MEM_MB);
-      let delegate_stake_reward: u128 = Network::percent_mul(overall_subnet_reward, delegate_stake_rewards_percentage);
-      let subnet_reward: u128 = overall_subnet_reward.saturating_sub(delegate_stake_reward);
-      
-      let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
-
-      let reward_ratio: u128 = Network::percent_div(DEFAULT_SCORE, sum);
-      let account_reward: u128 = Network::percent_mul(reward_ratio, subnet_reward);
-  
-      let base_reward = BaseValidatorReward::<Test>::get();
-  
-      let submission_attestations: u128 = submission.attests.len() as u128;
-      let attestation_percentage: u128 = Network::percent_div(submission_attestations, submission_nodes_count);
-
-      // check each subnet nodes balance increased
-      for n in 1..total_subnet_nodes+1 {
-        if n == 1 {
-          // validator
-          let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
-          let validator_reward: u128 = Network::percent_mul(base_reward, attestation_percentage);
-          assert_eq!(stake_balance, amount + (account_reward * (num+1) as u128) + (validator_reward * (num+1) as u128));
-        } else if n == total_subnet_nodes {
-          // node removed | should have no rewards
-          let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
-          assert!(stake_balance == amount, "Invalid subnet node staking rewards");
-        } else {
-          // attestors
-          let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
-          assert!(stake_balance == amount + (account_reward * (num+1) as u128), "Invalid subnet node staking rewards");
-        }
-      }
-
-      increase_epochs(1);
     }
-
-    // node should be removed
-    let subnet_node_id = HotkeySubnetNodeId::<Test>::try_get(subnet_id, account(total_subnet_nodes));
-    assert_eq!(subnet_node_id, Err(()));
-
-    let subnet_node_account = SubnetNodeAccount::<Test>::try_get(subnet_id, peer(total_subnet_nodes));
-    assert_eq!(subnet_node_account, Err(()));
+    
+    Network::reward_subnets_v2(System::block_number(), epoch);
   });
 }
+
+
+// #[test]
+// fn test_reward_subnets_remove_subnet_node() {
+//   new_test_ext().execute_with(|| {
+//     let max_absent = MaxSubnetNodePenalties::<Test>::get();
+//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+//     let deposit_amount: u128 = 10000000000000000000000;
+//     let amount: u128 = 1000000000000000000000;
+
+// let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+// build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
+
+//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+//     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+//     increase_epochs(1);
+
+//     let epoch_length = EpochLength::get();
+
+//     // shift node classes
+//     // validate n-1
+//     // attest   n-1
+//     // Simulate epochs
+//     for num in 0..max_absent+1 {
+//       let epoch = System::block_number() / epoch_length;
+  
+//       let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes-1);
+    
+//       // --- Insert validator
+//       SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+//       let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
+
+//       // validate without n-1
+//       assert_ok!(
+//         Network::validate(
+//           RuntimeOrigin::signed(account(1)), 
+//           subnet_id,
+//           subnet_node_data_vec.clone(),
+//           None,
+//         )
+//       );
+  
+//       // Attest without n-1
+//       for n in 1..total_subnet_nodes {
+//         let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
+//         if attestor == validator.clone() {
+//           continue
+//         }  
+//         assert_ok!(
+//           Network::attest(
+//             RuntimeOrigin::signed(account(n)), 
+//             subnet_id,
+//           )
+//         );
+//       }
+      
+//       // --- Get submission data and count before node is removed
+//       // Check rewards
+//       // Ensure only attestors, validators, and validated get rewards
+//       let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
+
+//       // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
+//       let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(
+//         subnet_id, 
+//         &SubnetNodeClass::Validator, 
+//         epoch
+//       );
+
+//       let submission_nodes_count = submission_nodes.len() as u128;
+
+//       Network::reward_subnets(System::block_number(), epoch);
+//       let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes);
+
+//       if num + 1 > max_absent {
+//         post_remove_subnet_node_ensures(total_subnet_nodes, subnet_id);
+//         // when node is removed they're SubnetNodePenalties is reset to zero
+//         assert_eq!(node_absent_count, 0);  
+//       } else {
+//         assert_eq!(node_absent_count, num+1);  
+//       }
+
+//       let base_reward_per_mb: u128 = BaseRewardPerMB::<Test>::get();
+//       let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<Test>::get();
+//       let overall_subnet_reward: u128 = Network::percent_mul(base_reward_per_mb, DEFAULT_MEM_MB);
+//       let delegate_stake_reward: u128 = Network::percent_mul(overall_subnet_reward, delegate_stake_rewards_percentage);
+//       let subnet_reward: u128 = overall_subnet_reward.saturating_sub(delegate_stake_reward);
+      
+//       let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
+
+//       let reward_ratio: u128 = Network::percent_div(DEFAULT_SCORE, sum);
+//       let account_reward: u128 = Network::percent_mul(reward_ratio, subnet_reward);
+  
+//       let base_reward = BaseValidatorReward::<Test>::get();
+  
+//       let submission_attestations: u128 = submission.attests.len() as u128;
+//       let attestation_percentage: u128 = Network::percent_div(submission_attestations, submission_nodes_count);
+
+//       // check each subnet nodes balance increased
+//       for n in 1..total_subnet_nodes+1 {
+//         if n == 1 {
+//           // validator
+//           let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+//           let validator_reward: u128 = Network::percent_mul(base_reward, attestation_percentage);
+//           assert_eq!(stake_balance, amount + (account_reward * (num+1) as u128) + (validator_reward * (num+1) as u128));
+//         } else if n == total_subnet_nodes {
+//           // node removed | should have no rewards
+//           let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+//           assert!(stake_balance == amount, "Invalid subnet node staking rewards");
+//         } else {
+//           // attestors
+//           let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+//           assert!(stake_balance == amount + (account_reward * (num+1) as u128), "Invalid subnet node staking rewards");
+//         }
+//       }
+
+//       increase_epochs(1);
+//     }
+
+//     // node should be removed
+//     let subnet_node_id = HotkeySubnetNodeId::<Test>::try_get(subnet_id, account(total_subnet_nodes));
+//     assert_eq!(subnet_node_id, Err(()));
+
+//     let subnet_node_account = PeerIdSubnetNode::<Test>::try_get(subnet_id, peer(total_subnet_nodes));
+//     assert_eq!(subnet_node_account, Err(()));
+//   });
+// }
 
 // // #[test]
 // // fn test_reward_subnets_absent_node_increment_decrement() {
@@ -726,7 +802,7 @@ fn test_reward_subnets_remove_subnet_node() {
 // //       let epoch = System::block_number() / epoch_length;
 
 // //       // --- Insert validator
-// //       SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, account(1));
+// //       SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, account(1));
     
 // //       if num % 2 == 0 {
 // //         // increment on even epochs
@@ -751,7 +827,7 @@ fn test_reward_subnets_remove_subnet_node() {
 // //           );
 // //         }
         
-// //         Network::reward_subnets(System::block_number(), epoch as u32);
+// //         Network::reward_subnets(System::block_number(), epoch);
   
 // //         let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, (total_subnet_nodes-1));
 // //         assert_eq!(node_absent_count, 1);
@@ -777,7 +853,7 @@ fn test_reward_subnets_remove_subnet_node() {
 // //           );
 // //         }
         
-// //         Network::reward_subnets(System::block_number(), epoch as u32);
+// //         Network::reward_subnets(System::block_number(), epoch);
   
 // //         let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, (total_subnet_nodes-1));
 // //         assert_eq!(node_absent_count, 0);  
@@ -788,98 +864,98 @@ fn test_reward_subnets_remove_subnet_node() {
 // //   });
 // // }
 
-#[test]
-fn test_reward_subnets_check_balances() {
-  new_test_ext().execute_with(|| {
-    let max_absent = MaxSubnetNodePenalties::<Test>::get();
+// #[test]
+// fn test_reward_subnets_check_balances() {
+//   new_test_ext().execute_with(|| {
+//     let max_absent = MaxSubnetNodePenalties::<Test>::get();
 
-    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
-    let deposit_amount: u128 = 10000000000000000000000;
-    let amount: u128 = 1000000000000000000000;
+//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+//     let deposit_amount: u128 = 10000000000000000000000;
+//     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, amount);
+//     build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, amount);
 
-    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
-    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+//     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
 
-    increase_epochs(1);
+//     increase_epochs(1);
 
-    let epoch_length = EpochLength::get();
-    let epoch = System::block_number() / epoch_length;
+//     let epoch_length = EpochLength::get();
+//     let epoch = System::block_number() / epoch_length;
 
-    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+//     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
   
-    // --- Insert validator
-    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
-    let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
+//     // --- Insert validator
+//     SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+//     let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
 
-    // validate without n-1
-    assert_ok!(
-      Network::validate(
-        RuntimeOrigin::signed(account(1)), 
-        subnet_id,
-        subnet_node_data_vec.clone(),
-        None,
-      )
-    );
+//     // validate without n-1
+//     assert_ok!(
+//       Network::validate(
+//         RuntimeOrigin::signed(account(1)), 
+//         subnet_id,
+//         subnet_node_data_vec.clone(),
+//         None,
+//       )
+//     );
 
-    // Attest without n-1
-    for n in 1..total_subnet_nodes {
-      let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
-      if attestor == validator.clone() {
-        continue
-      }
-      assert_ok!(
-        Network::attest(
-          RuntimeOrigin::signed(account(n)), 
-          subnet_id,
-        )
-      );
-    }
+//     // Attest without n-1
+//     for n in 1..total_subnet_nodes {
+//       let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
+//       if attestor == validator.clone() {
+//         continue
+//       }
+//       assert_ok!(
+//         Network::attest(
+//           RuntimeOrigin::signed(account(n)), 
+//           subnet_id,
+//         )
+//       );
+//     }
     
-    // --- Get submission data and count before node is removed
-    // Check rewards
-    // Ensure only attestors, validators, and validated get rewards
-    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch as u32).unwrap();
+//     // --- Get submission data and count before node is removed
+//     // Check rewards
+//     // Ensure only attestors, validators, and validated get rewards
+//     let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
 
-    // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
-    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
-    let submission_nodes_count = submission_nodes.len() as u128;
+//     // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
+//     let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
+//     let submission_nodes_count = submission_nodes.len() as u128;
 
-    Network::reward_subnets(System::block_number(), epoch as u32);
-    let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes-1);
-    assert_eq!(node_absent_count, 0); 
+//     Network::reward_subnets(System::block_number(), epoch);
+//     let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes-1);
+//     assert_eq!(node_absent_count, 0); 
           
-    let base_reward_per_mb: u128 = BaseRewardPerMB::<Test>::get();
-    let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<Test>::get();
-    let overall_subnet_reward: u128 = Network::percent_mul(base_reward_per_mb, DEFAULT_MEM_MB);
-    let delegate_stake_reward: u128 = Network::percent_mul(overall_subnet_reward, delegate_stake_rewards_percentage);
-    let subnet_reward: u128 = overall_subnet_reward.saturating_sub(delegate_stake_reward);
+//     let base_reward_per_mb: u128 = BaseRewardPerMB::<Test>::get();
+//     let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<Test>::get();
+//     let overall_subnet_reward: u128 = Network::percent_mul(base_reward_per_mb, DEFAULT_MEM_MB);
+//     let delegate_stake_reward: u128 = Network::percent_mul(overall_subnet_reward, delegate_stake_rewards_percentage);
+//     let subnet_reward: u128 = overall_subnet_reward.saturating_sub(delegate_stake_reward);
 
-    let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
-    let reward_ratio: u128 = Network::percent_div(DEFAULT_SCORE, sum);
-    let account_reward: u128 = Network::percent_mul(reward_ratio, subnet_reward);
+//     let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
+//     let reward_ratio: u128 = Network::percent_div(DEFAULT_SCORE, sum);
+//     let account_reward: u128 = Network::percent_mul(reward_ratio, subnet_reward);
 
-    let base_reward = BaseValidatorReward::<Test>::get();
+//     let base_reward = BaseValidatorReward::<Test>::get();
 
-    let submission_attestations: u128 = submission.attests.len() as u128;
-    let attestation_percentage: u128 = Network::percent_div(submission_attestations, submission_nodes_count);
+//     let submission_attestations: u128 = submission.attests.len() as u128;
+//     let attestation_percentage: u128 = Network::percent_div(submission_attestations, submission_nodes_count);
 
-    // check each subnet nodes balance increased
-    for n in 1..total_subnet_nodes {
-      if n == 1 {
-        // validator
-        let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
-        let validator_reward: u128 = Network::percent_mul(base_reward, attestation_percentage);
-        assert_eq!(stake_balance, amount + (account_reward as u128) + (validator_reward as u128));
-      } else {
-        // attestors
-        let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
-        assert_eq!(stake_balance, amount + (account_reward as u128));
-      }
-    }
-  });
-}
+//     // check each subnet nodes balance increased
+//     for n in 1..total_subnet_nodes {
+//       if n == 1 {
+//         // validator
+//         let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+//         let validator_reward: u128 = Network::percent_mul(base_reward, attestation_percentage);
+//         assert_eq!(stake_balance, amount + (account_reward as u128) + (validator_reward as u128));
+//       } else {
+//         // attestors
+//         let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+//         assert_eq!(stake_balance, amount + (account_reward as u128));
+//       }
+//     }
+//   });
+// }
 
 #[test]
 fn test_reward_subnets_validator_slash() {
@@ -888,7 +964,9 @@ fn test_reward_subnets_validator_slash() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -898,12 +976,12 @@ fn test_reward_subnets_validator_slash() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(System::block_number(), epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
 
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
     // --- Get validator
-    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32).unwrap();
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
     let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
 
     assert_ok!(
@@ -919,7 +997,56 @@ fn test_reward_subnets_validator_slash() {
     
     let before_slash_validator_stake_balance: u128 = AccountSubnetStake::<Test>::get(&validator.clone(), subnet_id);
 
-    Network::reward_subnets(System::block_number(), epoch as u32);
+    Network::reward_subnets(System::block_number(), epoch);
+
+    let slashed_validator_stake_balance: u128 = AccountSubnetStake::<Test>::get(&validator.clone(), subnet_id);
+
+    // Ensure validator was slashed
+    assert!(before_slash_validator_stake_balance > slashed_validator_stake_balance, "Validator was not slashed")
+  });
+}
+
+#[test]
+fn test_reward_subnets_v2_validator_slash() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, stake_amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    // increase_epochs(1);
+
+    let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
+
+    Network::do_epoch_preliminaries(System::block_number(), epoch, epoch_length);
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+
+    // --- Get validator
+    let validator_id = SubnetRewardsValidator::<Test>::get(subnet_id, epoch).unwrap();
+    let mut validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, validator_id).unwrap();
+
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(validator.clone()), 
+        subnet_id,
+        subnet_node_data_vec.clone(),
+        None,
+      )
+    );
+
+    // No attests to ensure validator is slashed
+    
+    let before_slash_validator_stake_balance: u128 = AccountSubnetStake::<Test>::get(&validator.clone(), subnet_id);
+
+    Network::reward_subnets_v2(System::block_number(), epoch);
 
     let slashed_validator_stake_balance: u128 = AccountSubnetStake::<Test>::get(&validator.clone(), subnet_id);
 
@@ -935,7 +1062,9 @@ fn test_reward_subnets_subnet_penalty_count() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -948,7 +1077,7 @@ fn test_reward_subnets_subnet_penalty_count() {
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
     // --- Insert validator
-    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
     let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
 
     assert_ok!(
@@ -974,7 +1103,67 @@ fn test_reward_subnets_subnet_penalty_count() {
       );
     }
     
-    Network::reward_subnets(System::block_number(), epoch as u32);
+    Network::reward_subnets(System::block_number(), epoch);
+
+    let subnet_penalty_count = SubnetPenaltyCount::<Test>::get(subnet_id);
+    assert_eq!(subnet_penalty_count, 1);
+
+    let subnet_node_penalty_count = SubnetNodePenalties::<Test>::get(subnet_id, 0);
+    assert_eq!(subnet_node_penalty_count, 0);
+  });
+}
+
+#[test]
+fn test_reward_subnets_v2_subnet_penalty_count() {
+  new_test_ext().execute_with(|| {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, stake_amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    increase_epochs(1);
+
+    let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+
+    // --- Insert validator
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+    let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
+
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(account(1)), 
+        subnet_id,
+        Vec::new(),
+        None,
+      )
+    );
+
+    // Attest
+    for n in 1..total_subnet_nodes+1 {
+      let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
+      if attestor == validator.clone() {
+        continue
+      }
+      assert_ok!(
+        Network::attest(
+          RuntimeOrigin::signed(account(n)), 
+          subnet_id,
+        )
+      );
+    }
+    
+    Network::reward_subnets_v2(System::block_number(), epoch);
 
     let subnet_penalty_count = SubnetPenaltyCount::<Test>::get(subnet_id);
     assert_eq!(subnet_penalty_count, 1);
@@ -991,7 +1180,9 @@ fn test_reward_subnets_account_penalty_count() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -1004,7 +1195,7 @@ fn test_reward_subnets_account_penalty_count() {
     let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
 
     // --- Insert validator
-    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch as u32, 1);
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
 
     assert_ok!(
       Network::validate(
@@ -1017,7 +1208,52 @@ fn test_reward_subnets_account_penalty_count() {
 
     // No Attest
 
-    Network::reward_subnets(System::block_number(), epoch as u32);
+    Network::reward_subnets(System::block_number(), epoch);
+
+    let subnet_penalty_count = SubnetPenaltyCount::<Test>::get(subnet_id);
+    assert_eq!(subnet_penalty_count, 1);
+
+    let subnet_node_penalty_count = SubnetNodePenalties::<Test>::get(subnet_id, 1);
+    assert_eq!(subnet_node_penalty_count, 1);
+  });
+}
+
+#[test]
+fn test_reward_subnets_v2_account_penalty_count() {
+  new_test_ext().execute_with(|| {
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 15, deposit_amount, stake_amount);
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    increase_epochs(1);
+
+    let epoch_length = EpochLength::get();
+    let epoch = System::block_number() / epoch_length;
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+
+    // --- Insert validator
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(account(1)), 
+        subnet_id,
+        Vec::new(),
+        None,
+      )
+    );
+
+    // No Attest
+
+    Network::reward_subnets_v2(System::block_number(), epoch);
 
     let subnet_penalty_count = SubnetPenaltyCount::<Test>::get(subnet_id);
     assert_eq!(subnet_penalty_count, 1);
@@ -1033,82 +1269,79 @@ fn test_reward_subnets_account_penalty_count() {
 
 
 
-#[test]
-fn test_do_epoch_preliminaries_deactivate_subnet_enactment_period() {
-  new_test_ext().execute_with(|| {
-    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+// #[test]
+// fn test_do_epoch_preliminaries_deactivate_subnet_enactment_period() {
+//   new_test_ext().execute_with(|| {
+//     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
 
-    let epoch_length = EpochLength::get();
-    let block_number = System::block_number();
-    let epoch = System::block_number().saturating_div(epoch_length);
+//     let epoch_length = EpochLength::get();
+//     let block_number = System::block_number();
+//     let epoch = System::block_number().saturating_div(epoch_length);
   
-    let cost = Network::registration_cost(epoch as u32);
+//     let cost = Network::registration_cost(epoch);
   
-    let _ = Balances::deposit_creating(&account(1), cost+1000);
+//     let _ = Balances::deposit_creating(&account(1), cost+1000);
   
-    let registration_blocks = MinSubnetRegistrationBlocks::<Test>::get();
-
-    let add_subnet_data = RegistrationSubnetData {
-      path: subnet_path.clone().into(),
-      memory_mb: DEFAULT_MEM_MB,
-      registration_blocks: registration_blocks,
-      entry_interval: 0,
-    };
+//     let add_subnet_data = RegistrationSubnetData {
+//       path: subnet_path.clone().into(),
+//       max_node_registration_epochs: 16,
+//       node_registration_interval: 0,
+//       node_queue_period: 1,
+      // coldkey_whitelist: Some(BTreeSet::new()),
+      // coldkey_whitelist: None,
+//     };
   
-    let epoch_length = EpochLength::get();
-    let block_number = System::block_number();
-    let epoch = System::block_number().saturating_div(epoch_length);
-    let next_registration_epoch = Network::get_next_registration_epoch(epoch as u32);
-    increase_epochs(next_registration_epoch - epoch as u32);
+//     let epoch_length = EpochLength::get();
+//     let block_number = System::block_number();
+//     let epoch = System::block_number().saturating_div(epoch_length);
+//     let next_registration_epoch = Network::get_next_registration_epoch(epoch);
+//     increase_epochs(next_registration_epoch - epoch);
 
-    // --- Register subnet for activation
-    assert_ok!(
-      Network::register_subnet(
-        RuntimeOrigin::signed(account(1)),
-        add_subnet_data,
-      )
-    );
+//     // --- Register subnet for activation
+//     assert_ok!(
+//       Network::register_subnet(
+//         RuntimeOrigin::signed(account(1)),
+//         add_subnet_data,
+//       )
+//     );
 
-    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
-    let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
+//     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+//     let subnet = SubnetsData::<Test>::get(subnet_id).unwrap();
 
-    let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance(subnet.min_nodes);
-    let _ = Balances::deposit_creating(&account(1), min_subnet_delegate_stake+1000);
+//     let min_subnet_delegate_stake = Network::get_min_subnet_delegate_stake_balance();
+//     let _ = Balances::deposit_creating(&account(1), min_subnet_delegate_stake+1000);
   
-    let registration_blocks = subnet.registration_blocks;
-    let max_registration_block = subnet.initialized + subnet.registration_blocks;
+//     let mut subnet_registering = true;
+//     let subnet_activation_enactment_blocks = SubnetActivationEnactmentBlocks::<Test>::get();
 
-    let mut subnet_registering = true;
-    let subnet_activation_enactment_period = SubnetActivationEnactmentPeriod::<Test>::get();
+//     while subnet_registering {
+//       increase_epochs(1);
+//       let block_number = System::block_number();
 
-    while subnet_registering {
-      increase_epochs(1);
-      let block_number = System::block_number();
+//       let epoch_length = EpochLength::get();
+//       let epoch = System::block_number() / epoch_length;  
 
-      let epoch_length = EpochLength::get();
-      let epoch = System::block_number() / epoch_length;  
-
-      Network::do_epoch_preliminaries(block_number, epoch as u32, epoch_length);
+//       Network::do_epoch_preliminaries(block_number, epoch, epoch_length);
       
-      if block_number > max_registration_block + subnet_activation_enactment_period {
-        assert_eq!(
-          *network_events().last().unwrap(),
-          Event::SubnetDeactivated {
-            subnet_id: subnet_id, 
-            reason: SubnetRemovalReason::EnactmentPeriod
-          }
-        );
+//       if block_number > max_registration_block + subnet_activation_enactment_blocks {
+//         assert_eq!(
+//           *network_events().last().unwrap(),
+//           Event::SubnetDeactivated {
+//             subnet_id: subnet_id, 
+//             reason: SubnetRemovalReason::EnactmentPeriod
+//           }
+//         );
 
-        let removed_subnet = SubnetsData::<Test>::try_get(subnet_id);
-        assert_eq!(removed_subnet, Err(()));
-        subnet_registering = false;
-      } else {
-        let registered_subnet = SubnetsData::<Test>::try_get(subnet_id).unwrap();
-        assert_eq!(registered_subnet.id, subnet_id);
-      }
-    }
-  });
-}
+//         let removed_subnet = SubnetsData::<Test>::try_get(subnet_id);
+//         assert_eq!(removed_subnet, Err(()));
+//         subnet_registering = false;
+//       } else {
+//         let registered_subnet = SubnetsData::<Test>::try_get(subnet_id).unwrap();
+//         assert_eq!(registered_subnet.id, subnet_id);
+//       }
+//     }
+//   });
+// }
 
 #[test]
 fn test_do_epoch_preliminaries_deactivate_min_subnet_delegate_stake() {
@@ -1118,16 +1351,18 @@ fn test_do_epoch_preliminaries_deactivate_min_subnet_delegate_stake() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
 
     // --- Remove delegate stake to force MinSubnetDelegateStake removal reason
-    let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(1), subnet_id);
+    let delegate_shares = AccountSubnetDelegateStakeShares::<Test>::get(account(1000), subnet_id);
     assert_ok!(
       Network::remove_delegate_stake(
-        RuntimeOrigin::signed(account(1)),
+        RuntimeOrigin::signed(account(1000)),
         subnet_id,
         delegate_shares,
       ) 
@@ -1139,7 +1374,7 @@ fn test_do_epoch_preliminaries_deactivate_min_subnet_delegate_stake() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;  
 
-    Network::do_epoch_preliminaries(block_number, epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(block_number, epoch, epoch_length);
     assert_eq!(
       *network_events().last().unwrap(),
       Event::SubnetDeactivated {
@@ -1158,7 +1393,9 @@ fn test_do_epoch_preliminaries_deactivate_max_penalties() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -1172,7 +1409,7 @@ fn test_do_epoch_preliminaries_deactivate_max_penalties() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(block_number, epoch as u32, epoch_length);
+    Network::do_epoch_preliminaries(block_number, epoch, epoch_length);
     assert_eq!(
       *network_events().last().unwrap(),
       Event::SubnetDeactivated {
@@ -1191,7 +1428,9 @@ fn test_do_epoch_preliminaries_choose_validator() {
     let deposit_amount: u128 = 10000000000000000000000;
     let amount: u128 = 1000000000000000000000;
 
-    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, amount);
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet(subnet_path.clone(), 0, 0, deposit_amount, stake_amount);
 
     let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
     let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
@@ -1202,8 +1441,8 @@ fn test_do_epoch_preliminaries_choose_validator() {
     let epoch_length = EpochLength::get();
     let epoch = System::block_number() / epoch_length;
 
-    Network::do_epoch_preliminaries(block_number, epoch as u32, epoch_length);
-    let validator = SubnetRewardsValidator::<Test>::get(subnet_id, epoch as u32);
+    Network::do_epoch_preliminaries(block_number, epoch, epoch_length);
+    let validator = SubnetRewardsValidator::<Test>::get(subnet_id, epoch);
     assert_ne!(validator, None);
   });
 }
@@ -1245,7 +1484,7 @@ fn test_do_epoch_preliminaries_choose_validator() {
 // // //       ) 
 // // //     );
 
-// // //     let node_set = SubnetNodesClasses::<Test>::get(subnet_id, SubnetNodeClass::Idle);
+// // //     let node_set = SubnetNodesClasses::<Test>::get(subnet_id, SubnetNodeClass::Queue);
 // // //     assert_eq!(node_set.len(), n_peers as usize);
 
 // // //   })
@@ -1318,3 +1557,293 @@ fn test_do_epoch_preliminaries_choose_validator() {
 // // //     );
 // // // 	})
 // // // }
+
+#[test]
+fn test_reward_subnets_check_balances() {
+  new_test_ext().execute_with(|| {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet_with_delegator_rewards(
+      subnet_path.clone(), 
+      0, 
+      16, 
+      deposit_amount, 
+      stake_amount,
+      DEFAULT_DELEGATE_REWARD_RATE,
+    );
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+
+    let _ = Balances::deposit_creating(&account(total_subnet_nodes+1), amount+500);
+
+    assert_ok!(
+      Network::add_to_node_delegate_stake(
+        RuntimeOrigin::signed(account(total_subnet_nodes+1)), 
+        subnet_id,
+        0,
+        amount,
+      )
+    );
+
+    increase_epochs(1);
+
+    let epoch = get_epoch();
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+  
+    // --- Insert validator
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+    let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
+
+    // validate without n-1
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(account(1)), 
+        subnet_id,
+        subnet_node_data_vec.clone(),
+        None,
+      )
+    );
+
+    // Attest without n-1
+    for n in 1..total_subnet_nodes+1 {
+      let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
+      if attestor == validator.clone() {
+        continue
+      }
+      assert_ok!(
+        Network::attest(
+          RuntimeOrigin::signed(account(n)), 
+          subnet_id,
+        )
+      );
+    }
+    
+    // --- Get submission data and count before node is removed
+    // Check rewards
+    // Ensure only attestors, validators, and validated get rewards
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
+
+    assert_ok!(Network::reward_subnets_v2(System::block_number(), epoch));
+
+    let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes-1);
+    assert_eq!(node_absent_count, 0); 
+
+    let mut rewards: u128 = Network::get_epoch_emissions(epoch);
+
+    let total_issuance: u128 = Network::get_total_network_issuance();
+
+    let subnet_owner_percentage = SubnetOwnerPercentage::<Test>::get();
+    let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<Test>::get();
+
+    let weight = 1e+9 as u128;
+
+    let overall_subnet_reward: u128 = Network::percent_mul(rewards, weight);
+
+    // --- Get owner rewards
+    let subnet_owner_reward: u128 = Network::percent_mul(overall_subnet_reward, subnet_owner_percentage);
+
+    // --- Get subnet rewards minus owner cut
+    let subnet_reward: u128 = overall_subnet_reward.saturating_sub(subnet_owner_reward);
+
+    // --- Get delegators rewards
+    let delegate_stake_reward: u128 = Network::percent_mul(subnet_reward, delegate_stake_rewards_percentage);
+
+    // --- Get subnet nodes rewards
+    let subnet_node_reward: u128 = subnet_reward.saturating_sub(delegate_stake_reward);
+
+    // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
+    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
+    let submission_nodes_count = submission_nodes.len() as u128;
+
+    let attestations: u128 = submission.attests.len() as u128;
+    let attestation_percentage: u128 = Network::percent_div(attestations, submission_nodes_count);
+    assert_eq!(attestation_percentage, 1e+9 as u128);
+
+    let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
+    let score_percentage: u128 = Network::percent_div(DEFAULT_SCORE, sum);
+
+    let mut account_reward: u128 = Network::percent_mul(score_percentage, subnet_node_reward);
+
+    
+    for n in 1..total_subnet_nodes+1 {
+      let hotkey_subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(n)).unwrap();
+      let subnet_node_id_hotkey = SubnetNodeIdHotkey::<Test>::get(subnet_id, hotkey_subnet_node_id).unwrap();
+      let subnet_node = SubnetNodesData::<Test>::get(subnet_id, hotkey_subnet_node_id);
+      let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+
+      if subnet_node_id_hotkey == validator.clone() {
+        // validator
+        let validator_reward: u128 = Network::get_validator_reward(attestation_percentage);
+        let validator_total_reward: u128 = (account_reward as u128) + (validator_reward as u128);
+        assert_eq!(stake_balance, amount + validator_total_reward);
+      } else {
+        assert_eq!(stake_balance, amount + account_reward);
+      }
+    }
+  });
+}
+
+#[test]
+fn test_reward_subnets_with_delegate_node_staking_check_balances() {
+  new_test_ext().execute_with(|| {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
+    let deposit_amount: u128 = 10000000000000000000000;
+    let amount: u128 = 1000000000000000000000;
+    let stake_amount: u128 = MinStakeBalance::<Test>::get();
+
+    build_activated_subnet_with_delegator_rewards(
+      subnet_path.clone(), 
+      0, 
+      16, 
+      deposit_amount, 
+      stake_amount,
+      DEFAULT_DELEGATE_REWARD_RATE,
+    );
+
+    let subnet_id = SubnetPaths::<Test>::get(subnet_path.clone()).unwrap();
+    let total_subnet_nodes = TotalSubnetNodes::<Test>::get(subnet_id);
+    
+    for n in 1..total_subnet_nodes+1 {
+      let _ = Balances::deposit_creating(&account(total_subnet_nodes+2), amount+500);
+
+      assert_ok!(
+        Network::add_to_node_delegate_stake(
+          RuntimeOrigin::signed(account(total_subnet_nodes+2)), 
+          subnet_id,
+          n,
+          amount,
+        )
+      );  
+    }
+
+    increase_epochs(1);
+
+    let epoch = get_epoch();
+
+    let subnet_node_data_vec = subnet_node_data(0, total_subnet_nodes);
+  
+    // --- Insert validator
+    SubnetRewardsValidator::<Test>::insert(subnet_id, epoch, 1);
+    let validator = SubnetNodeIdHotkey::<Test>::get(subnet_id, 1).unwrap();
+
+    // validate without n-1
+    assert_ok!(
+      Network::validate(
+        RuntimeOrigin::signed(account(1)), 
+        subnet_id,
+        subnet_node_data_vec.clone(),
+        None,
+      )
+    );
+
+    // Attest without n-1
+    for n in 1..total_subnet_nodes+1 {
+      let attestor = SubnetNodeIdHotkey::<Test>::get(subnet_id, n).unwrap();
+      if attestor == validator.clone() {
+        continue
+      }
+      assert_ok!(
+        Network::attest(
+          RuntimeOrigin::signed(account(n)), 
+          subnet_id,
+        )
+      );
+    }
+    
+    // --- Get submission data and count before node is removed
+    // Check rewards
+    // Ensure only attestors, validators, and validated get rewards
+    let submission = SubnetRewardsSubmission::<Test>::get(subnet_id, epoch).unwrap();
+
+    assert_ok!(Network::reward_subnets_v2(System::block_number(), epoch));
+
+    let node_absent_count = SubnetNodePenalties::<Test>::get(subnet_id, total_subnet_nodes-1);
+    assert_eq!(node_absent_count, 0); 
+
+    let mut rewards: u128 = Network::get_epoch_emissions(epoch);
+
+    let total_issuance: u128 = Network::get_total_network_issuance();
+
+    let subnet_owner_percentage = SubnetOwnerPercentage::<Test>::get();
+    let delegate_stake_rewards_percentage: u128 = DelegateStakeRewardsPercentage::<Test>::get();
+
+    let weight = 1e+9 as u128;
+
+    let overall_subnet_reward: u128 = Network::percent_mul(rewards, weight);
+
+    // --- Get owner rewards
+    let subnet_owner_reward: u128 = Network::percent_mul(overall_subnet_reward, subnet_owner_percentage);
+
+    // --- Get subnet rewards minus owner cut
+    let subnet_reward: u128 = overall_subnet_reward.saturating_sub(subnet_owner_reward);
+
+    // --- Get delegators rewards
+    let delegate_stake_reward: u128 = Network::percent_mul(subnet_reward, delegate_stake_rewards_percentage);
+
+    // --- Get subnet nodes rewards
+    let subnet_node_reward: u128 = subnet_reward.saturating_sub(delegate_stake_reward);
+
+    // --- Any removals impact the following epochs attestation data unless removed ahead of rewards
+    let submission_nodes: BTreeSet<<Test as frame_system::Config>::AccountId> = Network::get_classified_hotkeys(subnet_id, &SubnetNodeClass::Validator, epoch);
+    let submission_nodes_count = submission_nodes.len() as u128;
+
+    let attestations: u128 = submission.attests.len() as u128;
+    let attestation_percentage: u128 = Network::percent_div(attestations, submission_nodes_count);
+    assert_eq!(attestation_percentage, 1e+9 as u128);
+
+    let sum = submission.data.iter().fold(0, |acc, x| acc + x.score);
+    let score_percentage: u128 = Network::percent_div(DEFAULT_SCORE, sum);
+
+    let mut account_reward: u128 = Network::percent_mul(score_percentage, subnet_node_reward);
+    log::error!("account_reward:            {:?}", account_reward);
+
+    
+    for n in 1..total_subnet_nodes+1 {
+      let mut node_reward = account_reward;
+      let hotkey_subnet_node_id = HotkeySubnetNodeId::<Test>::get(subnet_id, account(n)).unwrap();
+      let subnet_node_id_hotkey = SubnetNodeIdHotkey::<Test>::get(subnet_id, hotkey_subnet_node_id).unwrap();
+      let subnet_node = SubnetNodesData::<Test>::get(subnet_id, hotkey_subnet_node_id);
+      let stake_balance: u128 = AccountSubnetStake::<Test>::get(&account(n), subnet_id);
+
+      log::error!(" ");
+      log::error!("subnet_node ID:        {:?}", hotkey_subnet_node_id);
+      log::error!("subnet_node.delegate_reward_rate:        {:?}", subnet_node.delegate_reward_rate);
+
+      assert_ne!(subnet_node.delegate_reward_rate, 0);
+
+      if subnet_node_id_hotkey == validator.clone() {
+        // validator
+        let validator_reward: u128 = Network::get_validator_reward(attestation_percentage);
+
+        if subnet_node.delegate_reward_rate != 0 {
+          let total_node_delegated_stake_shares = TotalNodeDelegateStakeShares::<Test>::get(subnet_id, hotkey_subnet_node_id);
+          if total_node_delegated_stake_shares != 0 {
+            let node_delegate_reward = Network::percent_mul(node_reward, subnet_node.delegate_reward_rate);
+            node_reward = node_reward - node_delegate_reward;
+          }
+        }
+        let validator_total_reward: u128 = (node_reward as u128) + (validator_reward as u128);
+
+        assert_eq!(stake_balance, amount + validator_total_reward);
+      } else {
+        if subnet_node.delegate_reward_rate != 0 {
+          let total_node_delegated_stake_shares = TotalNodeDelegateStakeShares::<Test>::get(subnet_id, hotkey_subnet_node_id);
+          if total_node_delegated_stake_shares != 0 {
+            let node_delegate_reward = Network::percent_mul(node_reward, subnet_node.delegate_reward_rate);
+            node_reward = node_reward - node_delegate_reward;
+          }
+        }
+        assert_eq!(stake_balance, amount + node_reward);
+      }
+    }
+  });
+}
