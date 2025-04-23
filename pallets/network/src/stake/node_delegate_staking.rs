@@ -81,7 +81,7 @@ impl<T: Config> Pallet<T> {
     let total_node_delegated_stake_shares = match TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id) {
       0 => {
         // --- Mitigate inflation attack
-        TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(1000));
+        TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(Self::MIN_LIQUIDITY));
         0
       },
       shares => shares,
@@ -363,7 +363,7 @@ impl<T: Config> Pallet<T> {
     if TotalNodeDelegateStakeBalance::<T>::get(subnet_id, subnet_node_id) == 0 || 
       TotalNodeDelegateStakeShares::<T>::get(subnet_id, subnet_node_id) == 0 
     {
-      TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(1000));
+      TotalNodeDelegateStakeShares::<T>::mutate(subnet_id, subnet_node_id, |mut n| n.saturating_accrue(Self::MIN_LIQUIDITY));
     };
 
     // -- increase total subnet delegate stake 

@@ -107,7 +107,7 @@ impl<T: Config> Pallet<T> {
     let total_subnet_delegated_stake_shares = match TotalSubnetDelegateStakeShares::<T>::get(subnet_id) {
       0 => {
          // --- Mitigate inflation attack
-        TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(1000));
+        TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(Self::MIN_LIQUIDITY));
         0
       },
       shares => shares,
@@ -121,7 +121,7 @@ impl<T: Config> Pallet<T> {
       total_subnet_delegated_stake_balance
     );
 
-    // --- Check rounding errors
+    // --- Check rounding errors, mitigates donation attacks that round to zero
     if delegate_stake_to_be_added_as_shares == 0 {
       return (Err(Error::<T>::CouldNotConvertToShares.into()), 0, 0);
     }
@@ -319,7 +319,7 @@ impl<T: Config> Pallet<T> {
     if TotalSubnetDelegateStakeBalance::<T>::get(subnet_id) == 0 || 
       TotalSubnetDelegateStakeShares::<T>::get(subnet_id) == 0 
     {
-      TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(1000));
+      TotalSubnetDelegateStakeShares::<T>::mutate(subnet_id, |mut n| n.saturating_accrue(Self::MIN_LIQUIDITY));
     };
 
     // -- increase total subnet delegate stake 
