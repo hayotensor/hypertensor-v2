@@ -19,6 +19,10 @@ use super::*;
 use sp_runtime::Saturating;
 
 impl<T: Config> Pallet<T> {
+  /// Add to the subnet delegate stake balance of a user
+  ///
+  /// See `perform_do_add_node_delegate_stake`
+  ///
   pub fn do_add_node_delegate_stake(
     origin: T::RuntimeOrigin,
     subnet_id: u32,
@@ -145,6 +149,10 @@ impl<T: Config> Pallet<T> {
   }
 
 
+  /// Remove the node delegate stake balance of a user
+  ///
+  /// See `perform_do_remove_node_delegate_stake`
+  ///
   pub fn do_remove_node_delegate_stake(
     origin: T::RuntimeOrigin, 
     subnet_id: u32,

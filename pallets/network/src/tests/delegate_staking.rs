@@ -127,33 +127,83 @@ fn check_balances() {
     let user = account(1);
 
     // Initial user tokens
-    const USER_INITIAL_TOKENS: u128 = 1000000000000000000;
-    const USER_INITIAL_BALANCE: u128 = USER_INITIAL_TOKENS + 500;
+    // const USER_INITIAL_TOKENS: u128 = 1000000000000000000; // 1
+    // const USER_INITIAL_TOKENS: u128 = 10000000000000000000; // 10
+    // const USER_INITIAL_TOKENS: u128 = 100000000000000000000; // 100
 
-    Balances::make_free_balance_be(&user, USER_INITIAL_BALANCE);
+    // const USER_INITIAL_BALANCE: u128 = USER_INITIAL_TOKENS + 500;
 
-    // ---- Step 1: uSER deposits minimal amount ----
-    // The MinDelegateStakeBalance (deposit min) is 1000, otherwise reverts with CouldNotConvertToBalance
-    assert_ok!(
-      Network::do_add_delegate_stake(
-        RuntimeOrigin::signed(user.clone()),
-        subnet_id,
-        USER_INITIAL_TOKENS,
-      )
-    );
+    // Balances::make_free_balance_be(&user, USER_INITIAL_BALANCE);
 
-    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
-    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+    // // ---- Step 1: uSER deposits minimal amount ----
+    // // The MinDelegateStakeBalance (deposit min) is 1000, otherwise reverts with CouldNotConvertToBalance
+    // assert_ok!(
+    //   Network::do_add_delegate_stake(
+    //     RuntimeOrigin::signed(user.clone()),
+    //     subnet_id,
+    //     USER_INITIAL_TOKENS,
+    //   )
+    // );
 
-    // Validate initial deposit
-    let user_balance = Network::convert_to_balance(
-      AccountSubnetDelegateStakeShares::<Test>::get(&user, subnet_id),
-      total_subnet_delegated_stake_shares,
-      total_subnet_delegated_stake_balance
-    );
-    log::error!("USER_INITIAL_TOKENS  {:?}", USER_INITIAL_TOKENS);
-    log::error!("user_balance         {:?}", user_balance);
+    // let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    // let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    // // Validate initial deposit
+    // let user_balance = Network::convert_to_balance(
+    //   AccountSubnetDelegateStakeShares::<Test>::get(&user, subnet_id),
+    //   total_subnet_delegated_stake_shares,
+    //   total_subnet_delegated_stake_balance
+    // );
+    // log::error!("USER_INITIAL_TOKENS  {:?}", USER_INITIAL_TOKENS);
+    // log::error!("user_balance         {:?}", user_balance);
+    // // assert!(false);
+
+    // log::error!("10_u128.pow(1)         {:?}", 10_u128.pow(1));
+
+    // let loss = 1.0 - user_balance as f64 / USER_INITIAL_TOKENS as f64;
+    // log::error!("loss         {:?}", loss);
+
+
+    for n in 3..28 {
+      // reset everything
+      let _ = AccountSubnetDelegateStakeShares::<Test>::remove(user.clone(), subnet_id);			
+      let _ = TotalSubnetDelegateStakeShares::<Test>::remove(subnet_id);
+      let _ = TotalSubnetDelegateStakeBalance::<Test>::remove(subnet_id);
+
+      let USER_INITIAL_TOKENS: u128 = 10_u128.pow(n);
+      let USER_INITIAL_BALANCE: u128 = USER_INITIAL_TOKENS + 500;
+      Balances::make_free_balance_be(&user, USER_INITIAL_BALANCE);
+
+      assert_ok!(
+        Network::do_add_delegate_stake(
+          RuntimeOrigin::signed(user.clone()),
+          subnet_id,
+          USER_INITIAL_TOKENS,
+        )
+      );
+  
+      let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+      let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+  
+      // Validate initial deposit
+      let user_balance = Network::convert_to_balance(
+        AccountSubnetDelegateStakeShares::<Test>::get(&user, subnet_id),
+        total_subnet_delegated_stake_shares,
+        total_subnet_delegated_stake_balance
+      );
+      log::error!("USER_INITIAL_TOKENS  {:?}", USER_INITIAL_TOKENS);
+      log::error!("user_balance         {:?}", user_balance);
+      let loss = 1.0 - user_balance as f64 / USER_INITIAL_TOKENS as f64;
+      log::error!("Initial Deposit   {}", USER_INITIAL_TOKENS as f64 / 1e+18 as f64);
+      log::error!("Resulting Balance {}", user_balance as f64 / 1e+18 as f64);
+      log::error!("Loss              {}", loss);
+
+      log::error!(" ");
+
+
+    }
     // assert!(false);
+
   });
 }
 
@@ -1559,5 +1609,7 @@ fn test_donation_attack_simulation() {
     let attacker_final_balance = Balances::free_balance(&attacker);
 
     assert!(attacker_final_balance < ATTACKER_INITIAL_TOKENS);
+
+    // assert!(false);
   });
 }

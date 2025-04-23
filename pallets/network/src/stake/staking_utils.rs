@@ -17,6 +17,8 @@ use super::*;
 use sp_core::U256;
 
 impl<T: Config> Pallet<T> {
+  /// Min liquidity/shares in any pool
+  /// Used to mint dead shares on first deposit
   pub const MIN_LIQUIDITY: u128 = 1000;
   
   pub fn add_balance_to_unbonding_ledger(
@@ -140,6 +142,14 @@ impl<T: Config> Pallet<T> {
     input.try_into().ok()
   }
   
+  /// Convert TENSOR balance to shares in vault
+  ///
+  /// # Arguments
+  ///
+  /// * `balance` - Amount of TENSOR to convert to shares.
+  /// * `total_shares` - Total shares in the vault.
+  /// * `total_balance` - Total balance of TENSOR in the vault.
+  ///
   pub fn convert_to_shares(
     balance: u128,
     total_shares: u128,
@@ -157,6 +167,14 @@ impl<T: Config> Pallet<T> {
     shares.try_into().unwrap_or(u128::MAX)
   }
   
+  /// Convert vault shares to TENSOR balance
+  ///
+  /// # Arguments
+  ///
+  /// * `shares` - Amount of shares to convert to TENSOR.
+  /// * `total_shares` - Total shares in the vault.
+  /// * `total_balance` - Total balance of TENSOR in the vault.
+  ///
   pub fn convert_to_balance(
     shares: u128,
     total_shares: u128,
