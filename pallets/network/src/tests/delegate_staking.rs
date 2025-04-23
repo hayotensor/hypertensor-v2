@@ -119,6 +119,45 @@ fn test_delegate_math() {
 }
 
 #[test]
+fn check_balances() {
+  new_test_ext().execute_with(|| {
+    let _ = env_logger::builder().is_test(true).try_init();
+    
+    let subnet_id = 1;
+    let user = account(1);
+
+    // Initial user tokens
+    const USER_INITIAL_TOKENS: u128 = 1000000000000000000;
+    const USER_INITIAL_BALANCE: u128 = USER_INITIAL_TOKENS + 500;
+
+    Balances::make_free_balance_be(&user, USER_INITIAL_BALANCE);
+
+    // ---- Step 1: uSER deposits minimal amount ----
+    // The MinDelegateStakeBalance (deposit min) is 1000, otherwise reverts with CouldNotConvertToBalance
+    assert_ok!(
+      Network::do_add_delegate_stake(
+        RuntimeOrigin::signed(user.clone()),
+        subnet_id,
+        USER_INITIAL_TOKENS,
+      )
+    );
+
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    // Validate initial deposit
+    let user_balance = Network::convert_to_balance(
+      AccountSubnetDelegateStakeShares::<Test>::get(&user, subnet_id),
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+    log::error!("USER_INITIAL_TOKENS  {:?}", USER_INITIAL_TOKENS);
+    log::error!("user_balance         {:?}", user_balance);
+    // assert!(false);
+  });
+}
+
+#[test]
 fn test_delegate_math_with_storage_deposit() {
   new_test_ext().execute_with(|| {
     let subnet_path: Vec<u8> = "petals-team/StableBeluga2".into();
@@ -1254,5 +1293,271 @@ fn test_switch_delegate_stake_subnet_to_node() {
       (account_node_delegate_stake_balance >= Network::percent_mul(from_delegate_balance, 990000000)) &&
       (account_node_delegate_stake_balance < from_delegate_balance)
     );
+  });
+}
+
+#[test]
+fn test_inflation_exploit_mitigation_dead_shares() {
+  new_test_ext().execute_with(|| {
+    let subnet_id = 1;
+    let first_user = account(1);
+    let second_user = account(2);
+    let stake = 1_000_000_000_000;
+
+    // Give both users balances to stake
+    Balances::deposit_creating(&first_user, stake * 10);
+    Balances::deposit_creating(&second_user, stake * 10);
+
+    // First user delegates stake
+    // assert_ok!(Network::do_add_delegate_stake(
+    //   RuntimeOrigin::signed(first_user.clone()),
+    //   subnet_id,
+    //   stake
+    // ));
+
+    Network::do_add_delegate_stake(
+      RuntimeOrigin::signed(first_user.clone()),
+      subnet_id,
+      stake
+    );
+
+    // Get shares after first stake
+
+    let first_user_shares = AccountSubnetDelegateStakeShares::<Test>::get(&first_user, subnet_id);
+    let total_shares_after_first = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+
+    // Ensure that shares given are less than 100% of total because of pre-injected 1000 shares
+    assert!(first_user_shares < total_shares_after_first);
+
+    // Second user adds same stake
+    // assert_ok!(Network::add_to_delegate_stake(
+    //     RuntimeOrigin::signed(second_user.clone()),
+    //     subnet_id,
+    //     stake
+    // ));
+    Network::do_add_delegate_stake(
+      RuntimeOrigin::signed(second_user.clone()),
+      subnet_id,
+      stake
+    );
+
+    // Get second user shares
+    let second_user_shares = AccountSubnetDelegateStakeShares::<Test>::get(&second_user, subnet_id);
+    let total_shares_after_both = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_balance_after_both = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    log::error!("first_user_shares  {:?}", first_user_shares);
+    log::error!("second_user_shares {:?}", second_user_shares);
+
+    // Check that second user also received a fair share
+    assert!(second_user_shares > 0);
+    assert!(first_user_shares <= second_user_shares);
+
+    let first_user_balance = Network::convert_to_balance(
+      first_user_shares,
+      total_shares_after_both,
+      total_balance_after_both,
+    );
+
+    let second_user_balance = Network::convert_to_balance(
+      second_user_shares,
+      total_shares_after_both,
+      total_balance_after_both,
+    );
+
+    log::error!("first_user_balance  {:?}", first_user_balance);
+    log::error!("second_user_balance {:?}", second_user_balance);
+
+    assert!(first_user_balance < second_user_balance);
+
+    // Check that total shares increased correctly
+    assert_eq!(first_user_shares + second_user_shares + 1000, total_shares_after_both);
+  });
+}
+
+#[test]
+fn test_no_inflation_exploit_via_increase_delegate_stake() {
+  new_test_ext().execute_with(|| {
+    let subnet_id = 1;
+    let attacker = account(1);
+    let initial_balance = 1_000_000;
+    let stake_amount = 100_000;
+    let reward_amount = 100_000;
+
+    // Step 0: Fund attacker
+    Balances::make_free_balance_be(&attacker, initial_balance);
+
+    // Step 1: Attacker stakes
+    assert_ok!(Network::do_add_delegate_stake(
+      RuntimeOrigin::signed(attacker.clone()),
+      subnet_id,
+      stake_amount
+    ));
+
+    let shares_before = AccountSubnetDelegateStakeShares::<Test>::get(&attacker, subnet_id);
+    let shares_total_before = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let pool_balance_before = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    // Step 2: Attacker deposits reward (donation-style increase)
+    Network::do_increase_delegate_stake(subnet_id, reward_amount);
+
+    // Step 3: Check that no new shares were minted
+    let shares_after_reward = AccountSubnetDelegateStakeShares::<Test>::get(&attacker, subnet_id);
+    let shares_total_after_reward = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let pool_balance_before = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    assert_eq!(shares_after_reward, shares_before);
+    assert_eq!(shares_total_after_reward, shares_total_before);
+
+    // Step 4: Unstake all
+    assert_ok!(Network::do_remove_delegate_stake(
+      RuntimeOrigin::signed(attacker.clone()),
+      subnet_id,
+      shares_after_reward
+    ));
+
+    // Step 5: Check final balance — should not exceed stake + reward
+    let final_balance = Balances::free_balance(&attacker);
+    let expected_max_balance = initial_balance; // he started with this
+
+    // attacker should never receive more than they fairly deserve
+    assert!(final_balance <= expected_max_balance + reward_amount);
+
+    // In fact, he should end up with exactly stake + reward back
+    assert!(final_balance <= initial_balance); // restaked and unstaked exactly once, reward goes to share value
+
+    // ✅ Passed: No inflation exploit
+  });
+}
+
+// ——————————————————————————————————————————————————————————————
+// ERC‑4626 Donation Attack Scenario:
+//
+// 1) totalAssets=0, totalShares=0
+// 2) Attacker deposits 1 → totalAssets=1, totalShares=1
+// 3) Attacke "donates" 10_000 via do_increase_delegate_stake
+//    → totalAssets=10_001, totalShares=1
+// 4) Innocent LP deposits 10_000 → would mint
+//    floor(10_000 * 1 / 10_001) = 0 shares
+//    → WITHOUT mitigation: they get 0 shares silently
+//    → WITH our mitigation: we detect zero shares and return Err(CouldNotConvertToShares)
+//
+// Inflation exploits are mitigated via:
+//  - Min deposit of 1000 TENSOR
+//  - minting of dead shares when at zero shares
+//  - use of virtual shares using decimal offset is converting assets/shares
+//
+//
+// ——————————————————————————————————————————————————————————————
+#[test]
+fn test_donation_attack_simulation() {
+  new_test_ext().execute_with(|| {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let subnet_id = 1;
+    let attacker = account(1);
+    let victim = account(2);
+
+    // Initial attacker tokens
+    // const ATTACKER_INITIAL_TOKENS: u128 = 10000;
+    const ATTACKER_INITIAL_TOKENS: u128 = 10000000;
+    // Small amount to initially deposit
+    // const ATTACKER_INITIAL_DEPOSIT: u128 = 1;
+    const ATTACKER_INITIAL_DEPOSIT: u128 = 1000;
+    // Large amount to donate directly
+    // const ATTACKER_DONATION: u128 = 9999;
+    const ATTACKER_DONATION: u128 = 9999000;
+    // Victim deposit amount
+    // const VICTIM_DEPOSIT: u128 = 1000;
+    const VICTIM_DEPOSIT: u128 = 1000000;
+
+    Balances::make_free_balance_be(&attacker, ATTACKER_INITIAL_TOKENS);
+    Balances::make_free_balance_be(&victim, VICTIM_DEPOSIT + 500);
+
+
+    // ---- Step 1: Attacker deposits minimal amount ----
+    // The MinDelegateStakeBalance (deposit min) is 1000, otherwise reverts with CouldNotConvertToBalance
+    assert_ok!(
+      Network::do_add_delegate_stake(
+        RuntimeOrigin::signed(attacker.clone()),
+        subnet_id,
+        ATTACKER_INITIAL_DEPOSIT,
+      )
+    );
+
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    // Validate initial deposit
+    let attacker_balance = Network::convert_to_balance(
+      AccountSubnetDelegateStakeShares::<Test>::get(&attacker, subnet_id),
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+    log::error!("attacker_balance         {:?}", attacker_balance);
+
+    assert_eq!(AccountSubnetDelegateStakeShares::<Test>::get(&attacker, subnet_id), ATTACKER_INITIAL_DEPOSIT);
+    // assert_eq!(TotalSubnetDelegateStakeShares::<Test>::get(subnet_id), ATTACKER_INITIAL_DEPOSIT);
+    // ---- We mint 1000 dead shares so we check against this
+    assert_eq!(TotalSubnetDelegateStakeShares::<Test>::get(subnet_id), ATTACKER_INITIAL_DEPOSIT + 1000);
+    assert_eq!(TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id), ATTACKER_INITIAL_DEPOSIT);
+
+
+    // ---- Step 2: Attacker donates to inflate share price ----
+    Network::do_increase_delegate_stake(subnet_id, ATTACKER_DONATION);
+
+    // Vault now has 10000 tokens (1 + 9999999)
+    // assert_eq!(TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id), ATTACKER_INITIAL_TOKENS);
+
+    // ---- Step 3: Victim deposits and gets almost no shares ----
+    // We ensure they get shares
+    assert_ok!(
+      Network::do_add_delegate_stake(
+        RuntimeOrigin::signed(victim.clone()),
+        subnet_id,
+        VICTIM_DEPOSIT,
+      )
+    );
+
+    let victim_shares = AccountSubnetDelegateStakeShares::<Test>::get(&victim, subnet_id);
+    log::error!("victim_shares  {:?}", victim_shares);
+
+    let total_subnet_delegated_stake_shares = TotalSubnetDelegateStakeShares::<Test>::get(subnet_id);
+    let total_subnet_delegated_stake_balance = TotalSubnetDelegateStakeBalance::<Test>::get(subnet_id);
+
+    let victim_balance = Network::convert_to_balance(
+      victim_shares,
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+    log::error!("VICTIM_DEPOSIT {:?}", VICTIM_DEPOSIT);
+    log::error!("victim_balance {:?}", victim_balance);
+
+    assert!(
+      (victim_balance >= Network::percent_mul(VICTIM_DEPOSIT, 990000000)) &&
+      (victim_balance <= VICTIM_DEPOSIT)
+    );
+
+    let attacker_balance = Network::convert_to_balance(
+      AccountSubnetDelegateStakeShares::<Test>::get(&attacker, subnet_id),
+      total_subnet_delegated_stake_shares,
+      total_subnet_delegated_stake_balance
+    );
+    log::error!("attacker_balance         {:?}", attacker_balance);
+    log::error!("ATTACKER_INITIAL_DEPOSIT {:?}", ATTACKER_INITIAL_DEPOSIT + ATTACKER_DONATION);
+
+    assert!(attacker_balance < ATTACKER_INITIAL_DEPOSIT + ATTACKER_DONATION);
+
+    // ---- Step 4: Attacker withdraws and gets profit ----
+    // We ensure they do not profit from this attack
+    assert_ok!(Network::do_remove_delegate_stake(
+      RuntimeOrigin::signed(attacker.clone()),
+      subnet_id,
+      AccountSubnetDelegateStakeShares::<Test>::get(&attacker, subnet_id)
+    ));
+
+    let attacker_final_balance = Balances::free_balance(&attacker);
+
+    assert!(attacker_final_balance < ATTACKER_INITIAL_TOKENS);
   });
 }

@@ -17,6 +17,8 @@ use super::*;
 use sp_core::U256;
 
 impl<T: Config> Pallet<T> {
+  pub const MIN_LIQUIDITY: u128 = 1000;
+  
   pub fn add_balance_to_unbonding_ledger(
     coldkey: &T::AccountId,
     amount: u128,

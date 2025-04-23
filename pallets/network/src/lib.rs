@@ -400,6 +400,7 @@ pub mod pallet {
 		NoStakeUnbondingsOrCooldownNotMet,
 		// Conversion to balance was zero
 		InsufficientBalanceToSharesConversion,
+		MinDelegateStake,
 
 		/// Not enough balance to withdraw bid for proposal
 		NotEnoughBalanceToBid,
@@ -2459,6 +2460,11 @@ pub mod pallet {
 				Error::<T>::SubnetNotExist
 			);
 
+			ensure!(
+				amount >= MinDelegateStakeBalance::<T>::get(),
+				Error::<T>::MinDelegateStake
+			);
+
 			let amount_as_balance = Self::u128_to_balance(amount);
 
 			ensure!(
@@ -2612,6 +2618,11 @@ pub mod pallet {
 				Error::<T>::SubnetNodeNotExist
 			);
 			
+			ensure!(
+				amount >= MinDelegateStakeBalance::<T>::get(),
+				Error::<T>::MinDelegateStake
+			);
+
 			let amount_as_balance = Self::u128_to_balance(amount);
 
 			ensure!(
